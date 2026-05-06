@@ -1,0 +1,86 @@
+import Link from "next/link";
+import { signUp } from "@/app/auth/actions";
+
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const params = await searchParams;
+
+  return (
+    <main className="flex min-h-screen items-center justify-center p-4">
+      <form action={signUp} className="w-full max-w-sm space-y-4">
+        <h1 className="text-2xl font-bold">Creer un compte</h1>
+        {params.error ? (
+          <p className="rounded-lg bg-red-950/50 px-3 py-2 text-sm text-red-300">
+            {params.error}
+          </p>
+        ) : null}
+        <input
+          type="text"
+          name="display_name"
+          placeholder="Prenom"
+          required
+          autoComplete="given-name"
+          className="w-full rounded-lg bg-zinc-800 px-3 py-2 text-zinc-50 placeholder-zinc-500 outline-none focus:ring-2 focus:ring-toi"
+        />
+        <fieldset>
+          <legend className="mb-2 text-sm text-zinc-400">
+            Couleur de profil
+          </legend>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-zinc-800 px-3 py-2 text-sm has-[:checked]:bg-toi has-[:checked]:text-zinc-950">
+              <input
+                type="radio"
+                name="color_role"
+                value="toi"
+                defaultChecked
+                className="sr-only"
+              />
+              Toi (orange)
+            </label>
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-zinc-800 px-3 py-2 text-sm has-[:checked]:bg-elle has-[:checked]:text-zinc-950">
+              <input
+                type="radio"
+                name="color_role"
+                value="elle"
+                className="sr-only"
+              />
+              Elle (violet)
+            </label>
+          </div>
+        </fieldset>
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          required
+          autoComplete="email"
+          className="w-full rounded-lg bg-zinc-800 px-3 py-2 text-zinc-50 placeholder-zinc-500 outline-none focus:ring-2 focus:ring-toi"
+        />
+        <input
+          type="password"
+          name="password"
+          placeholder="Mot de passe (min. 6 caracteres)"
+          required
+          minLength={6}
+          autoComplete="new-password"
+          className="w-full rounded-lg bg-zinc-800 px-3 py-2 text-zinc-50 placeholder-zinc-500 outline-none focus:ring-2 focus:ring-toi"
+        />
+        <button
+          type="submit"
+          className="w-full rounded-lg bg-toi px-4 py-2 font-medium text-zinc-950 transition hover:bg-toi/90"
+        >
+          Creer mon compte
+        </button>
+        <p className="text-center text-sm text-zinc-400">
+          Deja inscrit ?{" "}
+          <Link href="/login" className="text-toi hover:underline">
+            Se connecter
+          </Link>
+        </p>
+      </form>
+    </main>
+  );
+}
