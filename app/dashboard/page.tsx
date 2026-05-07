@@ -7,29 +7,38 @@ export default async function DashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
-  const { data: profile } = await supabase
+  const profileQuery = await supabase
     .from("profiles")
     .select("display_name, color_role")
     .eq("id", user.id)
     .single();
+  const profile = profileQuery.data;
 
-  const { data: member } = await supabase
+  const memberQuery = await supabase
     .from("couple_members")
     .select("couple_id")
     .eq("profile_id", user.id)
     .maybeSingle();
+  const member = memberQuery.data;
 
-  if (!member) redirect("/onboarding");
+  if (!member) {
+    redirect("/onboarding");
+  }
 
-  const { data: partners } = await supabase
+  const coupleId: string = member.couple_id;
+
+  const partnersQuery = await supabase
     .from("couple_members")
     .select("profile_id, profiles ( display_name, color_role )")
-    .eq("couple_id", member.couple_id)
+    .eq("couple_id", coupleId)
     .neq("profile_id", user.id);
 
-  const partner = partners?.[0]?.profiles;
+  const partner = partnersQuery.data?.[0]?.profiles ?? null;
+
   const colorClass =
     profile?.color_role === "elle" ? "text-elle" : "text-toi";
 
@@ -48,7 +57,7 @@ export default async function DashboardPage() {
             <div className="mt-2 rounded-lg bg-zinc-900 p-3 text-sm">
               <p className="text-zinc-400">Code couple a partager :</p>
               <code className="mt-1 block break-all font-mono text-xs text-zinc-200">
-                {member.couple_id}
+                {coupleId}
               </code>
             </div>
           )}
