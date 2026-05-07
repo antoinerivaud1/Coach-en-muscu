@@ -351,7 +351,7 @@ export type Database = {
     }
     Functions: {
       accessible_profile_ids: { Args: never; Returns: string[] }
-      create_couple: { Args: { couple_name?: string }; Returns: string }
+      create_couple: { Args: { couple_name: string }; Returns: string }
       join_couple: { Args: { target_couple_id: string }; Returns: string }
       user_couple_id: { Args: never; Returns: string }
     }
