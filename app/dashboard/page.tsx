@@ -2,6 +2,22 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/auth/actions";
 
+type ColorRole = "toi" | "elle";
+
+type ProfileRow = {
+  display_name: string;
+  color_role: ColorRole;
+};
+
+type MemberRow = {
+  couple_id: string;
+};
+
+type PartnerRow = {
+  profile_id: string;
+  profiles: ProfileRow | null;
+};
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
@@ -11,33 +27,37 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const profileQuery = await supabase
+  const profileResult = await supabase
     .from("profiles")
     .select("display_name, color_role")
     .eq("id", user.id)
-    .single();
-  const profile = profileQuery.data;
+    .returns<ProfileRow[]>()
+    .maybeSingle();
+  const profile = profileResult.data;
 
-  const memberQuery = await supabase
+  const memberResult = await supabase
     .from("couple_members")
     .select("couple_id")
     .eq("profile_id", user.id)
+    .returns<MemberRow[]>()
     .maybeSingle();
-  const member = memberQuery.data;
+  const member = memberResult.data;
 
   if (!member) {
     redirect("/onboarding");
   }
 
-  const coupleId: string = member.couple_id;
+  const coupleId = member.couple_id;
 
-  const partnersQuery = await supabase
+  const partnersResult = await supabase
     .from("couple_members")
     .select("profile_id, profiles ( display_name, color_role )")
     .eq("couple_id", coupleId)
-    .neq("profile_id", user.id);
+    .neq("profile_id", user.id)
+    .returns<PartnerRow[]>();
 
-  const partner = partnersQuery.data?.[0]?.profiles ?? null;
+  const firstPartner = partnersResult.data?.[0];
+  const partner = firstPartner?.profiles ?? null;
 
   const colorClass =
     profile?.color_role === "elle" ? "text-elle" : "text-toi";

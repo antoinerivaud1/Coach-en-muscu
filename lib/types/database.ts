@@ -348,10 +348,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      accessible_profile_ids: { Args: never; Returns: string[] }
+      accessible_profile_ids: { Args: Record<PropertyKey, never>; Returns: string[] }
       create_couple: { Args: { couple_name?: string }; Returns: string }
       join_couple: { Args: { target_couple_id: string }; Returns: string }
-      user_couple_id: { Args: never; Returns: string }
+      user_couple_id: { Args: Record<PropertyKey, never>; Returns: string }
     }
     Enums: {
       color_role: "toi" | "elle"

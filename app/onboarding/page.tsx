@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createCoupleAction, joinCoupleAction } from "./actions";
 
+type MemberRow = {
+  couple_id: string;
+};
+
 export default async function OnboardingPage({
   searchParams,
 }: {
@@ -13,15 +17,20 @@ export default async function OnboardingPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
-  const { data: existingMember } = await supabase
+  const existingMemberResult = await supabase
     .from("couple_members")
     .select("couple_id")
     .eq("profile_id", user.id)
+    .returns<MemberRow[]>()
     .maybeSingle();
 
-  if (existingMember) redirect("/dashboard");
+  if (existingMemberResult.data) {
+    redirect("/dashboard");
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
