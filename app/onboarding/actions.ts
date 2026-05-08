@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-type CreateCoupleArgs = { couple_name?: string };
+type CreateCoupleArgs = { couple_name: string };
 type JoinCoupleArgs = { target_couple_id: string };
 
 export async function createCoupleAction(formData: FormData) {
