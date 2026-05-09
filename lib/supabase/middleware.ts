@@ -5,6 +5,14 @@ import type { Database } from "@/lib/types/database";
 const PUBLIC_PATHS = ["/login", "/signup", "/auth"];
 
 export async function updateSession(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  const isPublic =
+    path === "/" || PUBLIC_PATHS.some((p) => path.startsWith(p));
+
+  if (isPublic) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient<Database>(
@@ -32,11 +40,7 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
-  const isPublic =
-    path === "/" || PUBLIC_PATHS.some((p) => path.startsWith(p));
-
-  if (!user && !isPublic) {
+  if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
