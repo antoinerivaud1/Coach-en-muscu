@@ -184,7 +184,7 @@ export default function ProgramForm({ exercises, hasCouple }: Props) {
       const result = await createProgram({
         name: name.trim(),
         scope,
-        days: days.map((d, dayIdx) => ({
+        days: days.map((d) => ({
           name: d.name.trim(),
           exercises: d.exercises.map((e, exIdx) => ({
             ...e,

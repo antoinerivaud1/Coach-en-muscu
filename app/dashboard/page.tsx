@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/auth/actions";
 import { getProgramsForUser } from "@/lib/queries/programs";
+import BottomNav from "@/components/BottomNav";
 import type { ProgramWithDays } from "@/lib/queries/programs";
 
 type ColorRole = "toi" | "elle";
@@ -73,7 +74,7 @@ export default async function DashboardPage() {
   const programs: ProgramWithDays[] = (programsData ?? []) as ProgramWithDays[];
 
   return (
-    <main className="min-h-screen p-4">
+    <main className="min-h-screen p-4 pb-24">
       <header className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">
@@ -133,9 +134,9 @@ export default async function DashboardPage() {
           <ul className="space-y-3">
             {programs.map((program) => (
               <li key={program.id}>
-                <span
-                  className="block cursor-not-allowed rounded-lg bg-zinc-900 p-4 opacity-80"
-                  title="Page programme bientôt disponible"
+                <Link
+                  href={`/programs/${program.id}`}
+                  className="block rounded-lg bg-zinc-900 p-4 transition-colors hover:bg-zinc-800"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{program.name}</span>
@@ -149,12 +150,13 @@ export default async function DashboardPage() {
                     {program.program_days.length}{" "}
                     {program.program_days.length === 1 ? "jour" : "jours"}
                   </p>
-                </span>
+                </Link>
               </li>
             ))}
           </ul>
         )}
       </section>
+    <BottomNav />
     </main>
   );
 }
