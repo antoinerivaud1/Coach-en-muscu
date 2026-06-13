@@ -30,7 +30,7 @@ export async function signUp(formData: FormData) {
   const colorRole: ColorRole = colorRoleRaw === "elle" ? "elle" : "toi";
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -43,6 +43,13 @@ export async function signUp(formData: FormData) {
 
   if (error) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`);
+  }
+
+  // Si la confirmation email est désactivée, signUp renvoie une session:
+  // l'utilisateur est connecté, on l'envoie direct dans l'app.
+  if (data.session) {
+    revalidatePath("/", "layout");
+    redirect("/dashboard");
   }
 
   redirect("/auth/check-email");
