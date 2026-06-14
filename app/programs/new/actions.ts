@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireProfileId, getCoupleId } from "@/lib/profile";
 
 type ExerciseInput = {
   exercise_id: string;
@@ -30,27 +31,10 @@ export type CreateProgramResult =
 export async function createProgram(
   input: CreateProgramInput,
 ): Promise<CreateProgramResult> {
+  const profileId = await requireProfileId();
   const supabase = await createClient();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) {
-    return { success: false, error: "Non authentifié" };
-  }
-
-  const { data: memberData, error: memberError } = await supabase
-    .from("couple_members")
-    .select("couple_id")
-    .eq("profile_id", user.id)
-    .maybeSingle();
-
-  if (memberError) {
-    return { success: false, error: memberError.message };
-  }
-
-  const coupleId = memberData?.couple_id ?? null;
+  const coupleId = await getCoupleId(supabase, profileId);
 
   if (input.scope === "couple" && !coupleId) {
     return {
@@ -62,7 +46,7 @@ export async function createProgram(
   const programInsert =
     input.scope === "couple"
       ? { name: input.name, couple_id: coupleId, owner_profile_id: null }
-      : { name: input.name, couple_id: null, owner_profile_id: user.id };
+      : { name: input.name, couple_id: null, owner_profile_id: profileId };
 
   const { data: program, error: programError } = await supabase
     .from("programs")

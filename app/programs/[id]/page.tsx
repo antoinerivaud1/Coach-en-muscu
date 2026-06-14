@@ -1,6 +1,7 @@
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requireProfileId } from "@/lib/profile";
 import { getProgramWithDays } from "@/lib/queries/programs";
 import type { ProgramFull, ProgramDayFull } from "@/lib/queries/programs";
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
@@ -12,14 +13,8 @@ export default async function ProgramDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  await requireProfileId();
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/login");
-  }
 
   const { data } = await getProgramWithDays(supabase, id);
   const program = data as ProgramFull | null;

@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requireProfileId, getCoupleId, getCoupleProfileIds } from "@/lib/profile";
 import { getHistory } from "@/lib/queries/sessions";
 import type { HistorySessionRow } from "@/lib/queries/sessions";
 import { formatDateLong } from "@/lib/utils/training";
@@ -20,18 +20,13 @@ const FEEDBACK_LABELS: Record<string, string> = {
 };
 
 export default async function HistoryPage() {
+  const profileId = await requireProfileId();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/login");
-  }
 
-  const { data: accessibleIds } = await supabase
-    .rpc("accessible_profile_ids")
-    .returns<string[]>();
-  const ids = accessibleIds ?? [user.id];
+  const coupleId = await getCoupleId(supabase, profileId);
+  const ids = coupleId
+    ? await getCoupleProfileIds(supabase, coupleId)
+    : [profileId];
 
   const { data: profilesData } = await supabase
     .from("profiles")

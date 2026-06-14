@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireProfileId, getCurrentProfileId } from "@/lib/profile";
 import type { Database } from "@/lib/types/database";
 
 type Feedback = Database["public"]["Enums"]["session_feedback"];
@@ -28,16 +29,10 @@ export type FinishSessionResult =
 export async function finishSession(
   input: FinishSessionInput,
 ): Promise<FinishSessionResult> {
+  const profileId = await requireProfileId();
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: "Non authentifié" };
-  }
-
-  // Vérifie que la séance appartient bien à l'utilisateur.
+  // Vérifie que la séance appartient bien au profil courant.
   const { data: session, error: sessionError } = await supabase
     .from("sessions")
     .select("id, profile_id")
@@ -47,7 +42,7 @@ export async function finishSession(
   if (sessionError) {
     return { success: false, error: sessionError.message };
   }
-  if (!session || session.profile_id !== user.id) {
+  if (!session || session.profile_id !== profileId) {
     return { success: false, error: "Séance introuvable" };
   }
 
@@ -102,17 +97,15 @@ export async function finishSession(
 
 export async function deleteSession(formData: FormData) {
   const sessionId = String(formData.get("session_id") ?? "").trim();
+  const profileId = await getCurrentProfileId();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user || !sessionId) return;
+  if (!profileId || !sessionId) return;
 
   await supabase
     .from("sessions")
     .delete()
     .eq("id", sessionId)
-    .eq("profile_id", user.id);
+    .eq("profile_id", profileId);
 
   revalidatePath("/history");
   revalidatePath("/progress");

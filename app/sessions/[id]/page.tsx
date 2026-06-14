@@ -1,6 +1,7 @@
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requireProfileId } from "@/lib/profile";
 import { getDayWithExercises } from "@/lib/queries/programs";
 import type { ProgramDayFull } from "@/lib/queries/programs";
 import {
@@ -41,13 +42,8 @@ export default async function SessionPage({
   const { id } = await params;
   const { edit } = await searchParams;
 
+  const profileId = await requireProfileId();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/login");
-  }
 
   const { data: sessionData } = await getSession(supabase, id);
   const session = sessionData as SessionRow | null;
@@ -55,7 +51,7 @@ export default async function SessionPage({
     notFound();
   }
 
-  const isMine = session.profile_id === user.id;
+  const isMine = session.profile_id === profileId;
 
   const { data: setsData } = await getSessionSets(supabase, id);
   const existingSets = (setsData ?? []) as SessionSetRow[];
@@ -82,7 +78,7 @@ export default async function SessionPage({
     const exerciseIds = programExercises.map((pe) => pe.exercise_id);
     const lastByExercise = await getLastSetsByExercise(
       supabase,
-      user.id,
+      profileId,
       exerciseIds,
       id,
     );

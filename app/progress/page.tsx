@@ -1,5 +1,9 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  requireProfileId,
+  getCoupleId,
+  getCoupleProfileIds,
+} from "@/lib/profile";
 import { getAllSetsForProgress } from "@/lib/queries/sessions";
 import type { ProgressRow } from "@/lib/queries/sessions";
 import {
@@ -18,20 +22,14 @@ export default async function ProgressPage({
   searchParams: Promise<{ profile?: string }>;
 }) {
   const { profile: profileParam } = await searchParams;
+  const profileId = await requireProfileId();
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Profils accessibles (moi + partenaire).
-  const { data: accessibleIds } = await supabase
-    .rpc("accessible_profile_ids")
-    .returns<string[]>();
-  const ids = accessibleIds ?? [user.id];
+  // Profils du couple (moi + partenaire).
+  const coupleId = await getCoupleId(supabase, profileId);
+  const ids = coupleId
+    ? await getCoupleProfileIds(supabase, coupleId)
+    : [profileId];
 
   const { data: profilesData } = await supabase
     .from("profiles")
@@ -41,7 +39,7 @@ export default async function ProgressPage({
   const profiles = profilesData ?? [];
 
   const selectedProfileId =
-    profileParam && ids.includes(profileParam) ? profileParam : user.id;
+    profileParam && ids.includes(profileParam) ? profileParam : profileId;
   const selectedProfile =
     profiles.find((p) => p.id === selectedProfileId) ?? null;
   const color = selectedProfile?.color_role === "elle" ? "#A855F7" : "#F97316";
