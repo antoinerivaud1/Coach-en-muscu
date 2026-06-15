@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfileId, getCoupleId } from "@/lib/profile";
+import type { Database } from "@/lib/types/database";
 
 type ExerciseInput = {
   exercise_id: string;
@@ -98,4 +99,71 @@ export async function createProgram(
 
   revalidatePath("/dashboard");
   return { success: true, programId: program.id };
+}
+
+type MuscleGroup = Database["public"]["Enums"]["muscle_group"];
+
+export type CreateExerciseResult =
+  | {
+      success: true;
+      exercise: {
+        id: string;
+        name: string;
+        muscle_group: MuscleGroup;
+        is_compound: boolean;
+        couple_id: string | null;
+      };
+    }
+  | { success: false; error: string };
+
+export async function createCustomExercise(input: {
+  name: string;
+  muscle_group: MuscleGroup;
+}): Promise<CreateExerciseResult> {
+  const profileId = await requireProfileId();
+  const supabase = await createClient();
+
+  const name = input.name.trim();
+  if (!name) {
+    return { success: false, error: "Le nom de l'exercice est requis" };
+  }
+
+  const coupleId = await getCoupleId(supabase, profileId);
+  if (!coupleId) {
+    return {
+      success: false,
+      error: "Tu dois être en couple pour créer un exercice perso",
+    };
+  }
+
+  // Évite les doublons (catalogue système ou exercices du couple).
+  const { data: dupes } = await supabase
+    .from("exercises")
+    .select("id")
+    .eq("name", name)
+    .or(`couple_id.is.null,couple_id.eq.${coupleId}`);
+  if (dupes && dupes.length > 0) {
+    return { success: false, error: "Un exercice porte déjà ce nom" };
+  }
+
+  const { data, error } = await supabase
+    .from("exercises")
+    .insert({
+      name,
+      muscle_group: input.muscle_group,
+      is_compound: false,
+      couple_id: coupleId,
+    })
+    .select("id, name, muscle_group, is_compound, couple_id")
+    .single();
+
+  if (error || !data) {
+    return {
+      success: false,
+      error: error?.message ?? "Erreur lors de la création de l'exercice",
+    };
+  }
+
+  revalidatePath("/programs/new");
+  return { success: true, exercise: data };
 }
