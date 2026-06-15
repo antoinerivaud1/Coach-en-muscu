@@ -116,7 +116,7 @@ export default function SessionLogger({
         if (Number.isFinite(reps) && reps > 0 && Number.isFinite(weight)) {
           payload.push({
             exercise_id: ex.exercise_id,
-            set_index: i,
+            set_index: i + 1,
             weight_kg: weight,
             reps,
           });
@@ -203,7 +203,7 @@ export default function SessionLogger({
                       <button
                         type="button"
                         onClick={() => step(ex.exercise_id, i, "weight", -2.5)}
-                        className="px-2 py-2 text-zinc-400 active:bg-zinc-700"
+                        className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-zinc-300 active:bg-zinc-700"
                         aria-label="Moins"
                       >
                         −
@@ -221,12 +221,12 @@ export default function SessionLogger({
                         onChange={(e) =>
                           updateField(ex.exercise_id, i, "weight", e.target.value)
                         }
-                        className="w-full min-w-0 bg-transparent py-2 text-center text-white focus:outline-none"
+                        className="w-full min-w-0 bg-transparent py-3 text-center text-lg text-white focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={() => step(ex.exercise_id, i, "weight", 2.5)}
-                        className="px-2 py-2 text-zinc-400 active:bg-zinc-700"
+                        className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-zinc-300 active:bg-zinc-700"
                         aria-label="Plus"
                       >
                         +
@@ -237,7 +237,7 @@ export default function SessionLogger({
                       <button
                         type="button"
                         onClick={() => step(ex.exercise_id, i, "reps", -1)}
-                        className="px-2 py-2 text-zinc-400 active:bg-zinc-700"
+                        className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-zinc-300 active:bg-zinc-700"
                         aria-label="Moins"
                       >
                         −
@@ -252,12 +252,12 @@ export default function SessionLogger({
                         onChange={(e) =>
                           updateField(ex.exercise_id, i, "reps", e.target.value)
                         }
-                        className="w-full min-w-0 bg-transparent py-2 text-center text-white focus:outline-none"
+                        className="w-full min-w-0 bg-transparent py-3 text-center text-lg text-white focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={() => step(ex.exercise_id, i, "reps", 1)}
-                        className="px-2 py-2 text-zinc-400 active:bg-zinc-700"
+                        className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-zinc-300 active:bg-zinc-700"
                         aria-label="Plus"
                       >
                         +
