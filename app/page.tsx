@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAllProfiles } from "@/lib/profile";
 import { selectProfile } from "./actions";
+import OnboardingPhoto from "@/components/OnboardingPhoto";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -41,6 +42,8 @@ export default async function Home() {
             );
           })}
         </div>
+
+        <OnboardingPhoto />
 
         <p className="mt-8 text-center text-xs text-zinc-600">
           Pas de mot de passe : choisis simplement ton profil.
