@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { finishSession, type LoggedSet } from "./actions";
 import type { LastExerciseData } from "@/lib/queries/sessions";
 import { formatWeight, formatDateShort } from "@/lib/utils/training";
+import BackButton from "@/components/BackButton";
 
 type Feedback = "easy" | "normal" | "hard" | "failure";
 
@@ -150,6 +151,9 @@ export default function SessionLogger({
   return (
     <div className="mx-auto max-w-lg pb-32">
       <div className="sticky top-0 z-10 -mx-4 bg-zinc-950/90 px-4 py-3 backdrop-blur">
+        <div className="mb-1">
+          <BackButton label="Quitter" />
+        </div>
         <h1 className="text-xl font-bold">{dayName}</h1>
         <p className="text-sm text-zinc-400">
           Séance en cours · {completedCount}/{exercises.length} exos remplis
