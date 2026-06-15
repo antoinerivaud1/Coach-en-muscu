@@ -89,11 +89,15 @@ export default async function SessionPage({
       target_sets: pe.target_sets,
       target_reps_min: pe.target_reps_min,
       target_reps_max: pe.target_reps_max,
+      rest_seconds: pe.rest_seconds,
       last: lastByExercise[pe.exercise_id] ?? null,
     }));
 
     // Pré-remplissage des champs.
-    const initialSets: Record<string, { weight: string; reps: string }[]> = {};
+    const initialSets: Record<
+      string,
+      { weight: string; reps: string; isWarmup: boolean }[]
+    > = {};
     const existingByExercise: Record<string, SessionSetRow[]> = {};
     for (const s of existingSets) {
       (existingByExercise[s.exercise_id] ??= []).push(s);
@@ -107,13 +111,19 @@ export default async function SessionPage({
           .map((s) => ({
             weight: formatWeight(s.weight_kg),
             reps: String(s.reps),
+            isWarmup: s.is_warmup,
           }));
       } else {
+        const last = lastByExercise[pe.exercise_id] ?? null;
         const count = Math.max(1, pe.target_sets);
-        initialSets[pe.exercise_id] = Array.from({ length: count }, () => ({
-          weight: "",
-          reps: "",
-        }));
+        initialSets[pe.exercise_id] = Array.from({ length: count }, (_, i) => {
+          const ls = last?.sets[i];
+          return {
+            weight: ls ? formatWeight(ls.weight_kg) : "",
+            reps: ls ? String(ls.reps) : "",
+            isWarmup: false,
+          };
+        });
       }
     }
 
@@ -124,6 +134,7 @@ export default async function SessionPage({
           dayName={day.name}
           exercises={exercises}
           initialSets={initialSets}
+          editing={existingSets.length > 0}
         />
       </main>
     );
@@ -170,7 +181,9 @@ export default async function SessionPage({
   // Pour chaque exercice: best e1RM de cette séance vs meilleur antérieur.
   const prByExercise: Record<string, boolean> = {};
   for (const exId of Object.keys(setsByExercise)) {
-    const thisBest = bestE1RM(setsByExercise[exId]!);
+    const thisBest = bestE1RM(
+      setsByExercise[exId]!.filter((s) => !s.is_warmup),
+    );
     let priorBest = 0;
     for (const row of allSets) {
       if (row.exercise_id !== exId) continue;
@@ -183,7 +196,7 @@ export default async function SessionPage({
   }
 
   const orderedExerciseIds = Object.keys(setsByExercise);
-  const sessionVolume = totalVolume(existingSets);
+  const sessionVolume = totalVolume(existingSets.filter((s) => !s.is_warmup));
   const prCount = Object.values(prByExercise).filter(Boolean).length;
   const durationMin = session.duration_seconds
     ? Math.round(session.duration_seconds / 60)
@@ -251,13 +264,20 @@ export default async function SessionPage({
                   {rows.map((r) => (
                     <li
                       key={r.id}
-                      className="rounded-lg bg-zinc-800 px-3 py-1.5 text-sm"
+                      className={`rounded-lg px-3 py-1.5 text-sm ${
+                        r.is_warmup
+                          ? "bg-zinc-800/50 text-zinc-500"
+                          : "bg-zinc-800"
+                      }`}
                     >
                       <span className="font-medium">
                         {formatWeight(r.weight_kg)}
                       </span>
                       <span className="text-zinc-500"> kg × </span>
                       <span className="font-medium">{r.reps}</span>
+                      {r.is_warmup && (
+                        <span className="ml-1 text-[10px] uppercase">éch.</span>
+                      )}
                     </li>
                   ))}
                 </ul>

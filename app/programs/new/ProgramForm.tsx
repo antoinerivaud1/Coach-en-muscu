@@ -2,13 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createProgram, createCustomExercise } from "./actions";
+import { createProgram, createCustomExercise, updateProgram } from "./actions";
 import type { SystemExercise } from "@/lib/queries/exercises";
 
 type Props = {
   exercises: SystemExercise[];
   hasCouple: boolean;
   canCreateExercise: boolean;
+  mode?: "create" | "edit";
+  programId?: string;
+  initialName?: string;
+  initialScope?: "individual" | "couple";
+  initialDays?: DayEntry[];
 };
 
 type ExerciseEntry = {
@@ -20,6 +25,7 @@ type ExerciseEntry = {
 };
 
 type DayEntry = {
+  id?: string;
   name: string;
   exercises: ExerciseEntry[];
 };
@@ -54,7 +60,13 @@ export default function ProgramForm({
   exercises,
   hasCouple,
   canCreateExercise,
+  mode = "create",
+  programId,
+  initialName,
+  initialScope,
+  initialDays,
 }: Props) {
+  const isEdit = mode === "edit";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isCreating, startCreate] = useTransition();
@@ -67,9 +79,15 @@ export default function ProgramForm({
   const [createError, setCreateError] = useState<string | null>(null);
 
   const [step, setStep] = useState<Step>(1);
-  const [name, setName] = useState("");
-  const [scope, setScope] = useState<"individual" | "couple">("individual");
-  const [days, setDays] = useState<DayEntry[]>([{ name: "", exercises: [] }]);
+  const [name, setName] = useState(initialName ?? "");
+  const [scope, setScope] = useState<"individual" | "couple">(
+    initialScope ?? "individual",
+  );
+  const [days, setDays] = useState<DayEntry[]>(
+    initialDays && initialDays.length > 0
+      ? initialDays
+      : [{ name: "", exercises: [] }],
+  );
   const [error, setError] = useState<string | null>(null);
 
   // Step 3 state: which day is currently being edited
@@ -194,24 +212,38 @@ export default function ProgramForm({
   function handleSubmit() {
     setError(null);
     startTransition(async () => {
-      const result = await createProgram({
-        name: name.trim(),
-        scope,
-        days: days.map((d) => ({
-          name: d.name.trim(),
-          exercises: d.exercises.map((e, exIdx) => ({
-            ...e,
-            order_index: exIdx,
-          })),
+      const mappedDays = days.map((d) => ({
+        id: d.id,
+        name: d.name.trim(),
+        exercises: d.exercises.map((e, exIdx) => ({
+          ...e,
+          order_index: exIdx,
         })),
-      });
+      }));
+
+      const result =
+        isEdit && programId
+          ? await updateProgram({
+              programId,
+              name: name.trim(),
+              scope,
+              days: mappedDays,
+            })
+          : await createProgram({
+              name: name.trim(),
+              scope,
+              days: mappedDays.map((d) => ({
+                name: d.name,
+                exercises: d.exercises,
+              })),
+            });
 
       if (!result.success) {
         setError(result.error);
         return;
       }
 
-      router.push("/dashboard");
+      router.push(isEdit && programId ? `/programs/${programId}` : "/dashboard");
     });
   }
 
@@ -260,7 +292,9 @@ export default function ProgramForm({
         {/* Step 1 — Name + scope */}
         {step === 1 && (
           <div className="space-y-6">
-            <h1 className="text-xl font-bold">Nouveau programme</h1>
+            <h1 className="text-xl font-bold">
+              {isEdit ? "Modifier le programme" : "Nouveau programme"}
+            </h1>
 
             <div className="space-y-2">
               <label className="block text-sm text-zinc-400">
@@ -728,7 +762,11 @@ export default function ProgramForm({
                 disabled={isPending}
                 className="flex-1 rounded-lg bg-toi py-3 font-semibold text-white disabled:opacity-50"
               >
-                {isPending ? "Création…" : "Créer le programme"}
+                {isPending
+                  ? "Enregistrement…"
+                  : isEdit
+                    ? "Enregistrer"
+                    : "Créer le programme"}
               </button>
             </div>
           </div>

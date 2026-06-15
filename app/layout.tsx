@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import PendingSync from "@/components/PendingSync";
 
 export const metadata: Metadata = {
   title: "Coach en Muscu",
@@ -33,6 +34,7 @@ export default function RootLayout({
     <html lang="fr">
       <body className="min-h-screen bg-zinc-950 text-zinc-50 antialiased">
         {children}
+        <PendingSync />
         <ServiceWorkerRegister />
       </body>
     </html>

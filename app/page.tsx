@@ -28,11 +28,12 @@ export default async function Home() {
                   }`}
                 >
                   <span
-                    className={`flex h-12 w-12 items-center justify-center rounded-full text-xl font-bold ${
+                    className={`flex h-12 w-12 items-center justify-center rounded-full text-2xl ${
                       isElle ? "bg-elle text-white" : "bg-toi text-white"
                     }`}
+                    aria-hidden
                   >
-                    {p.display_name.charAt(0)}
+                    {isElle ? "🤸‍♀️" : "🏋️‍♂️"}
                   </span>
                   <span className="text-lg font-semibold">
                     {p.display_name}
