@@ -10,9 +10,11 @@ import {
   bestE1RM,
   topWeight,
   formatDateShort,
+  estimatedOneRepMax,
 } from "@/lib/utils/training";
 import BottomNav from "@/components/BottomNav";
 import ProgressView, { type ExerciseSeries } from "./ProgressView";
+import StatsSummary, { type StatsData } from "./StatsSummary";
 
 type ProfileRow = { id: string; display_name: string; color_role: "toi" | "elle" };
 
@@ -53,13 +55,17 @@ export default async function ProgressPage({
   // Noms d'exercices.
   const exerciseIds = Array.from(new Set(allSets.map((s) => s.exercise_id)));
   const names: Record<string, string> = {};
+  const muscleByEx: Record<string, string> = {};
   if (exerciseIds.length > 0) {
     const { data: exData } = await supabase
       .from("exercises")
-      .select("id, name")
+      .select("id, name, muscle_group")
       .in("id", exerciseIds)
-      .returns<{ id: string; name: string }[]>();
-    for (const ex of exData ?? []) names[ex.id] = ex.name;
+      .returns<{ id: string; name: string; muscle_group: string }[]>();
+    for (const ex of exData ?? []) {
+      names[ex.id] = ex.name;
+      muscleByEx[ex.id] = ex.muscle_group;
+    }
   }
 
   // Groupe par exercice puis par séance.
@@ -85,6 +91,87 @@ export default async function ProgressPage({
       return { exercise_id: exId, name: names[exId] ?? "Exercice", points };
     })
     .sort((a, b) => b.points.length - a.points.length);
+
+  // ----- Statistiques résumées (profil sélectionné) -----
+  const sessionPerformedAt = new Map<string, string>();
+  for (const r of allSets) {
+    const at = r.sessions?.performed_at;
+    if (at) sessionPerformedAt.set(r.session_id, at);
+  }
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  let sessionsThisMonth = 0;
+  let sessionsLastMonth = 0;
+  for (const at of sessionPerformedAt.values()) {
+    const d = new Date(at);
+    if (d >= monthStart) sessionsThisMonth++;
+    else if (d >= prevMonthStart) sessionsLastMonth++;
+  }
+
+  let totalVolumeKg = 0;
+  let recordE1rm = 0;
+  let recordExercise = "";
+  const volumeByGroup: Record<string, number> = {};
+  for (const r of allSets) {
+    const vol = r.weight_kg * r.reps;
+    totalVolumeKg += vol;
+    const e = estimatedOneRepMax(r.weight_kg, r.reps);
+    if (e > recordE1rm) {
+      recordE1rm = e;
+      recordExercise = names[r.exercise_id] ?? "";
+    }
+    const g = muscleByEx[r.exercise_id] ?? "other";
+    volumeByGroup[g] = (volumeByGroup[g] ?? 0) + vol;
+  }
+  const totalSets = allSets.length;
+
+  const startOfWeek = (d: Date) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    const dow = (x.getDay() + 6) % 7;
+    x.setDate(x.getDate() - dow);
+    return x;
+  };
+  const thisMonday = startOfWeek(now);
+  const weekBuckets: { start: number; label: string; volume: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const wkStart = new Date(thisMonday);
+    wkStart.setDate(wkStart.getDate() - 7 * i);
+    weekBuckets.push({
+      start: wkStart.getTime(),
+      label: `${wkStart.getDate()}/${wkStart.getMonth() + 1}`,
+      volume: 0,
+    });
+  }
+  for (const r of allSets) {
+    const at = r.sessions?.performed_at;
+    if (!at) continue;
+    const ws = startOfWeek(new Date(at)).getTime();
+    const bucket = weekBuckets.find((b) => b.start === ws);
+    if (bucket) bucket.volume += r.weight_kg * r.reps;
+  }
+
+  const groupsTotal = Object.values(volumeByGroup).reduce((a, b) => a + b, 0);
+  const groups = Object.entries(volumeByGroup)
+    .map(([group, vol]) => ({
+      group,
+      pct: groupsTotal > 0 ? Math.round((vol / groupsTotal) * 100) : 0,
+    }))
+    .filter((g) => g.pct > 0)
+    .sort((a, b) => b.pct - a.pct);
+
+  const stats: StatsData = {
+    sessionsThisMonth,
+    sessionsDelta: sessionsThisMonth - sessionsLastMonth,
+    totalVolumeKg,
+    totalSets,
+    recordE1rm,
+    recordExercise,
+    weeks: weekBuckets.map((b) => ({ label: b.label, volume: b.volume })),
+    groups,
+  };
 
   return (
     <main className="min-h-screen p-4 pb-24">
@@ -113,6 +200,10 @@ export default async function ProgressPage({
               );
             })}
           </div>
+        )}
+
+        {allSets.length > 0 && (
+          <StatsSummary stats={stats} color={color} />
         )}
 
         <ProgressView series={series} color={color} />
