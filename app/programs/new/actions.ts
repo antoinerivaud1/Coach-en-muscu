@@ -167,3 +167,113 @@ export async function createCustomExercise(input: {
   revalidatePath("/programs/new");
   return { success: true, exercise: data };
 }
+
+export type UpdateProgramInput = {
+  programId: string;
+  name: string;
+  scope: "individual" | "couple";
+  days: (ProgramDayInput & { id?: string })[];
+};
+
+export async function updateProgram(
+  input: UpdateProgramInput,
+): Promise<CreateProgramResult> {
+  const profileId = await requireProfileId();
+  const supabase = await createClient();
+
+  const coupleId = await getCoupleId(supabase, profileId);
+  if (input.scope === "couple" && !coupleId) {
+    return {
+      success: false,
+      error: "Tu dois être en couple pour un programme partagé",
+    };
+  }
+
+  const { data: prog } = await supabase
+    .from("programs")
+    .select("id")
+    .eq("id", input.programId)
+    .maybeSingle();
+  if (!prog) {
+    return { success: false, error: "Programme introuvable" };
+  }
+
+  const programUpdate =
+    input.scope === "couple"
+      ? { name: input.name, couple_id: coupleId, owner_profile_id: null }
+      : { name: input.name, couple_id: null, owner_profile_id: profileId };
+
+  const { error: updErr } = await supabase
+    .from("programs")
+    .update(programUpdate)
+    .eq("id", input.programId);
+  if (updErr) {
+    return { success: false, error: updErr.message };
+  }
+
+  // Jours existants -> supprimer ceux retirés (les séances passées gardent
+  // leur lien grâce à on delete set null sur sessions.program_day_id).
+  const { data: existingDays } = await supabase
+    .from("program_days")
+    .select("id")
+    .eq("program_id", input.programId)
+    .returns<{ id: string }[]>();
+  const keepIds = new Set(
+    input.days.map((d) => d.id).filter((x): x is string => Boolean(x)),
+  );
+  const toDelete = (existingDays ?? [])
+    .map((d) => d.id)
+    .filter((id) => !keepIds.has(id));
+  if (toDelete.length > 0) {
+    const { error } = await supabase
+      .from("program_days")
+      .delete()
+      .in("id", toDelete);
+    if (error) return { success: false, error: error.message };
+  }
+
+  for (let i = 0; i < input.days.length; i++) {
+    const day = input.days[i]!;
+    let dayId = day.id;
+
+    if (dayId) {
+      const { error } = await supabase
+        .from("program_days")
+        .update({ name: day.name, order_index: i })
+        .eq("id", dayId);
+      if (error) return { success: false, error: error.message };
+      const { error: delEx } = await supabase
+        .from("program_exercises")
+        .delete()
+        .eq("program_day_id", dayId);
+      if (delEx) return { success: false, error: delEx.message };
+    } else {
+      const { data: created, error } = await supabase
+        .from("program_days")
+        .insert({ program_id: input.programId, name: day.name, order_index: i })
+        .select("id")
+        .single();
+      if (error || !created) {
+        return { success: false, error: error?.message ?? "Erreur jour" };
+      }
+      dayId = created.id;
+    }
+
+    for (const exercise of day.exercises) {
+      const { error } = await supabase.from("program_exercises").insert({
+        program_day_id: dayId,
+        exercise_id: exercise.exercise_id,
+        target_sets: exercise.target_sets,
+        target_reps_min: exercise.target_reps_min,
+        target_reps_max: exercise.target_reps_max,
+        rest_seconds: exercise.rest_seconds,
+        order_index: exercise.order_index,
+      });
+      if (error) return { success: false, error: error.message };
+    }
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/programs/${input.programId}`);
+  return { success: true, programId: input.programId };
+}

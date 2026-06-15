@@ -5,7 +5,8 @@ import { requireProfileId } from "@/lib/profile";
 import { getProgramWithDays } from "@/lib/queries/programs";
 import type { ProgramFull, ProgramDayFull } from "@/lib/queries/programs";
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
-import { startSession } from "./actions";
+import { startSession, deleteProgram } from "./actions";
+import ConfirmSubmit from "@/components/ConfirmSubmit";
 
 export default async function ProgramDetailPage({
   params,
@@ -48,6 +49,24 @@ export default async function ProgramDetailPage({
           {days.length} {days.length === 1 ? "jour" : "jours"} · choisis ta
           séance du jour
         </p>
+
+        <div className="mt-4 flex gap-3">
+          <Link
+            href={`/programs/${id}/edit`}
+            className="flex-1 rounded-lg bg-zinc-800 py-2.5 text-center text-sm font-semibold text-zinc-200"
+          >
+            Modifier
+          </Link>
+          <form action={deleteProgram} className="flex-1">
+            <input type="hidden" name="program_id" value={id} />
+            <ConfirmSubmit
+              message="Supprimer ce programme ? Les séances déjà enregistrées sont conservées."
+              className="w-full rounded-lg bg-zinc-800 py-2.5 text-sm font-semibold text-red-400"
+            >
+              Supprimer
+            </ConfirmSubmit>
+          </form>
+        </div>
 
         <div className="mt-6 space-y-4">
           {days.map((day) => {

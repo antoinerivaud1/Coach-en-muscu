@@ -13,6 +13,7 @@ export type LoggedSet = {
   set_index: number;
   weight_kg: number;
   reps: number;
+  is_warmup: boolean;
 };
 
 export type FinishSessionInput = {
@@ -68,7 +69,7 @@ export async function finishSession(
         set_index: s.set_index,
         weight_kg: s.weight_kg,
         reps: s.reps,
-        is_warmup: false,
+        is_warmup: s.is_warmup,
       })),
     );
     if (insertError) {
