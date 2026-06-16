@@ -6,6 +6,24 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCHS MANUELS À RÉAPPLIQUER APRÈS CHAQUE REGÉNÉRATION DU TYPEGEN (CM-7)
+//
+// Ce fichier est généré par le typegen Supabase. Deux points à connaître :
+//
+// 1. `create_couple.Args.couple_name` est forcé en `string` (obligatoire). Le
+//    typegen le sort parfois en optionnel (`couple_name?: string`) ; on le
+//    remet en requis pour que l'inférence du `rpc("create_couple", …)` exige
+//    bien l'argument. Si tu régénères les types, vérifie cette ligne.
+//
+// 2. `@supabase/supabase-js` est épinglé EXACTEMENT à `2.55.0` dans
+//    package.json (sans caret). Les versions intermédiaires 2.45→2.55 ont un
+//    bug d'inférence qui type le 2e argument de `rpc()` comme `undefined`
+//    (cf. https://www.answeroverflow.com/m/1409468021931511849). Avant de
+//    lever le pin, vérifier que le bug est officiellement corrigé :
+//    https://github.com/supabase/supabase-js/issues
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -351,6 +369,7 @@ export type Database = {
     }
     Functions: {
       accessible_profile_ids: { Args: never; Returns: string[] }
+      // couple_name : requis (patch manuel CM-7, voir note en tête de fichier)
       create_couple: { Args: { couple_name: string }; Returns: string }
       join_couple: { Args: { target_couple_id: string }; Returns: string }
       user_couple_id: { Args: never; Returns: string }
