@@ -8,6 +8,7 @@ import { formatWeight, formatDateShort } from "@/lib/utils/training";
 import BackButton from "@/components/BackButton";
 import ExerciseInfo from "@/components/ExerciseInfo";
 import { addPending } from "@/lib/pendingSessions";
+import { useWakeLock } from "@/hooks/useWakeLock";
 
 type Feedback = "easy" | "normal" | "hard" | "failure";
 
@@ -68,6 +69,9 @@ export default function SessionLogger({
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [offlineSaved, setOfflineSaved] = useState(false);
+
+  // Garde l'écran allumé pendant la séance (relâché au départ de l'écran).
+  useWakeLock(!offlineSaved);
 
   // ----- Minuteur de repos -----
   const [restRemaining, setRestRemaining] = useState<number | null>(null);
