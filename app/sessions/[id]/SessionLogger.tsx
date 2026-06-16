@@ -6,6 +6,7 @@ import { finishSession, type LoggedSet } from "./actions";
 import type { LastExerciseData } from "@/lib/queries/sessions";
 import { formatWeight, formatDateShort } from "@/lib/utils/training";
 import BackButton from "@/components/BackButton";
+import ExerciseInfo from "@/components/ExerciseInfo";
 import { addPending } from "@/lib/pendingSessions";
 
 type Feedback = "easy" | "normal" | "hard" | "failure";
@@ -17,6 +18,7 @@ export type LoggerExercise = {
   target_reps_min: number;
   target_reps_max: number;
   rest_seconds: number;
+  muscle_group: string;
   last: LastExerciseData | null;
 };
 
@@ -246,7 +248,10 @@ export default function SessionLogger({
           const last = ex.last;
           return (
             <section key={ex.exercise_id} className="rounded-xl bg-zinc-900 p-4">
-              <h2 className="font-semibold">{ex.name}</h2>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="font-semibold">{ex.name}</h2>
+                <ExerciseInfo name={ex.name} muscleGroup={ex.muscle_group} />
+              </div>
               <p className="mt-0.5 text-xs text-zinc-500">
                 Objectif {ex.target_sets}×{ex.target_reps_min}–
                 {ex.target_reps_max}
