@@ -11,7 +11,7 @@ export default function OnboardingPhoto() {
       src="/couple.jpg"
       alt="Le gymbro et la fitgirl"
       onError={() => setOk(false)}
-      className="mt-8 w-full rounded-2xl object-cover"
+      className="mx-auto mt-6 max-h-48 w-auto rounded-2xl object-contain"
     />
   );
 }

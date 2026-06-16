@@ -90,6 +90,7 @@ export default async function SessionPage({
       target_reps_min: pe.target_reps_min,
       target_reps_max: pe.target_reps_max,
       rest_seconds: pe.rest_seconds,
+      muscle_group: pe.exercises?.muscle_group ?? "other",
       last: lastByExercise[pe.exercise_id] ?? null,
     }));
 
