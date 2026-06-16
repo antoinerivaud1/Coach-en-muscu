@@ -8,6 +8,11 @@ import { formatWeight, formatDateShort } from "@/lib/utils/training";
 import BackButton from "@/components/BackButton";
 import ExerciseInfo from "@/components/ExerciseInfo";
 import { addPending } from "@/lib/pendingSessions";
+import {
+  ensureNotificationPermission,
+  scheduleRestNotification,
+  cancelRestNotification,
+} from "@/lib/restNotifications";
 
 type Feedback = "easy" | "normal" | "hard" | "failure";
 
@@ -74,6 +79,10 @@ export default function SessionLogger({
   const [restTotal, setRestTotal] = useState<number>(0);
 
   useEffect(() => {
+    ensureNotificationPermission();
+  }, []);
+
+  useEffect(() => {
     if (restRemaining === null) return;
     if (restRemaining <= 0) {
       setRestRemaining(null);
@@ -93,6 +102,7 @@ export default function SessionLogger({
     const s = seconds > 0 ? seconds : 90;
     setRestTotal(s);
     setRestRemaining(s);
+    void scheduleRestNotification(s, `/sessions/${sessionId}`);
   }
 
   const completedCount = useMemo(() => {
@@ -436,7 +446,10 @@ export default function SessionLogger({
           {restRemaining !== null && (
             <button
               type="button"
-              onClick={() => setRestRemaining(null)}
+              onClick={() => {
+                setRestRemaining(null);
+                void cancelRestNotification();
+              }}
               className="flex w-full flex-col items-center rounded-xl bg-toi/15 py-4 active:bg-toi/25"
             >
               <span className="text-xs uppercase tracking-wide text-toi/80">
