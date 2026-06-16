@@ -42,7 +42,7 @@ export default async function HistoryPage() {
   );
 
   return (
-    <main className="min-h-screen p-4 pb-24">
+    <main className="min-h-screen p-4 pb-28">
       <div className="mx-auto max-w-lg">
         <h1 className="text-2xl font-bold">Historique</h1>
         <p className="mt-1 text-sm text-zinc-400">

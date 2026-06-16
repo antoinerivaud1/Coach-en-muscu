@@ -8,27 +8,42 @@ export default function ExerciseInfo({
   name,
   muscleGroup,
   className,
+  triggerClassName,
+  children,
 }: {
   name: string;
   muscleGroup: string;
   className?: string;
+  triggerClassName?: string;
+  children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const g = getGuide(name, muscleGroup);
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label={`Comment faire : ${name}`}
-        className={
-          className ??
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-sm font-bold text-zinc-300 active:bg-zinc-700"
-        }
-      >
-        ?
-      </button>
+      {children ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={`Comment faire : ${name}`}
+          className={triggerClassName}
+        >
+          {children}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={`Comment faire : ${name}`}
+          className={
+            className ??
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-sm font-bold text-zinc-300 active:bg-zinc-700"
+          }
+        >
+          ?
+        </button>
+      )}
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4"
