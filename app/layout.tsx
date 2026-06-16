@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import OrientationLock from "@/components/OrientationLock";
 import PendingSync from "@/components/PendingSync";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({
         {children}
         <PendingSync />
         <ServiceWorkerRegister />
+        <OrientationLock />
       </body>
     </html>
   );
