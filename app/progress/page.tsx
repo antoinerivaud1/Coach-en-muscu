@@ -174,7 +174,7 @@ export default async function ProgressPage({
   };
 
   return (
-    <main className="min-h-screen p-4 pb-24">
+    <main className="min-h-screen p-4 pb-28">
       <div className="mx-auto max-w-lg">
         <h1 className="text-2xl font-bold">Progression</h1>
 

@@ -35,12 +35,12 @@ export default async function GuidePage() {
   const groups = GROUP_ORDER.filter((g) => byGroup[g]?.length);
 
   return (
-    <main className="min-h-screen p-4 pb-24">
+    <main className="min-h-screen p-4 pb-28">
       <div className="mx-auto max-w-lg">
         <h1 className="text-2xl font-bold">Guide des exercices</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Comment exécuter chaque mouvement, ce qu&apos;il faut éviter, et
-          comment étirer le muscle. Touche le « ? ».
+          Touche un exercice pour voir comment l&apos;exécuter, ce qu&apos;il
+          faut éviter, et comment étirer le muscle.
         </p>
 
         {groups.map((group) => (
@@ -50,13 +50,17 @@ export default async function GuidePage() {
             </h2>
             <div className="space-y-2">
               {byGroup[group]!.map((ex) => (
-                <div
+                <ExerciseInfo
                   key={ex.id}
-                  className="flex items-center justify-between rounded-lg bg-zinc-900 px-4 py-3"
+                  name={ex.name}
+                  muscleGroup={ex.muscle_group}
+                  triggerClassName="flex w-full items-center justify-between rounded-lg bg-zinc-900 px-4 py-3 text-left active:bg-zinc-800"
                 >
                   <span className="text-sm">{ex.name}</span>
-                  <ExerciseInfo name={ex.name} muscleGroup={ex.muscle_group} />
-                </div>
+                  <span className="text-lg text-zinc-500" aria-hidden>
+                    ›
+                  </span>
+                </ExerciseInfo>
               ))}
             </div>
           </div>

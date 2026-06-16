@@ -39,7 +39,7 @@ export default async function DashboardPage() {
   const programs: ProgramWithDays[] = (programsData ?? []) as ProgramWithDays[];
 
   return (
-    <main className="min-h-screen p-4 pb-24">
+    <main className="min-h-screen p-4 pb-28">
       <header className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">
