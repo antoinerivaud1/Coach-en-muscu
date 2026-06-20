@@ -71,7 +71,7 @@ export default function ExerciseInfo({
               </button>
             </div>
             <div className="mt-3 rounded-xl bg-zinc-950/40 p-2">
-              <MuscleMap muscleGroup={muscleGroup} />
+              <MuscleMap name={name} muscleGroup={muscleGroup} />
             </div>
             <dl className="mt-3 space-y-2.5 text-sm">
               <div>
