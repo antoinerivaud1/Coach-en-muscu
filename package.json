@@ -14,6 +14,7 @@
     "@supabase/supabase-js": "2.55.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
+    "react-body-highlighter": "^2.0.5",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
