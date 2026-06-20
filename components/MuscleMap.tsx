@@ -35,7 +35,7 @@ export default function MuscleMap({
     <div>
       <div className="flex items-stretch justify-center gap-4">
         <figure className="m-0 flex flex-col items-center">
-          <div className="h-40 w-24">
+          <div className="h-40 w-24" style={{ filter: "blur(0.5px)" }}>
             <Model type="anterior" {...common} />
           </div>
           <figcaption className="mt-1 text-[10px] font-medium text-zinc-500">
@@ -43,7 +43,7 @@ export default function MuscleMap({
           </figcaption>
         </figure>
         <figure className="m-0 flex flex-col items-center">
-          <div className="h-40 w-24">
+          <div className="h-40 w-24" style={{ filter: "blur(0.5px)" }}>
             <Model type="posterior" {...common} />
           </div>
           <figcaption className="mt-1 text-[10px] font-medium text-zinc-500">
