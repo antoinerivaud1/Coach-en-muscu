@@ -5,7 +5,7 @@ import { requireProfileId } from "@/lib/profile";
 import { getProgramWithDays } from "@/lib/queries/programs";
 import type { ProgramFull, ProgramDayFull } from "@/lib/queries/programs";
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
-import { startSession, deleteProgram } from "./actions";
+import { startSession, deleteProgram, setDayWeekdays } from "./actions";
 import ConfirmSubmit from "@/components/ConfirmSubmit";
 
 export default async function ProgramDetailPage({
@@ -123,6 +123,35 @@ export default async function ProgramDetailPage({
                     ))}
                   </ul>
                 )}
+                <form action={setDayWeekdays} className="mt-4 border-t border-line pt-3">
+                  <input type="hidden" name="day_id" value={day.id} />
+                  <input type="hidden" name="program_id" value={id} />
+                  <div className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
+                    Jours de la semaine
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {["L", "M", "M", "J", "V", "S", "D"].map((wl, wi) => (
+                      <label key={wi} className="cursor-pointer">
+                        <input
+                          type="checkbox"
+                          name="wd"
+                          value={wi}
+                          defaultChecked={day.weekdays?.includes(wi)}
+                          className="peer sr-only"
+                        />
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface2 text-sm font-bold text-fg-muted peer-checked:border-energy peer-checked:bg-energy peer-checked:text-ink">
+                          {wl}
+                        </span>
+                      </label>
+                    ))}
+                    <button
+                      type="submit"
+                      className="ml-auto rounded-lg bg-surface2 px-3 py-2 text-xs font-bold text-fg active:bg-white/10"
+                    >
+                      Enregistrer
+                    </button>
+                  </div>
+                </form>
               </section>
             );
           })}

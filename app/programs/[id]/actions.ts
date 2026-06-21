@@ -27,6 +27,21 @@ export async function startSession(formData: FormData) {
   redirect(`/sessions/${session.id}`);
 }
 
+export async function setDayWeekdays(formData: FormData) {
+  const dayId = String(formData.get("day_id") ?? "").trim();
+  const programId = String(formData.get("program_id") ?? "").trim();
+  if (!dayId) redirect("/dashboard");
+  await requireProfileId();
+  const supabase = await createClient();
+  const weekdays = formData
+    .getAll("wd")
+    .map((v) => Number(v))
+    .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+  await supabase.from("program_days").update({ weekdays }).eq("id", dayId);
+  revalidatePath(`/programs/${programId}`);
+  revalidatePath("/dashboard");
+}
+
 export async function deleteProgram(formData: FormData) {
   const programId = String(formData.get("program_id") ?? "").trim();
   if (!programId) {

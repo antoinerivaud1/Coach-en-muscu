@@ -149,6 +149,7 @@ export type Database = {
           name: string
           order_index: number
           program_id: string
+          weekdays: number[]
         }
         Insert: {
           created_at?: string
@@ -156,6 +157,7 @@ export type Database = {
           name: string
           order_index?: number
           program_id: string
+          weekdays?: number[]
         }
         Update: {
           created_at?: string
@@ -163,6 +165,7 @@ export type Database = {
           name?: string
           order_index?: number
           program_id?: string
+          weekdays?: number[]
         }
         Relationships: [
           {
