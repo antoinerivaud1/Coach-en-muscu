@@ -39,7 +39,7 @@ export default function ExerciseInfo({
           aria-label={`Comment faire : ${name}`}
           className={
             className ??
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-sm font-bold text-zinc-300 active:bg-zinc-700"
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface2 text-sm font-bold text-fg active:bg-white/10"
           }
         >
           ?
@@ -51,46 +51,46 @@ export default function ExerciseInfo({
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-zinc-900 p-5"
+            className="w-full max-w-lg rounded-2xl border border-line bg-surface p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-bold">{name}</h3>
-                <p className="text-xs font-medium text-toi">
+                <h3 className="text-lg font-black tracking-tight">{name}</h3>
+                <span className="mt-1.5 inline-block rounded-full border border-line bg-surface2 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-fg">
                   {MUSCLE_GROUP_LABELS[muscleGroup] ?? muscleGroup}
-                </p>
+                </span>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="text-zinc-400 hover:text-zinc-200"
+                className="text-fg-muted hover:text-fg"
                 aria-label="Fermer"
               >
                 ✕
               </button>
             </div>
-            <div className="mt-3 rounded-xl bg-zinc-950/40 p-2">
+            <div className="mt-3 rounded-xl border border-line bg-ink/40 p-2">
               <MuscleMap name={name} muscleGroup={muscleGroup} />
             </div>
             <dl className="mt-3 space-y-2.5 text-sm">
               <div>
-                <dt className="text-xs uppercase tracking-wide text-zinc-500">
+                <dt className="text-xs uppercase tracking-wide text-fg-muted">
                   Mouvement
                 </dt>
-                <dd className="text-zinc-200">{g.how}</dd>
+                <dd className="text-fg">{g.how}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-zinc-500">
+                <dt className="text-xs uppercase tracking-wide text-fg-muted">
                   À éviter
                 </dt>
-                <dd className="text-zinc-200">{g.avoid}</dd>
+                <dd className="text-fg">{g.avoid}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-zinc-500">
+                <dt className="text-xs uppercase tracking-wide text-fg-muted">
                   Étirement
                 </dt>
-                <dd className="text-zinc-200">{g.stretch}</dd>
+                <dd className="text-fg">{g.stretch}</dd>
               </div>
             </dl>
           </div>
