@@ -9,6 +9,7 @@ export type Profile = {
   id: string;
   display_name: string;
   color_role: "toi" | "elle";
+  weekly_goal: number;
 };
 
 export async function getCurrentProfileId(): Promise<string | null> {
@@ -28,7 +29,7 @@ export async function getAllProfiles(
 ): Promise<Profile[]> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, display_name, color_role")
+    .select("id, display_name, color_role, weekly_goal")
     .order("color_role")
     .returns<Profile[]>();
   return data ?? [];
@@ -40,7 +41,7 @@ export async function getProfile(
 ): Promise<Profile | null> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, display_name, color_role")
+    .select("id, display_name, color_role, weekly_goal")
     .eq("id", id)
     .returns<Profile[]>()
     .maybeSingle();
