@@ -1,3 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --ink: #0b0b0f;
+    --surface: #16161c;
+    --surface-2: #1f1f27;
+    --energy: #ccff02;
+    --flame: #ff8a3d;
+    --accent-lui: #2fe6ff;
+    --accent-elle: #ff4f7e;
+    --fg: #f2f2f5;
+    --fg-muted: #8c8c97;
+    --fg-faint: #56565e;
+    --line: rgba(255, 255, 255, 0.07);
+  }
+
+  html {
+    background-color: var(--ink);
+  }
+
+  body {
+    background-color: var(--ink);
+    color: var(--fg);
+    font-family: var(--font-archivo), system-ui, sans-serif;
+  }
+}
