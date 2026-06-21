@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { getGuide } from "@/lib/exerciseGuides";
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
+import { getMuscleTags } from "@/lib/exerciseMuscles";
 import MuscleMap from "@/components/MuscleMap";
 
 export default function ExerciseInfo({
@@ -57,9 +58,19 @@ export default function ExerciseInfo({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-black tracking-tight">{name}</h3>
-                <span className="mt-1.5 inline-block rounded-full border border-line bg-surface2 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-fg">
-                  {MUSCLE_GROUP_LABELS[muscleGroup] ?? muscleGroup}
-                </span>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(getMuscleTags(name, muscleGroup).length
+                    ? getMuscleTags(name, muscleGroup)
+                    : [MUSCLE_GROUP_LABELS[muscleGroup] ?? muscleGroup]
+                  ).map((t) => (
+                    <span
+                      key={t}
+                      className="rounded-full border border-line bg-surface2 px-2.5 py-0.5 text-[11px] font-bold text-fg"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
               </div>
               <button
                 type="button"

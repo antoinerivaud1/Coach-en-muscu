@@ -124,3 +124,33 @@ export function getExerciseMuscles(
     FALLBACK_BY_GROUP.other!
   );
 }
+
+const MUSCLE_FR: Record<string, string> = {
+  chest: "Pectoraux",
+  "upper-back": "Dos",
+  "lower-back": "Lombaires",
+  trapezius: "Trapèzes",
+  "front-deltoids": "Épaules",
+  "back-deltoids": "Épaules",
+  biceps: "Biceps",
+  triceps: "Triceps",
+  forearm: "Avant-bras",
+  abs: "Abdos",
+  obliques: "Obliques",
+  quadriceps: "Quadriceps",
+  hamstring: "Ischios",
+  gluteal: "Fessiers",
+  calves: "Mollets",
+  neck: "Cou",
+};
+
+/** Tags muscles lisibles (primaire puis secondaire, dédupliqués). */
+export function getMuscleTags(name: string, muscleGroup: string): string[] {
+  const m = getExerciseMuscles(name, muscleGroup);
+  const out: string[] = [];
+  for (const slug of [...m.primary, ...m.secondary]) {
+    const fr = MUSCLE_FR[slug as string] ?? String(slug);
+    if (!out.includes(fr)) out.push(fr);
+  }
+  return out.slice(0, 4);
+}
