@@ -174,9 +174,9 @@ export default async function ProgressPage({
   };
 
   return (
-    <main className="min-h-screen p-4 pb-28">
+    <main className="min-h-[100dvh] p-4 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
       <div className="mx-auto max-w-lg">
-        <h1 className="text-2xl font-bold">Progression</h1>
+        <h1 className="text-3xl font-black tracking-tight">Progression</h1>
 
         {profiles.length > 1 && (
           <div className="mt-3 flex gap-2">
@@ -190,9 +190,9 @@ export default async function ProgressPage({
                   className={`rounded-full px-3 py-1.5 text-sm font-medium ${
                     active
                       ? c === "elle"
-                        ? "bg-elle text-white"
-                        : "bg-toi text-white"
-                      : "bg-zinc-800 text-zinc-400"
+                        ? "bg-elle text-ink"
+                        : "bg-toi text-ink"
+                      : "bg-surface2 text-fg-muted"
                   }`}
                 >
                   {p.display_name}

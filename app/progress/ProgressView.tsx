@@ -24,9 +24,9 @@ export default function ProgressView({ series, color }: Props) {
 
   if (series.length === 0) {
     return (
-      <div className="mt-8 rounded-xl bg-zinc-900 p-6 text-center">
-        <p className="text-zinc-300">Pas encore de séance enregistrée</p>
-        <p className="mt-1 text-sm text-zinc-500">
+      <div className="mt-8 rounded-xl border border-line bg-surface p-6 text-center">
+        <p className="text-fg">Pas encore de séance enregistrée</p>
+        <p className="mt-1 text-sm text-fg-muted">
           Tes courbes apparaîtront ici dès ta première séance loggée.
         </p>
       </div>
@@ -58,8 +58,8 @@ export default function ProgressView({ series, color }: Props) {
             onClick={() => setSelected(s.exercise_id)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               s.exercise_id === current.exercise_id
-                ? "bg-toi text-white"
-                : "bg-zinc-800 text-zinc-400"
+                ? "bg-toi text-ink"
+                : "bg-surface2 text-fg-muted"
             }`}
           >
             {s.name}
@@ -67,21 +67,21 @@ export default function ProgressView({ series, color }: Props) {
         ))}
       </div>
 
-      <div className="mt-4 rounded-xl bg-zinc-900 p-4">
+      <div className="mt-4 rounded-xl border border-line bg-surface p-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold">{current.name}</h2>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-fg-muted">
               {current.points.length} séance
               {current.points.length > 1 ? "s" : ""}
             </p>
           </div>
-          <div className="flex overflow-hidden rounded-lg bg-zinc-800 text-xs">
+          <div className="flex overflow-hidden rounded-lg bg-surface2 text-xs">
             <button
               type="button"
               onClick={() => setMetric("weight")}
               className={`px-3 py-1.5 font-medium ${
-                metric === "weight" ? "bg-toi text-white" : "text-zinc-400"
+                metric === "weight" ? "bg-toi text-ink" : "text-fg-muted"
               }`}
             >
               Poids max
@@ -90,7 +90,7 @@ export default function ProgressView({ series, color }: Props) {
               type="button"
               onClick={() => setMetric("e1rm")}
               className={`px-3 py-1.5 font-medium ${
-                metric === "e1rm" ? "bg-toi text-white" : "text-zinc-400"
+                metric === "e1rm" ? "bg-toi text-ink" : "text-fg-muted"
               }`}
             >
               1RM est.
@@ -100,7 +100,7 @@ export default function ProgressView({ series, color }: Props) {
 
         <div className="mt-3 flex items-baseline gap-2">
           <span className="text-3xl font-bold">{latestVal}</span>
-          <span className="text-sm text-zinc-500">kg</span>
+          <span className="text-sm text-fg-muted">kg</span>
           {current.points.length > 1 && (
             <span
               className={`ml-2 text-sm font-medium ${
@@ -108,7 +108,7 @@ export default function ProgressView({ series, color }: Props) {
                   ? "text-emerald-400"
                   : delta < 0
                     ? "text-red-400"
-                    : "text-zinc-500"
+                    : "text-fg-muted"
               }`}
             >
               {delta > 0 ? "+" : ""}
@@ -123,11 +123,11 @@ export default function ProgressView({ series, color }: Props) {
       </div>
 
       {/* Recent sessions table */}
-      <div className="mt-4 rounded-xl bg-zinc-900 p-4">
-        <h3 className="text-sm font-semibold text-zinc-300">
+      <div className="mt-4 rounded-xl border border-line bg-surface p-4">
+        <h3 className="text-sm font-semibold text-fg">
           Dernières séances
         </h3>
-        <ul className="mt-2 divide-y divide-zinc-800">
+        <ul className="mt-2 divide-y divide-white/10">
           {[...current.points]
             .slice(-8)
             .reverse()
@@ -136,10 +136,10 @@ export default function ProgressView({ series, color }: Props) {
                 key={i}
                 className="flex items-center justify-between py-2 text-sm"
               >
-                <span className="text-zinc-400">{p.label}</span>
+                <span className="text-fg-muted">{p.label}</span>
                 <span>
                   <span className="font-medium">{p.topWeight}</span>
-                  <span className="text-zinc-500"> kg · 1RM </span>
+                  <span className="text-fg-muted"> kg · 1RM </span>
                   <span className="font-medium">{Math.round(p.e1rm)}</span>
                 </span>
               </li>

@@ -13,7 +13,7 @@ type Props = {
  */
 export default function LineChart({
   points,
-  color = "#F97316",
+  color = "#2FE6FF",
   unit = "kg",
 }: Props) {
   const W = 320;
@@ -24,7 +24,7 @@ export default function LineChart({
 
   if (points.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-zinc-500">
+      <p className="py-8 text-center text-sm text-fg-muted">
         Pas encore de données
       </p>
     );
@@ -92,13 +92,13 @@ export default function LineChart({
       ))}
 
       {/* max / min labels */}
-      <text x={padX} y={11} fill="#a1a1aa" fontSize="10">
+      <text x={padX} y={11} fill="#8C8C97" fontSize="10">
         {Math.round(max)} {unit}
       </text>
-      <text x={padX} y={H - 8} fill="#71717a" fontSize="10">
+      <text x={padX} y={H - 8} fill="#56565E" fontSize="10">
         {firstLabel}
       </text>
-      <text x={W - padX} y={H - 8} fill="#71717a" fontSize="10" textAnchor="end">
+      <text x={W - padX} y={H - 8} fill="#56565E" fontSize="10" textAnchor="end">
         {lastLabel}
       </text>
     </svg>
