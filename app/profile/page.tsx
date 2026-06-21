@@ -4,6 +4,7 @@ import { requireProfileId, getProfile, getCoupleId, getCoupleProfileIds } from "
 import { clearProfile, updateWeeklyGoal } from "@/app/actions";
 import BottomNav from "@/components/BottomNav";
 import OnboardingPhoto from "@/components/OnboardingPhoto";
+import { getBadges } from "@/lib/badges";
 
 function Row({ href, title, sub }: { href: string; title: string; sub: string }) {
   return (
@@ -27,6 +28,11 @@ export default async function ProfilePage() {
   const supabase = await createClient();
   const profile = await getProfile(supabase, profileId);
   const isElle = profile?.color_role === "elle";
+  const { badges, earnedCount } = await getBadges(
+    supabase,
+    profileId,
+    profile?.weekly_goal ?? 4,
+  );
 
   const coupleId = await getCoupleId(supabase, profileId);
   let partnerName: string | null = null;
@@ -83,6 +89,33 @@ export default async function ProfilePage() {
               </form>
             );
           })}
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <div className="mb-2.5 flex items-center justify-between">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
+            Badges
+          </p>
+          <span className="text-xs font-semibold text-fg-muted">
+            {earnedCount}/{badges.length}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {badges.map((b) => (
+            <div
+              key={b.id}
+              className={`flex flex-col items-center gap-1 rounded-2xl border p-3 text-center ${
+                b.earned ? "border-energy/40 bg-energy/10" : "border-line bg-surface opacity-60"
+              }`}
+            >
+              <span className="text-2xl">{b.icon}</span>
+              <span className={`text-[11px] font-bold leading-tight ${b.earned ? "text-fg" : "text-fg-muted"}`}>
+                {b.label}
+              </span>
+              <span className="text-[10px] text-fg-faint">{b.detail}</span>
+            </div>
+          ))}
         </div>
       </div>
 
