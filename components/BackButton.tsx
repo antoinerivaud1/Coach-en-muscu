@@ -20,7 +20,7 @@ export default function BackButton({
           router.push(fallback);
         }
       }}
-      className="flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-200"
+      className="flex items-center gap-1 text-sm text-fg-muted hover:text-fg"
     >
       <span aria-hidden>←</span> {label}
     </button>

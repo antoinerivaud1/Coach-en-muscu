@@ -283,7 +283,7 @@ export default function ProgramForm({
             <div
               key={s}
               className={`h-1 flex-1 rounded-full transition-colors ${
-                s <= step ? "bg-toi" : "bg-zinc-700"
+                s <= step ? "bg-toi" : "bg-surface2"
               }`}
             />
           ))}
@@ -297,7 +297,7 @@ export default function ProgramForm({
             </h1>
 
             <div className="space-y-2">
-              <label className="block text-sm text-zinc-400">
+              <label className="block text-sm text-fg-muted">
                 Nom du programme
               </label>
               <input
@@ -305,12 +305,12 @@ export default function ProgramForm({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="ex. PPL A/B, Full Body…"
-                className="w-full rounded-lg bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-toi"
+                className="w-full rounded-lg bg-surface2 px-4 py-3 text-white placeholder-fg-faint focus:outline-none focus:ring-2 focus:ring-toi"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm text-zinc-400">Portée</label>
+              <label className="block text-sm text-fg-muted">Portée</label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
@@ -318,11 +318,11 @@ export default function ProgramForm({
                   className={`rounded-lg border-2 p-4 text-left transition-colors ${
                     scope === "individual"
                       ? "border-toi bg-toi/10"
-                      : "border-zinc-700 bg-zinc-800"
+                      : "border-line bg-surface2"
                   }`}
                 >
                   <div className="font-medium">Individuel</div>
-                  <div className="mt-1 text-xs text-zinc-400">
+                  <div className="mt-1 text-xs text-fg-muted">
                     Visible par toi uniquement
                   </div>
                 </button>
@@ -333,11 +333,11 @@ export default function ProgramForm({
                   className={`rounded-lg border-2 p-4 text-left transition-colors disabled:opacity-40 ${
                     scope === "couple"
                       ? "border-elle bg-elle/10"
-                      : "border-zinc-700 bg-zinc-800"
+                      : "border-line bg-surface2"
                   }`}
                 >
                   <div className="font-medium">Partagé</div>
-                  <div className="mt-1 text-xs text-zinc-400">
+                  <div className="mt-1 text-xs text-fg-muted">
                     {hasCouple
                       ? "Visible par vous deux"
                       : "Nécessite un partenaire"}
@@ -363,7 +363,7 @@ export default function ProgramForm({
           <div className="space-y-6">
             <div>
               <h1 className="text-xl font-bold">Jours d&apos;entraînement</h1>
-              <p className="mt-1 text-sm text-zinc-400">
+              <p className="mt-1 text-sm text-fg-muted">
                 Ajoute les séances de ton programme
               </p>
             </div>
@@ -371,7 +371,7 @@ export default function ProgramForm({
             <div className="space-y-3">
               {days.map((day, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <span className="w-6 shrink-0 text-center text-sm text-zinc-500">
+                  <span className="w-6 shrink-0 text-center text-sm text-fg-muted">
                     {i + 1}
                   </span>
                   <input
@@ -379,13 +379,13 @@ export default function ProgramForm({
                     value={day.name}
                     onChange={(e) => updateDayName(i, e.target.value)}
                     placeholder={`ex. Upper A, Lower B, Jour ${i + 1}…`}
-                    className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-toi"
+                    className="flex-1 rounded-lg bg-surface2 px-3 py-2 text-white placeholder-fg-faint focus:outline-none focus:ring-2 focus:ring-toi"
                   />
                   {days.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeDay(i)}
-                      className="rounded px-2 py-1 text-zinc-500 hover:text-red-400"
+                      className="rounded px-2 py-1 text-fg-muted hover:text-red-400"
                       aria-label="Supprimer ce jour"
                     >
                       ✕
@@ -398,7 +398,7 @@ export default function ProgramForm({
             <button
               type="button"
               onClick={addDay}
-              className="w-full rounded-lg border border-dashed border-zinc-600 py-3 text-sm text-zinc-400 hover:border-zinc-400 hover:text-zinc-200"
+              className="w-full rounded-lg border border-dashed border-line py-3 text-sm text-fg-muted hover:border-white/25 hover:text-fg"
             >
               + Ajouter un jour
             </button>
@@ -409,7 +409,7 @@ export default function ProgramForm({
               <button
                 type="button"
                 onClick={() => goToStep(1)}
-                className="flex-1 rounded-lg bg-zinc-800 py-3 font-semibold text-zinc-300"
+                className="flex-1 rounded-lg bg-surface2 py-3 font-semibold text-fg"
               >
                 Retour
               </button>
@@ -429,7 +429,7 @@ export default function ProgramForm({
           <div className="space-y-5">
             <div>
               <h1 className="text-xl font-bold">Exercices</h1>
-              <p className="mt-1 text-sm text-zinc-400">
+              <p className="mt-1 text-sm text-fg-muted">
                 Ajoute les exercices pour chaque jour
               </p>
             </div>
@@ -444,7 +444,7 @@ export default function ProgramForm({
                   className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
                     editingDayIndex === i
                       ? "bg-toi text-white"
-                      : "bg-zinc-800 text-zinc-400"
+                      : "bg-surface2 text-fg-muted"
                   }`}
                 >
                   {day.name || `Jour ${i + 1}`}
@@ -455,12 +455,12 @@ export default function ProgramForm({
             {/* Current day exercises */}
             <div className="space-y-2">
               {days[editingDayIndex].exercises.length === 0 && (
-                <p className="rounded-lg bg-zinc-900 p-4 text-center text-sm text-zinc-500">
+                <p className="rounded-lg bg-surface p-4 text-center text-sm text-fg-muted">
                   Aucun exercice — choisis dans le catalogue ci-dessous
                 </p>
               )}
               {days[editingDayIndex].exercises.map((ex, exIdx) => (
-                <div key={exIdx} className="rounded-lg bg-zinc-900 p-3">
+                <div key={exIdx} className="rounded-lg bg-surface p-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
                       {getExerciseName(ex.exercise_id)}
@@ -470,12 +470,12 @@ export default function ProgramForm({
                       onClick={() =>
                         removeExerciseFromDay(editingDayIndex, exIdx)
                       }
-                      className="text-xs text-zinc-500 hover:text-red-400"
+                      className="text-xs text-fg-muted hover:text-red-400"
                     >
                       Retirer
                     </button>
                   </div>
-                  <div className="mt-2 grid grid-cols-4 gap-2 text-xs text-zinc-400">
+                  <div className="mt-2 grid grid-cols-4 gap-2 text-xs text-fg-muted">
                     <div>
                       <div>Séries</div>
                       <input
@@ -491,7 +491,7 @@ export default function ProgramForm({
                             parseInt(e.target.value, 10) || 1,
                           )
                         }
-                        className="mt-1 w-full rounded bg-zinc-800 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-toi"
+                        className="mt-1 w-full rounded bg-surface2 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-toi"
                       />
                     </div>
                     <div>
@@ -509,7 +509,7 @@ export default function ProgramForm({
                             parseInt(e.target.value, 10) || 1,
                           )
                         }
-                        className="mt-1 w-full rounded bg-zinc-800 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-toi"
+                        className="mt-1 w-full rounded bg-surface2 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-toi"
                       />
                     </div>
                     <div>
@@ -527,7 +527,7 @@ export default function ProgramForm({
                             parseInt(e.target.value, 10) || 1,
                           )
                         }
-                        className="mt-1 w-full rounded bg-zinc-800 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-toi"
+                        className="mt-1 w-full rounded bg-surface2 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-toi"
                       />
                     </div>
                     <div>
@@ -546,7 +546,7 @@ export default function ProgramForm({
                             parseInt(e.target.value, 10) || 0,
                           )
                         }
-                        className="mt-1 w-full rounded bg-zinc-800 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-toi"
+                        className="mt-1 w-full rounded bg-surface2 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-toi"
                       />
                     </div>
                   </div>
@@ -555,14 +555,14 @@ export default function ProgramForm({
             </div>
 
             {/* Exercise catalog */}
-            <details className="group rounded-lg bg-zinc-900">
-              <summary className="cursor-pointer select-none p-3 text-sm font-medium text-zinc-300 marker:content-none group-open:border-b group-open:border-zinc-800">
+            <details className="group rounded-lg bg-surface">
+              <summary className="cursor-pointer select-none p-3 text-sm font-medium text-fg marker:content-none group-open:border-b group-open:border-line">
                 Catalogue d&apos;exercices{" "}
-                <span className="text-zinc-500">({catalog.length})</span>
+                <span className="text-fg-muted">({catalog.length})</span>
               </summary>
               <div className="max-h-64 overflow-y-auto p-2">
                 {canCreateExercise && (
-                  <div className="mb-3 border-b border-zinc-800 pb-3">
+                  <div className="mb-3 border-b border-line pb-3">
                     {!showCreate ? (
                       <button
                         type="button"
@@ -570,7 +570,7 @@ export default function ProgramForm({
                           setShowCreate(true);
                           setCreateError(null);
                         }}
-                        className="w-full rounded px-3 py-2 text-left text-sm font-medium text-toi hover:bg-zinc-800"
+                        className="w-full rounded px-3 py-2 text-left text-sm font-medium text-toi hover:bg-surface2"
                       >
                         + Créer un exercice
                       </button>
@@ -581,7 +581,7 @@ export default function ProgramForm({
                           value={newName}
                           onChange={(e) => setNewName(e.target.value)}
                           placeholder="Nom de l'exercice"
-                          className="w-full rounded bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-toi"
+                          className="w-full rounded bg-surface2 px-3 py-2 text-sm text-white placeholder-fg-faint focus:outline-none focus:ring-1 focus:ring-toi"
                         />
                         <select
                           value={newGroup}
@@ -590,7 +590,7 @@ export default function ProgramForm({
                               e.target.value as SystemExercise["muscle_group"],
                             )
                           }
-                          className="w-full rounded bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-toi"
+                          className="w-full rounded bg-surface2 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-toi"
                         >
                           {Object.entries(MUSCLE_GROUP_LABELS).map(
                             ([value, label]) => (
@@ -611,7 +611,7 @@ export default function ProgramForm({
                               setNewName("");
                               setCreateError(null);
                             }}
-                            className="flex-1 rounded bg-zinc-800 py-2 text-xs font-medium text-zinc-300"
+                            className="flex-1 rounded bg-surface2 py-2 text-xs font-medium text-fg"
                           >
                             Annuler
                           </button>
@@ -630,7 +630,7 @@ export default function ProgramForm({
                 )}
                 {Object.entries(exercisesByMuscle).map(([group, exList]) => (
                   <div key={group} className="mb-3">
-                    <div className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    <div className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
                       {MUSCLE_GROUP_LABELS[group] ?? group}
                     </div>
                     <div className="space-y-1">
@@ -648,15 +648,15 @@ export default function ProgramForm({
                             disabled={alreadyAdded}
                             className={`flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm transition-colors ${
                               alreadyAdded
-                                ? "text-zinc-600"
-                                : "text-zinc-300 hover:bg-zinc-800"
+                                ? "text-fg-faint"
+                                : "text-fg hover:bg-surface2"
                             }`}
                           >
                             <span>{ex.name}</span>
                             {alreadyAdded ? (
                               <span className="text-xs text-toi">✓</span>
                             ) : (
-                              <span className="text-xs text-zinc-500">+</span>
+                              <span className="text-xs text-fg-muted">+</span>
                             )}
                           </button>
                         );
@@ -673,7 +673,7 @@ export default function ProgramForm({
               <button
                 type="button"
                 onClick={() => goToStep(2)}
-                className="flex-1 rounded-lg bg-zinc-800 py-3 font-semibold text-zinc-300"
+                className="flex-1 rounded-lg bg-surface2 py-3 font-semibold text-fg"
               >
                 Retour
               </button>
@@ -693,18 +693,18 @@ export default function ProgramForm({
           <div className="space-y-6">
             <div>
               <h1 className="text-xl font-bold">Récapitulatif</h1>
-              <p className="mt-1 text-sm text-zinc-400">
+              <p className="mt-1 text-sm text-fg-muted">
                 Vérifie ton programme avant de le créer
               </p>
             </div>
 
-            <div className="rounded-lg bg-zinc-900 p-4 space-y-3">
+            <div className="rounded-lg bg-surface p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-zinc-400 text-sm">Nom</span>
+                <span className="text-fg-muted text-sm">Nom</span>
                 <span className="font-medium">{name}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-zinc-400 text-sm">Portée</span>
+                <span className="text-fg-muted text-sm">Portée</span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     scope === "couple"
@@ -716,14 +716,14 @@ export default function ProgramForm({
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-zinc-400 text-sm">Jours</span>
+                <span className="text-fg-muted text-sm">Jours</span>
                 <span className="font-medium">{days.length}</span>
               </div>
             </div>
 
             <div className="space-y-3">
               {days.map((day, i) => (
-                <div key={i} className="rounded-lg bg-zinc-900 p-3">
+                <div key={i} className="rounded-lg bg-surface p-3">
                   <div className="font-medium text-sm mb-2">
                     {i + 1}. {day.name}
                   </div>
@@ -731,7 +731,7 @@ export default function ProgramForm({
                     {day.exercises.map((ex, ei) => (
                       <li
                         key={ei}
-                        className="flex items-center justify-between text-xs text-zinc-400"
+                        className="flex items-center justify-between text-xs text-fg-muted"
                       >
                         <span>{getExerciseName(ex.exercise_id)}</span>
                         <span>
@@ -752,7 +752,7 @@ export default function ProgramForm({
                 type="button"
                 onClick={() => goToStep(3)}
                 disabled={isPending}
-                className="flex-1 rounded-lg bg-zinc-800 py-3 font-semibold text-zinc-300 disabled:opacity-50"
+                className="flex-1 rounded-lg bg-surface2 py-3 font-semibold text-fg disabled:opacity-50"
               >
                 Retour
               </button>

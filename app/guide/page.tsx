@@ -38,14 +38,14 @@ export default async function GuidePage() {
     <main className="min-h-screen p-4 pb-28">
       <div className="mx-auto max-w-lg">
         <h1 className="text-2xl font-bold">Guide des exercices</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-fg-muted">
           Touche un exercice pour voir comment l&apos;exécuter, ce qu&apos;il
           faut éviter, et comment étirer le muscle.
         </p>
 
         {groups.map((group) => (
           <div key={group}>
-            <h2 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <h2 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-fg-muted">
               {MUSCLE_GROUP_LABELS[group] ?? group}
             </h2>
             <div className="space-y-2">
@@ -54,10 +54,10 @@ export default async function GuidePage() {
                   key={ex.id}
                   name={ex.name}
                   muscleGroup={ex.muscle_group}
-                  triggerClassName="flex w-full items-center justify-between rounded-lg bg-zinc-900 px-4 py-3 text-left active:bg-zinc-800"
+                  triggerClassName="flex w-full items-center justify-between rounded-lg bg-surface px-4 py-3 text-left active:bg-surface2"
                 >
                   <span className="text-sm">{ex.name}</span>
-                  <span className="text-lg text-zinc-500" aria-hidden>
+                  <span className="text-lg text-fg-muted" aria-hidden>
                     ›
                   </span>
                 </ExerciseInfo>

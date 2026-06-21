@@ -208,13 +208,13 @@ export default async function SessionPage({
       <div className="mx-auto max-w-lg">
         <Link
           href="/history"
-          className="text-sm text-zinc-400 hover:text-zinc-200"
+          className="text-sm text-fg-muted hover:text-fg"
         >
           ← Historique
         </Link>
 
         <h1 className="mt-3 text-2xl font-bold">{dayName}</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-fg-muted">
           {formatDateLong(session.performed_at)}
           {durationMin !== null ? ` · ${durationMin} min` : ""}
           {session.feedback
@@ -230,14 +230,14 @@ export default async function SessionPage({
         )}
 
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-zinc-900 p-3">
-            <p className="text-xs text-zinc-500">Volume total</p>
+          <div className="rounded-xl bg-surface p-3">
+            <p className="text-xs text-fg-muted">Volume total</p>
             <p className="mt-1 text-lg font-bold">
               {Math.round(sessionVolume).toLocaleString("fr-FR")} kg
             </p>
           </div>
-          <div className="rounded-xl bg-zinc-900 p-3">
-            <p className="text-xs text-zinc-500">Exercices</p>
+          <div className="rounded-xl bg-surface p-3">
+            <p className="text-xs text-fg-muted">Exercices</p>
             <p className="mt-1 text-lg font-bold">
               {orderedExerciseIds.length}
             </p>
@@ -250,7 +250,7 @@ export default async function SessionPage({
               (a, b) => a.set_index - b.set_index,
             );
             return (
-              <section key={exId} className="rounded-xl bg-zinc-900 p-4">
+              <section key={exId} className="rounded-xl bg-surface p-4">
                 <div className="flex items-center justify-between">
                   <h2 className="font-semibold">
                     {exerciseNames[exId] ?? "Exercice"}
@@ -267,14 +267,14 @@ export default async function SessionPage({
                       key={r.id}
                       className={`rounded-lg px-3 py-1.5 text-sm ${
                         r.is_warmup
-                          ? "bg-zinc-800/50 text-zinc-500"
-                          : "bg-zinc-800"
+                          ? "bg-surface2/50 text-fg-muted"
+                          : "bg-surface2"
                       }`}
                     >
                       <span className="font-medium">
                         {formatWeight(r.weight_kg)}
                       </span>
-                      <span className="text-zinc-500"> kg × </span>
+                      <span className="text-fg-muted"> kg × </span>
                       <span className="font-medium">{r.reps}</span>
                       {r.is_warmup && (
                         <span className="ml-1 text-[10px] uppercase">éch.</span>
@@ -291,7 +291,7 @@ export default async function SessionPage({
           <div className="mt-6 flex gap-3">
             <Link
               href={`/sessions/${id}?edit=1`}
-              className="flex-1 rounded-lg bg-zinc-800 py-3 text-center text-sm font-semibold text-zinc-200"
+              className="flex-1 rounded-lg bg-surface2 py-3 text-center text-sm font-semibold text-fg"
             >
               Modifier
             </Link>
@@ -310,7 +310,7 @@ function SubmitDelete() {
   return (
     <button
       type="submit"
-      className="w-full rounded-lg bg-zinc-800 py-3 text-sm font-semibold text-red-400"
+      className="w-full rounded-lg bg-surface2 py-3 text-sm font-semibold text-red-400"
     >
       Supprimer
     </button>
