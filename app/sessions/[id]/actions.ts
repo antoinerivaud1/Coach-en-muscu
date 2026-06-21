@@ -112,3 +112,34 @@ export async function deleteSession(formData: FormData) {
   revalidatePath("/progress");
   redirect("/history");
 }
+
+export async function updateSet(formData: FormData) {
+  const setId = String(formData.get("set_id") ?? "").trim();
+  const sessionId = String(formData.get("session_id") ?? "").trim();
+  const weight = Number(String(formData.get("weight") ?? "0").replace(",", "."));
+  const reps = parseInt(String(formData.get("reps") ?? "0"), 10);
+  const profileId = await getCurrentProfileId();
+  const supabase = await createClient();
+  if (profileId && setId && Number.isFinite(weight) && Number.isFinite(reps) && reps > 0) {
+    await supabase
+      .from("session_sets")
+      .update({ weight_kg: weight, reps })
+      .eq("id", setId);
+  }
+  revalidatePath(`/sessions/${sessionId}`);
+  revalidatePath("/progress");
+  redirect(`/sessions/${sessionId}?editsets=1`);
+}
+
+export async function deleteSet(formData: FormData) {
+  const setId = String(formData.get("set_id") ?? "").trim();
+  const sessionId = String(formData.get("session_id") ?? "").trim();
+  const profileId = await getCurrentProfileId();
+  const supabase = await createClient();
+  if (profileId && setId) {
+    await supabase.from("session_sets").delete().eq("id", setId);
+  }
+  revalidatePath(`/sessions/${sessionId}`);
+  revalidatePath("/progress");
+  redirect(`/sessions/${sessionId}?editsets=1`);
+}
