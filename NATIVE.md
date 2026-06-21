@@ -44,3 +44,12 @@ splash, ou montée de version pour les stores.
 - `appId` : `com.antoinerivaud.coachenmuscu` (modifiable avant le premier `cap add`).
 - URL de prod actuelle : https://v0-gym-workout-tracker-silk.vercel.app (à garder synchro dans `capacitor.config.ts`).
 - Les dossiers `ios/` et `android/` sont générés par `cap add` sur ta machine ; tu peux les committer ensuite si tu veux les versionner.
+
+## Icône & splash (CM-44)
+Les sources sont dans `assets/` (icône encre + haltère vert acide, splash). Pour
+(re)générer les sources : `python3 scripts/gen-icons.py`. Pour les injecter dans
+les projets natifs (après `cap add`) :
+```bash
+npm run assets:gen   # = npx capacitor-assets generate
+npx cap sync
+```
