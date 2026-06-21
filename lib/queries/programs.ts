@@ -50,6 +50,7 @@ export type ProgramDayFull = {
   id: string;
   name: string;
   order_index: number;
+  weekdays: number[];
   program_exercises: ProgramExerciseFull[];
 };
 
@@ -70,7 +71,7 @@ export async function getProgramWithDays(
     .select(
       `id, name, couple_id, owner_profile_id,
        program_days (
-         id, name, order_index,
+         id, name, order_index, weekdays,
          program_exercises (
            id, exercise_id, target_sets, target_reps_min, target_reps_max,
            rest_seconds, order_index,
@@ -92,7 +93,7 @@ export async function getDayWithExercises(
   return supabase
     .from("program_days")
     .select(
-      `id, name, order_index,
+      `id, name, order_index, weekdays,
        program_exercises (
          id, exercise_id, target_sets, target_reps_min, target_reps_max,
          rest_seconds, order_index,
