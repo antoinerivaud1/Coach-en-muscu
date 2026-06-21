@@ -32,7 +32,7 @@ export default async function ProgramDetailPage({
       <div className="mx-auto max-w-lg">
         <Link
           href="/dashboard"
-          className="text-sm text-zinc-400 hover:text-zinc-200"
+          className="text-sm text-fg-muted hover:text-fg"
         >
           ← Retour
         </Link>
@@ -45,7 +45,7 @@ export default async function ProgramDetailPage({
             </span>
           )}
         </div>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-fg-muted">
           {days.length} {days.length === 1 ? "jour" : "jours"} · choisis ta
           séance du jour
         </p>
@@ -53,7 +53,7 @@ export default async function ProgramDetailPage({
         <div className="mt-4 flex gap-3">
           <Link
             href={`/programs/${id}/edit`}
-            className="flex-1 rounded-lg bg-zinc-800 py-2.5 text-center text-sm font-semibold text-zinc-200"
+            className="flex-1 rounded-lg bg-surface2 py-2.5 text-center text-sm font-semibold text-fg"
           >
             Modifier
           </Link>
@@ -61,7 +61,7 @@ export default async function ProgramDetailPage({
             <input type="hidden" name="program_id" value={id} />
             <ConfirmSubmit
               message="Supprimer ce programme ? Les séances déjà enregistrées sont conservées."
-              className="w-full rounded-lg bg-zinc-800 py-2.5 text-sm font-semibold text-red-400"
+              className="w-full rounded-lg bg-surface2 py-2.5 text-sm font-semibold text-red-400"
             >
               Supprimer
             </ConfirmSubmit>
@@ -76,7 +76,7 @@ export default async function ProgramDetailPage({
             return (
               <section
                 key={day.id}
-                className="rounded-xl bg-zinc-900 p-4"
+                className="rounded-xl bg-surface p-4"
               >
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="font-semibold">{day.name}</h2>
@@ -93,7 +93,7 @@ export default async function ProgramDetailPage({
                 </div>
 
                 {exercises.length === 0 ? (
-                  <p className="mt-3 text-sm text-zinc-500">
+                  <p className="mt-3 text-sm text-fg-muted">
                     Aucun exercice sur ce jour.
                   </p>
                 ) : (
@@ -101,13 +101,13 @@ export default async function ProgramDetailPage({
                     {exercises.map((pe) => (
                       <li
                         key={pe.id}
-                        className="flex items-center justify-between border-t border-zinc-800 pt-2 text-sm first:border-0 first:pt-0"
+                        className="flex items-center justify-between border-t border-line pt-2 text-sm first:border-0 first:pt-0"
                       >
                         <div>
-                          <span className="text-zinc-100">
+                          <span className="text-fg">
                             {pe.exercises?.name ?? "Exercice"}
                           </span>
-                          <span className="ml-2 text-xs text-zinc-500">
+                          <span className="ml-2 text-xs text-fg-muted">
                             {pe.exercises
                               ? MUSCLE_GROUP_LABELS[
                                   pe.exercises.muscle_group
@@ -115,7 +115,7 @@ export default async function ProgramDetailPage({
                               : ""}
                           </span>
                         </div>
-                        <span className="shrink-0 text-xs text-zinc-400">
+                        <span className="shrink-0 text-xs text-fg-muted">
                           {pe.target_sets}×{pe.target_reps_min}–
                           {pe.target_reps_max}
                         </span>

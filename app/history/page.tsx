@@ -45,15 +45,15 @@ export default async function HistoryPage() {
     <main className="min-h-screen p-4 pb-28">
       <div className="mx-auto max-w-lg">
         <h1 className="text-2xl font-bold">Historique</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-fg-muted">
           {sessions.length} séance{sessions.length > 1 ? "s" : ""} enregistrée
           {sessions.length > 1 ? "s" : ""}
         </p>
 
         {sessions.length === 0 ? (
-          <div className="mt-6 rounded-xl bg-zinc-900 p-6 text-center">
-            <p className="text-zinc-300">Aucune séance pour l&apos;instant</p>
-            <p className="mt-1 text-sm text-zinc-500">
+          <div className="mt-6 rounded-xl bg-surface p-6 text-center">
+            <p className="text-fg">Aucune séance pour l&apos;instant</p>
+            <p className="mt-1 text-sm text-fg-muted">
               Lance une séance depuis un de tes programmes.
             </p>
             <Link
@@ -72,7 +72,7 @@ export default async function HistoryPage() {
                 <li key={s.id}>
                   <Link
                     href={`/sessions/${s.id}`}
-                    className="block rounded-xl bg-zinc-900 p-4 transition-colors hover:bg-zinc-800"
+                    className="block rounded-xl bg-surface p-4 transition-colors hover:bg-surface2"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-medium">
@@ -90,7 +90,7 @@ export default async function HistoryPage() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-sm text-zinc-500">
+                    <p className="mt-1 text-sm text-fg-muted">
                       {formatDateLong(s.performed_at)} ·{" "}
                       {s.session_sets.length} série
                       {s.session_sets.length > 1 ? "s" : ""}
