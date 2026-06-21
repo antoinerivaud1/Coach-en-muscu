@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "cap:sync": "cap sync",
     "cap:ios": "cap open ios",
-    "cap:android": "cap open android"
+    "cap:android": "cap open android",
+    "assets:gen": "capacitor-assets generate"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
@@ -28,6 +29,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@types/node": "^22.9.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
