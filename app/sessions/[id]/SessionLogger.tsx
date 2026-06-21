@@ -246,12 +246,18 @@ export default function SessionLogger({
 
   return (
     <div className="mx-auto max-w-lg pb-44">
-      <div className="sticky top-0 z-10 -mx-4 bg-zinc-950/90 px-4 py-3 backdrop-blur">
-        <div className="mb-1">
+      <div className="sticky top-0 z-10 -mx-4 bg-ink/90 px-4 py-3 backdrop-blur">
+        <div className="mb-1 flex items-center justify-between">
           <BackButton label="Quitter" />
+          <span className="rounded-lg border border-line bg-surface2 px-2.5 py-1 font-oswald text-xs font-bold text-energy">
+            {completedCount}/{exercises.length}
+          </span>
         </div>
-        <h1 className="text-xl font-bold">{dayName}</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="flex items-center gap-2 text-xl font-black">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-elle" />
+          {dayName}
+        </h1>
+        <p className="text-sm text-fg-muted">
           Séance en cours · {completedCount}/{exercises.length} exos remplis
         </p>
       </div>
@@ -261,19 +267,19 @@ export default function SessionLogger({
           const rows = sets[ex.exercise_id] ?? [];
           const last = ex.last;
           return (
-            <section key={ex.exercise_id} className="rounded-xl bg-zinc-900 p-4">
+            <section key={ex.exercise_id} className="rounded-xl bg-surface p-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="font-semibold">{ex.name}</h2>
                 <ExerciseInfo name={ex.name} muscleGroup={ex.muscle_group} />
               </div>
-              <p className="mt-0.5 text-xs text-zinc-500">
+              <p className="mt-0.5 text-xs text-fg-muted">
                 Objectif {ex.target_sets}×{ex.target_reps_min}–
                 {ex.target_reps_max}
               </p>
 
               {last && last.sets.length > 0 ? (
-                <p className="mt-2 rounded-lg bg-zinc-800/60 px-3 py-2 text-xs text-zinc-300">
-                  <span className="text-zinc-500">
+                <p className="mt-2 rounded-lg bg-surface2/60 px-3 py-2 text-xs text-fg">
+                  <span className="text-fg-muted">
                     Dernière fois ({formatDateShort(last.performed_at)}) :{" "}
                   </span>
                   {last.sets
@@ -281,13 +287,13 @@ export default function SessionLogger({
                     .join("  ·  ")}
                 </p>
               ) : (
-                <p className="mt-2 text-xs text-zinc-600">
+                <p className="mt-2 text-xs text-fg-faint">
                   Première fois sur cet exercice
                 </p>
               )}
 
               <div className="mt-3 space-y-2">
-                <div className="grid grid-cols-[1.5rem_1fr_1fr_2rem] items-center gap-2 px-1 text-[11px] uppercase tracking-wide text-zinc-500">
+                <div className="grid grid-cols-[1.5rem_1fr_1fr_2rem] items-center gap-2 px-1 text-[11px] uppercase tracking-wide text-fg-muted">
                   <span>#</span>
                   <span>Poids (kg)</span>
                   <span>Reps</span>
@@ -296,15 +302,15 @@ export default function SessionLogger({
                 {rows.map((row, i) => (
                   <div key={i} className="space-y-1">
                     <div className="grid grid-cols-[1.5rem_1fr_1fr_2rem] items-center gap-2">
-                      <span className="text-center text-sm text-zinc-500">
+                      <span className="text-center text-sm text-fg-muted">
                         {row.isWarmup ? "↑" : i + 1}
                       </span>
 
-                      <div className="flex items-center overflow-hidden rounded-lg bg-zinc-800">
+                      <div className="flex items-center overflow-hidden rounded-lg bg-surface2">
                         <button
                           type="button"
                           onClick={() => step(ex.exercise_id, i, "weight", -2.5)}
-                          className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-zinc-300 active:bg-zinc-700"
+                          className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-fg active:bg-white/10"
                           aria-label="Moins"
                         >
                           −
@@ -322,23 +328,23 @@ export default function SessionLogger({
                           onChange={(e) =>
                             updateField(ex.exercise_id, i, "weight", e.target.value)
                           }
-                          className="w-full min-w-0 bg-transparent py-3 text-center text-lg text-white focus:outline-none"
+                          className="w-full min-w-0 bg-transparent py-3 text-center text-lg text-fg focus:outline-none"
                         />
                         <button
                           type="button"
                           onClick={() => step(ex.exercise_id, i, "weight", 2.5)}
-                          className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-zinc-300 active:bg-zinc-700"
+                          className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-fg active:bg-white/10"
                           aria-label="Plus"
                         >
                           +
                         </button>
                       </div>
 
-                      <div className="flex items-center overflow-hidden rounded-lg bg-zinc-800">
+                      <div className="flex items-center overflow-hidden rounded-lg bg-surface2">
                         <button
                           type="button"
                           onClick={() => step(ex.exercise_id, i, "reps", -1)}
-                          className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-zinc-300 active:bg-zinc-700"
+                          className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-fg active:bg-white/10"
                           aria-label="Moins"
                         >
                           −
@@ -353,12 +359,12 @@ export default function SessionLogger({
                           onChange={(e) =>
                             updateField(ex.exercise_id, i, "reps", e.target.value)
                           }
-                          className="w-full min-w-0 bg-transparent py-3 text-center text-lg text-white focus:outline-none"
+                          className="w-full min-w-0 bg-transparent py-3 text-center text-lg text-fg focus:outline-none"
                         />
                         <button
                           type="button"
                           onClick={() => step(ex.exercise_id, i, "reps", 1)}
-                          className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-zinc-300 active:bg-zinc-700"
+                          className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl leading-none text-fg active:bg-white/10"
                           aria-label="Plus"
                         >
                           +
@@ -368,7 +374,7 @@ export default function SessionLogger({
                       <button
                         type="button"
                         onClick={() => removeRow(ex.exercise_id, i)}
-                        className="text-center text-zinc-600 hover:text-red-400"
+                        className="text-center text-fg-faint hover:text-red-400"
                         aria-label="Supprimer la série"
                       >
                         ✕
@@ -378,7 +384,7 @@ export default function SessionLogger({
                       type="button"
                       onClick={() => toggleWarmup(ex.exercise_id, i)}
                       className={`ml-7 text-[11px] font-medium ${
-                        row.isWarmup ? "text-toi" : "text-zinc-600"
+                        row.isWarmup ? "text-toi" : "text-fg-faint"
                       }`}
                     >
                       {row.isWarmup ? "● Échauffement" : "○ Marquer échauffement"}
@@ -391,14 +397,14 @@ export default function SessionLogger({
                 <button
                   type="button"
                   onClick={() => addRow(ex.exercise_id)}
-                  className="flex-1 rounded-lg border border-dashed border-zinc-700 py-2 text-xs text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                  className="flex-1 rounded-lg border border-dashed border-line py-2 text-xs text-fg-muted hover:border-white/25 hover:text-fg"
                 >
                   + Ajouter une série
                 </button>
                 <button
                   type="button"
                   onClick={() => startRest(ex.rest_seconds)}
-                  className="rounded-lg bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-300 active:bg-zinc-700"
+                  className="rounded-lg bg-surface2 px-3 py-2 text-xs font-medium text-fg active:bg-white/10"
                 >
                   ⏱ Repos {ex.rest_seconds}s
                 </button>
@@ -408,8 +414,8 @@ export default function SessionLogger({
         })}
       </div>
 
-      <div className="mt-6 rounded-xl bg-zinc-900 p-4">
-        <p className="text-sm font-medium text-zinc-300">
+      <div className="mt-6 rounded-xl bg-surface p-4">
+        <p className="text-sm font-medium text-fg">
           Ressenti de la séance
         </p>
         <div className="mt-2 grid grid-cols-4 gap-2">
@@ -422,8 +428,8 @@ export default function SessionLogger({
               }
               className={`rounded-lg py-2 text-xs font-medium transition-colors ${
                 feedback === opt.value
-                  ? "bg-toi text-white"
-                  : "bg-zinc-800 text-zinc-400"
+                  ? "bg-energy text-ink"
+                  : "bg-surface2 text-fg-muted"
               }`}
             >
               {opt.label}
@@ -445,33 +451,81 @@ export default function SessionLogger({
         </p>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-800 bg-zinc-950/95 p-4 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-ink/95 p-4 backdrop-blur">
         <div className="mx-auto max-w-lg space-y-3">
-          {restRemaining !== null && (
-            <button
-              type="button"
-              onClick={() => {
-                setRestRemaining(null);
-                void cancelRestNotification();
-              }}
-              className="flex w-full flex-col items-center rounded-xl bg-toi/15 py-4 active:bg-toi/25"
-            >
-              <span className="text-xs uppercase tracking-wide text-toi/80">
-                Repos en cours · appuie pour passer
-              </span>
-              <span className="mt-1 text-5xl font-bold tabular-nums text-toi">
-                {fmtClock(restRemaining)}
-              </span>
-              <span className="mt-1 text-xs text-zinc-500">
-                / {fmtClock(restTotal)}
-              </span>
-            </button>
-          )}
+          {restRemaining !== null &&
+            (() => {
+              const total = restTotal > 0 ? restTotal : 1;
+              const frac = Math.max(0, Math.min(1, restRemaining / total));
+              const C = 2 * Math.PI * 70;
+              return (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative h-[150px] w-[150px]">
+                    <svg viewBox="0 0 160 160" className="h-full w-full -rotate-90">
+                      <circle cx="80" cy="80" r="70" fill="none" stroke="#1c1c24" strokeWidth="11" />
+                      <circle
+                        cx="80"
+                        cy="80"
+                        r="70"
+                        fill="none"
+                        stroke="var(--energy)"
+                        strokeWidth="11"
+                        strokeLinecap="round"
+                        strokeDasharray={C}
+                        strokeDashoffset={C * (1 - frac)}
+                        style={{ transition: "stroke-dashoffset 1s linear" }}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-fg-muted">
+                        Repos
+                      </span>
+                      <span className="font-oswald text-4xl font-bold tabular-nums text-fg">
+                        {fmtClock(restRemaining)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRestRemaining((sec) =>
+                          sec === null ? null : Math.max(0, sec - 15),
+                        )
+                      }
+                      className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+                    >
+                      − 15 s
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRestRemaining(null);
+                        void cancelRestNotification();
+                      }}
+                      className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+                    >
+                      Passer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRestTotal((t) => t + 15);
+                        setRestRemaining((sec) => (sec === null ? null : sec + 15));
+                      }}
+                      className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+                    >
+                      + 15 s
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           {offlineSaved ? (
             <button
               type="button"
               onClick={() => router.push("/dashboard")}
-              className="w-full rounded-xl bg-toi py-3 font-semibold text-white"
+              className="w-full rounded-xl bg-energy py-3 font-extrabold text-ink"
             >
               Retour à l&apos;accueil
             </button>
@@ -480,7 +534,7 @@ export default function SessionLogger({
               type="button"
               onClick={handleFinish}
               disabled={isPending}
-              className="w-full rounded-xl bg-toi py-3 font-semibold text-white disabled:opacity-50"
+              className="w-full rounded-xl bg-energy py-3 font-extrabold text-ink disabled:opacity-50"
             >
               {isPending ? "Enregistrement…" : "Terminer la séance"}
             </button>
