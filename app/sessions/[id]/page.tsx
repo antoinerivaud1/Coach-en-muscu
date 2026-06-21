@@ -23,7 +23,7 @@ import {
   estimatedOneRepMax,
 } from "@/lib/utils/training";
 import SessionLogger, { type LoggerExercise } from "./SessionLogger";
-import { deleteSession } from "./actions";
+import { deleteSession, updateSet, deleteSet } from "./actions";
 
 const FEEDBACK_LABELS: Record<string, string> = {
   easy: "Facile",
@@ -37,10 +37,10 @@ export default async function SessionPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; editsets?: string }>;
 }) {
   const { id } = await params;
-  const { edit } = await searchParams;
+  const { edit, editsets } = await searchParams;
 
   const profileId = await requireProfileId();
   const supabase = await createClient();
@@ -52,6 +52,7 @@ export default async function SessionPage({
   }
 
   const isMine = session.profile_id === profileId;
+  const editSets = isMine && edit !== "1" && editsets === "1";
 
   const { data: setsData } = await getSessionSets(supabase, id);
   const existingSets = (setsData ?? []) as SessionSetRow[];
@@ -211,12 +212,19 @@ export default async function SessionPage({
   return (
     <main className="min-h-screen p-4 pb-24">
       <div className="mx-auto max-w-lg">
-        <Link
-          href="/history"
-          className="text-sm text-fg-muted hover:text-fg"
-        >
-          ← Historique
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/history" className="text-sm text-fg-muted hover:text-fg">
+            ← Historique
+          </Link>
+          {isMine && (
+            <Link
+              href={editSets ? `/sessions/${id}` : `/sessions/${id}?editsets=1`}
+              className="text-sm font-semibold text-energy"
+            >
+              {editSets ? "Terminer" : "Corriger les séries"}
+            </Link>
+          )}
+        </div>
 
         <h1 className="mt-3 text-2xl font-bold">{dayName}</h1>
         <p className="mt-1 text-sm text-fg-muted">
@@ -267,25 +275,53 @@ export default async function SessionPage({
                   )}
                 </div>
                 <ul className="mt-2 flex flex-wrap gap-2">
-                  {rows.map((r) => (
-                    <li
-                      key={r.id}
-                      className={`rounded-lg px-3 py-1.5 text-sm ${
-                        r.is_warmup
-                          ? "bg-surface2/50 text-fg-muted"
-                          : "bg-surface2"
-                      }`}
-                    >
-                      <span className="font-medium">
-                        {formatWeight(r.weight_kg)}
-                      </span>
-                      <span className="text-fg-muted"> kg × </span>
-                      <span className="font-medium">{r.reps}</span>
-                      {r.is_warmup && (
-                        <span className="ml-1 text-[10px] uppercase">éch.</span>
-                      )}
-                    </li>
-                  ))}
+                  {rows.map((r) =>
+                    editSets ? (
+                      <li key={r.id} className="flex items-center gap-2 rounded-lg bg-surface2 px-2.5 py-1.5 text-sm">
+                        <form action={updateSet} className="flex items-center gap-1.5">
+                          <input type="hidden" name="set_id" value={r.id} />
+                          <input type="hidden" name="session_id" value={id} />
+                          <input
+                            name="weight"
+                            defaultValue={formatWeight(r.weight_kg)}
+                            inputMode="decimal"
+                            className="w-14 rounded bg-ink px-2 py-1 text-center text-fg"
+                          />
+                          <span className="text-fg-muted">×</span>
+                          <input
+                            name="reps"
+                            defaultValue={String(r.reps)}
+                            inputMode="numeric"
+                            className="w-12 rounded bg-ink px-2 py-1 text-center text-fg"
+                          />
+                          <button type="submit" className="rounded bg-energy px-2 py-1 font-bold text-ink" aria-label="Enregistrer">
+                            ✓
+                          </button>
+                        </form>
+                        <form action={deleteSet}>
+                          <input type="hidden" name="set_id" value={r.id} />
+                          <input type="hidden" name="session_id" value={id} />
+                          <button type="submit" className="px-1 text-fg-faint hover:text-red-400" aria-label="Supprimer">
+                            ✕
+                          </button>
+                        </form>
+                      </li>
+                    ) : (
+                      <li
+                        key={r.id}
+                        className={`rounded-lg px-3 py-1.5 text-sm ${
+                          r.is_warmup ? "bg-surface2/50 text-fg-muted" : "bg-surface2"
+                        }`}
+                      >
+                        <span className="font-medium">{formatWeight(r.weight_kg)}</span>
+                        <span className="text-fg-muted"> kg × </span>
+                        <span className="font-medium">{r.reps}</span>
+                        {r.is_warmup && (
+                          <span className="ml-1 text-[10px] uppercase">éch.</span>
+                        )}
+                      </li>
+                    ),
+                  )}
                 </ul>
               </section>
             );
