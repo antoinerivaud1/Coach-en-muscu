@@ -119,9 +119,14 @@ export default async function SessionPage({
         const count = Math.max(1, pe.target_sets);
         initialSets[pe.exercise_id] = Array.from({ length: count }, (_, i) => {
           const ls = last?.sets[i];
+          if (!ls) return { weight: "", reps: "", isWarmup: false };
+          // Surcharge progressive : si la dernière fois on a atteint le haut de
+          // la fourchette de reps, on suggère +2,5 kg en repartant du bas de la
+          // fourchette. Sinon on reprend la dernière perf.
+          const hitTop = pe.target_reps_max > 0 && ls.reps >= pe.target_reps_max;
           return {
-            weight: ls ? formatWeight(ls.weight_kg) : "",
-            reps: ls ? String(ls.reps) : "",
+            weight: formatWeight(hitTop ? ls.weight_kg + 2.5 : ls.weight_kg),
+            reps: String(hitTop ? Math.max(1, pe.target_reps_min) : ls.reps),
             isWarmup: false,
           };
         });
