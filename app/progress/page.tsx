@@ -44,7 +44,7 @@ export default async function ProgressPage({
     profileParam && ids.includes(profileParam) ? profileParam : profileId;
   const selectedProfile =
     profiles.find((p) => p.id === selectedProfileId) ?? null;
-  const color = selectedProfile?.color_role === "elle" ? "#A855F7" : "#F97316";
+  const color = selectedProfile?.color_role === "elle" ? "#FF4F7E" : "#2FE6FF";
 
   const { data: setsData } = await getAllSetsForProgress(
     supabase,

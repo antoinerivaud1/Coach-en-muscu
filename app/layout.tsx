@@ -1,8 +1,24 @@
 import type { Metadata, Viewport } from "next";
+import { Archivo, Oswald } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import OrientationLock from "@/components/OrientationLock";
 import PendingSync from "@/components/PendingSync";
+
+// Direction Sport — Archivo (titres / interface) + Oswald (chiffres / scores)
+const archivo = Archivo({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-archivo",
+  display: "swap",
+});
+
+const oswald = Oswald({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-oswald",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Coach en Muscu",
@@ -20,7 +36,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: "#0B0B0F",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -32,8 +48,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="fr">
-      <body className="min-h-screen bg-zinc-950 text-zinc-50 antialiased">
+    <html lang="fr" className={`${archivo.variable} ${oswald.variable}`}>
+      <body className="min-h-screen bg-ink font-sans text-fg antialiased">
         {children}
         <PendingSync />
         <ServiceWorkerRegister />
