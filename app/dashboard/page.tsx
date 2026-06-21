@@ -44,10 +44,29 @@ export default async function DashboardPage() {
   const accent = isElle ? "text-elle" : "text-toi";
 
   let partnerName: string | null = null;
+  let partnerIsElle = false;
+  let partnerLive: { dayName: string } | null = null;
   if (coupleId) {
     const pids = await getCoupleProfileIds(supabase, coupleId);
     const partnerId = pids.find((id) => id !== profileId);
-    if (partnerId) partnerName = (await getProfile(supabase, partnerId))?.display_name ?? null;
+    if (partnerId) {
+      const partner = await getProfile(supabase, partnerId);
+      partnerName = partner?.display_name ?? null;
+      partnerIsElle = partner?.color_role === "elle";
+      // Séance en cours = pas encore terminée (duration null) et récente (< 3 h).
+      const since = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+      const { data: live } = await supabase
+        .from("sessions")
+        .select("id, program_days(name)")
+        .eq("profile_id", partnerId)
+        .is("duration_seconds", null)
+        .gte("performed_at", since)
+        .order("performed_at", { ascending: false })
+        .limit(1)
+        .returns<{ id: string; program_days: { name: string } | null }[]>();
+      const row = live?.[0];
+      if (row) partnerLive = { dayName: row.program_days?.name ?? "une séance" };
+    }
   }
 
   // --- Séances du profil (compteur global + assiduité de la semaine) ---
@@ -169,6 +188,26 @@ export default async function DashboardPage() {
           {isElle ? "E" : "L"}
         </span>
       </header>
+
+      {partnerLive && (
+        <div
+          className={`mt-5 flex items-center gap-3 rounded-2xl border px-4 py-3 ${
+            partnerIsElle ? "border-elle/30 bg-elle/10" : "border-toi/30 bg-toi/10"
+          }`}
+        >
+          <span
+            className={`h-2.5 w-2.5 flex-none animate-pulse rounded-full ${
+              partnerIsElle ? "bg-elle" : "bg-toi"
+            }`}
+          />
+          <div className="text-sm">
+            <span className="font-bold text-fg">{partnerName}</span>
+            <span className="text-fg-muted">
+              {" "}s&apos;entraîne en ce moment · {partnerLive.dayName}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Strip de la semaine */}
       <div className="mt-6 flex justify-between gap-1.5 rounded-[18px] border border-line bg-surface px-4 py-3.5">
