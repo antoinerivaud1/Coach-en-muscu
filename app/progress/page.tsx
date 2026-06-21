@@ -162,6 +162,42 @@ export default async function ProgressPage({
     .filter((g) => g.pct > 0)
     .sort((a, b) => b.pct - a.pct);
 
+  // Objectif hebdo (nb de séances cette semaine) + comparaison couple
+  const WEEK_GOAL = 4;
+  const { data: weekSess } = await supabase
+    .from("sessions")
+    .select("id, profile_id, performed_at")
+    .in("profile_id", ids)
+    .gte("performed_at", new Date(thisMonday).toISOString())
+    .returns<{ id: string; profile_id: string; performed_at: string }[]>();
+  const weekSessions = (weekSess ?? []).filter(
+    (s) => s.profile_id === selectedProfileId,
+  ).length;
+  let couple: { name: string; isElle: boolean; sets: number }[] = [];
+  if (profiles.length > 1 && (weekSess?.length ?? 0) > 0) {
+    const sessToProfile = new Map(
+      (weekSess ?? []).map((s) => [s.id, s.profile_id]),
+    );
+    const { data: wkSets } = await supabase
+      .from("session_sets")
+      .select("session_id")
+      .in(
+        "session_id",
+        (weekSess ?? []).map((s) => s.id),
+      )
+      .returns<{ session_id: string }[]>();
+    const cnt: Record<string, number> = {};
+    for (const r of wkSets ?? []) {
+      const pid = sessToProfile.get(r.session_id);
+      if (pid) cnt[pid] = (cnt[pid] ?? 0) + 1;
+    }
+    couple = profiles.map((p) => ({
+      name: p.display_name,
+      isElle: p.color_role === "elle",
+      sets: cnt[p.id] ?? 0,
+    }));
+  }
+
   const stats: StatsData = {
     sessionsThisMonth,
     sessionsDelta: sessionsThisMonth - sessionsLastMonth,
@@ -171,6 +207,9 @@ export default async function ProgressPage({
     recordExercise,
     weeks: weekBuckets.map((b) => ({ label: b.label, volume: b.volume })),
     groups,
+    weekGoal: WEEK_GOAL,
+    weekSessions,
+    couple,
   };
 
   return (
