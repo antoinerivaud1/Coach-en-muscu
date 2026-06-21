@@ -124,18 +124,21 @@ export type Database = {
           created_at: string
           display_name: string
           id: string
+          weekly_goal: number
         }
         Insert: {
           color_role?: Database["public"]["Enums"]["color_role"]
           created_at?: string
           display_name: string
           id: string
+          weekly_goal?: number
         }
         Update: {
           color_role?: Database["public"]["Enums"]["color_role"]
           created_at?: string
           display_name?: string
           id?: string
+          weekly_goal?: number
         }
         Relationships: []
       }

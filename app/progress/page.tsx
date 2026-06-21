@@ -16,7 +16,7 @@ import BottomNav from "@/components/BottomNav";
 import ProgressView, { type ExerciseSeries } from "./ProgressView";
 import StatsSummary, { type StatsData } from "./StatsSummary";
 
-type ProfileRow = { id: string; display_name: string; color_role: "toi" | "elle" };
+type ProfileRow = { id: string; display_name: string; color_role: "toi" | "elle"; weekly_goal: number };
 
 export default async function ProgressPage({
   searchParams,
@@ -35,7 +35,7 @@ export default async function ProgressPage({
 
   const { data: profilesData } = await supabase
     .from("profiles")
-    .select("id, display_name, color_role")
+    .select("id, display_name, color_role, weekly_goal")
     .in("id", ids)
     .returns<ProfileRow[]>();
   const profiles = profilesData ?? [];
@@ -163,7 +163,7 @@ export default async function ProgressPage({
     .sort((a, b) => b.pct - a.pct);
 
   // Objectif hebdo (nb de séances cette semaine) + comparaison couple
-  const WEEK_GOAL = 4;
+  const WEEK_GOAL = selectedProfile?.weekly_goal ?? 4;
   const { data: weekSess } = await supabase
     .from("sessions")
     .select("id, profile_id, performed_at")

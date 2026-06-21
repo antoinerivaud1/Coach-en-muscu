@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfileId, getProfile, getCoupleId, getCoupleProfileIds } from "@/lib/profile";
-import { clearProfile } from "@/app/actions";
+import { clearProfile, updateWeeklyGoal } from "@/app/actions";
 import BottomNav from "@/components/BottomNav";
 import OnboardingPhoto from "@/components/OnboardingPhoto";
 
@@ -58,6 +58,33 @@ export default async function ProfilePage() {
       </div>
 
       <OnboardingPhoto />
+
+      <div className="mt-6 rounded-2xl border border-line bg-surface p-4">
+        <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-fg-muted">
+          Objectif hebdomadaire
+        </div>
+        <p className="mt-1 text-sm text-fg-muted">
+          Nombre de séances visées par semaine (anneau des Stats).
+        </p>
+        <div className="mt-3 flex gap-2">
+          {[3, 4, 5, 6].map((g) => {
+            const active = (profile?.weekly_goal ?? 4) === g;
+            return (
+              <form key={g} action={updateWeeklyGoal} className="flex-1">
+                <input type="hidden" name="weekly_goal" value={g} />
+                <button
+                  type="submit"
+                  className={`w-full rounded-xl py-2.5 font-oswald text-lg font-bold ${
+                    active ? "bg-energy text-ink" : "bg-surface2 text-fg-muted"
+                  }`}
+                >
+                  {g}
+                </button>
+              </form>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="mt-6 flex flex-col gap-2.5">
         <Row href="/guide" title="Guide des exercices" sub="Mouvements, erreurs à éviter, étirements" />
