@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { finishSession, type LoggedSet } from "./actions";
 import type { LastExerciseData } from "@/lib/queries/sessions";
 import { formatWeight, formatDateShort } from "@/lib/utils/training";
+import { resolvePrefill } from "@/lib/utils/prefill";
 import ExerciseInfo from "@/components/ExerciseInfo";
 import { addPending } from "@/lib/pendingSessions";
 import { useWakeLock } from "@/hooks/useWakeLock";
@@ -84,6 +85,10 @@ export default function SessionLogger({
   const [error, setError] = useState<string | null>(null);
   const [offlineSaved, setOfflineSaved] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  // Champ en cours d'édition au clavier (CM-63) sur la série active.
+  const [editingField, setEditingField] = useState<"weight" | "reps" | null>(
+    null,
+  );
 
   useWakeLock(!offlineSaved);
 
@@ -140,10 +145,45 @@ export default function SessionLogger({
         isWarmup: false,
         touched: false,
       };
-      const raw = Number(current[field]);
+      // La saisie directe peut contenir une virgule (22,5) : on normalise.
+      const raw = Number(String(current[field]).replace(",", "."));
       const base = Number.isFinite(raw) ? raw : 0;
       const next = Math.max(0, base + delta);
-      const value = field === "weight" ? formatWeight(next) : String(next);
+      const value =
+        field === "weight" ? formatWeight(next) : String(Math.round(next));
+      rows[rowIndex] = { ...current, [field]: value, touched: true };
+      return { ...prev, [exId]: rows };
+    });
+  }
+
+  // Saisie directe au clavier (CM-63) : tap sur la valeur -> pavé numérique.
+  function commitDirect(
+    exId: string,
+    rowIndex: number,
+    field: "weight" | "reps",
+    raw: string,
+  ) {
+    setEditingField(null);
+    const trimmed = raw.trim();
+    setSets((prev) => {
+      const rows = prev[exId] ? [...prev[exId]!] : [];
+      const current = rows[rowIndex];
+      if (!current) return prev;
+      let value: string;
+      if (field === "weight") {
+        if (trimmed === "") {
+          value = "";
+        } else {
+          const n = Number(trimmed.replace(",", "."));
+          if (!Number.isFinite(n) || n < 0) return prev;
+          value = formatWeight(n);
+        }
+      } else {
+        if (trimmed === "") return prev; // reps obligatoires : on ne vide pas
+        const n = parseInt(trimmed, 10);
+        if (!Number.isFinite(n) || n < 0) return prev;
+        value = String(n);
+      }
       rows[rowIndex] = { ...current, [field]: value, touched: true };
       return { ...prev, [exId]: rows };
     });
@@ -162,10 +202,26 @@ export default function SessionLogger({
   function addRow(exId: string) {
     setSets((prev) => {
       const rows = prev[exId] ? [...prev[exId]!] : [];
-      const last = rows[rows.length - 1];
+      // CM-68 : une série ajoutée manuellement hérite de la dernière série
+      // effective (hors échauffement) de l'exercice, sans être marquée touched.
+      let previousEffectiveSet: { weight: string; reps: string } | null = null;
+      for (let i = rows.length - 1; i >= 0; i -= 1) {
+        const r = rows[i]!;
+        if (!r.isWarmup && (r.weight !== "" || r.reps !== "")) {
+          previousEffectiveSet = { weight: r.weight, reps: r.reps };
+          break;
+        }
+      }
+      const resolved = resolvePrefill({
+        touched: false,
+        current: { weight: "", reps: "" },
+        previousEffectiveSet,
+        isFirstSet: rows.length === 0,
+        firstSetSuggestion: null,
+      });
       rows.push({
-        weight: last?.weight ?? "",
-        reps: "",
+        weight: resolved.weight,
+        reps: resolved.reps,
         isWarmup: false,
         touched: false,
       });
@@ -183,9 +239,35 @@ export default function SessionLogger({
       return;
     }
     setError(null);
+    setEditingField(null);
     setSets((prev) => {
       const r = prev[exId] ? [...prev[exId]!] : [];
-      if (r[activeIndex]) r[activeIndex] = { ...r[activeIndex]!, touched: true };
+      const validatedRow = r[activeIndex];
+      if (!validatedRow) return prev;
+      r[activeIndex] = { ...validatedRow, touched: true };
+      // CM-68 : propagation vers la série suivante non touchée. Un échauffement
+      // ne sert jamais de source de propagation vers une série effective.
+      const nextIndex = activeIndex + 1;
+      const next = r[nextIndex];
+      if (next && !validatedRow.isWarmup) {
+        const resolved = resolvePrefill({
+          touched: next.touched,
+          current: { weight: next.weight, reps: next.reps },
+          previousEffectiveSet: {
+            weight: validatedRow.weight,
+            reps: validatedRow.reps,
+          },
+          isFirstSet: nextIndex === 0,
+          firstSetSuggestion: null,
+        });
+        // On ne marque JAMAIS la série cible comme touched : une série
+        // pré-remplie mais non validée ne doit pas être enregistrée (CM-68).
+        r[nextIndex] = {
+          ...next,
+          weight: resolved.weight,
+          reps: resolved.reps,
+        };
+      }
       return { ...prev, [exId]: r };
     });
     setValidated((v) => ({ ...v, [exId]: (v[exId] ?? 0) + 1 }));
@@ -246,6 +328,24 @@ export default function SessionLogger({
   const exerciseDone = rows.length > 0 && vcount >= rows.length;
   const isLast = currentIdx === exercises.length - 1;
   const last = ex.last;
+
+  // Delta CM-64 : comparaison alignée sur l'index de série (série i vs série i
+  // de la dernière fois), affichée quand la saisie en cours diffère.
+  const lastForActive = last?.sets[activeIndex];
+  const currentWeightNum =
+    activeRow && activeRow.weight !== ""
+      ? Number(activeRow.weight.replace(",", "."))
+      : NaN;
+  const rawDelta =
+    lastForActive && Number.isFinite(currentWeightNum)
+      ? Math.round((currentWeightNum - lastForActive.weight_kg) * 100) / 100
+      : null;
+  const deltaKg = rawDelta !== null && Math.abs(rawDelta) >= 0.01 ? rawDelta : null;
+
+  // On sort du mode saisie clavier dès qu'on change d'exercice ou de série.
+  useEffect(() => {
+    setEditingField(null);
+  }, [currentIdx, activeIndex]);
 
   const C = 2 * Math.PI * 70;
   const restFrac =
@@ -397,14 +497,21 @@ export default function SessionLogger({
           Objectif {ex.target_sets} × {ex.target_reps_min}–{ex.target_reps_max}
         </p>
 
-        {last && last.sets.length > 0 && (
-          <div className="mt-3 flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
-            <span className="flex-1 text-fg-muted">
-              Dernière fois ({formatDateShort(last.performed_at)})
-            </span>
-            <span className="font-oswald text-fg">
-              {last.sets.map((s) => `${formatWeight(s.weight_kg)}×${s.reps}`).join(" · ")}
-            </span>
+        {/* Rappel « dernière fois » (CM-64) — lecture seule, distinct d'un champ. */}
+        {last && last.sets.length > 0 ? (
+          <div className="mt-3 rounded-xl bg-surface/50 px-3.5 py-2.5">
+            <div className="font-oswald text-[11px] font-bold uppercase tracking-[0.14em] text-fg-muted">
+              Dernière fois, {formatDateShort(last.performed_at)}
+            </div>
+            <div className="mt-0.5 font-oswald text-sm text-fg">
+              {last.sets
+                .map((s) => `${formatWeight(s.weight_kg)} kg × ${s.reps}`)
+                .join(", ")}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-xl bg-surface/50 px-3.5 py-2.5 text-sm text-fg-muted">
+            Première fois sur cet exercice
           </div>
         )}
 
@@ -454,54 +561,138 @@ export default function SessionLogger({
           })}
         </div>
 
-        {/* Steppers pour la série en cours */}
+        {/* Saisie de la série en cours (CM-63) */}
         {!exerciseDone && activeRow && (
           <div className="mt-4 flex flex-col gap-3">
-            {(
-              [
-                { field: "weight", label: "Poids", unit: "kg", delta: 2.5 },
-                { field: "reps", label: "Répétitions", unit: "reps", delta: 1 },
-              ] as const
-            ).map((s) => (
-              <div
-                key={s.field}
-                className="flex items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3.5"
-              >
-                <div>
-                  <div className="text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
-                    {s.label}
-                  </div>
-                  <div className="mt-0.5 flex items-baseline gap-1.5">
-                    <span className="font-oswald text-[34px] font-bold leading-none text-fg">
-                      {activeRow[s.field] || 0}
+            {/* Poids : pas de base 1 kg + pas rapide 2,5 kg + saisie clavier */}
+            <div className="rounded-2xl border border-line bg-surface px-4 py-3.5">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
+                  Poids
+                </div>
+                {deltaKg !== null && (
+                  <span
+                    className={`font-oswald text-xs font-bold ${
+                      deltaKg >= 0 ? "text-energy" : "text-flame"
+                    }`}
+                  >
+                    {deltaKg > 0 ? "+" : "−"}
+                    {formatWeight(Math.abs(deltaKg))} kg
+                    <span className="ml-1 font-normal text-fg-faint">
+                      vs dernière
                     </span>
-                    <span className="text-sm font-bold text-fg-muted">{s.unit}</span>
-                  </div>
-                </div>
-                <div className="flex gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => step(ex.exercise_id, activeIndex, s.field, -s.delta)}
-                    className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
-                    aria-label="Moins"
-                  >
-                    −
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => step(ex.exercise_id, activeIndex, s.field, s.delta)}
-                    className="flex h-11 w-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
-                    aria-label="Plus"
-                  >
-                    +
-                  </button>
-                </div>
+                  </span>
+                )}
               </div>
-            ))}
+              <div className="mt-0.5 flex items-baseline gap-1.5">
+                {editingField === "weight" ? (
+                  <DirectInput
+                    field="weight"
+                    initial={activeRow.weight}
+                    onCommit={(raw) =>
+                      commitDirect(ex.exercise_id, activeIndex, "weight", raw)
+                    }
+                    onCancel={() => setEditingField(null)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingField("weight")}
+                    className="min-h-11 font-oswald text-[34px] font-bold leading-none text-fg"
+                    aria-label="Modifier le poids au clavier"
+                  >
+                    {activeRow.weight || 0}
+                  </button>
+                )}
+                <span className="text-sm font-bold text-fg-muted">kg</span>
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  onClick={() => step(ex.exercise_id, activeIndex, "weight", -2.5)}
+                  className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 font-oswald text-base font-semibold text-fg active:bg-white/10"
+                  aria-label="Moins 2,5 kg"
+                >
+                  −2.5
+                </button>
+                <button
+                  type="button"
+                  onClick={() => step(ex.exercise_id, activeIndex, "weight", -1)}
+                  className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
+                  aria-label="Moins 1 kg"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  onClick={() => step(ex.exercise_id, activeIndex, "weight", 1)}
+                  className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
+                  aria-label="Plus 1 kg"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={() => step(ex.exercise_id, activeIndex, "weight", 2.5)}
+                  className="flex h-11 items-center justify-center rounded-2xl bg-energy font-oswald text-base font-bold text-ink"
+                  aria-label="Plus 2,5 kg"
+                >
+                  +2.5
+                </button>
+              </div>
+            </div>
+
+            {/* Répétitions : pas de 1 + saisie clavier (entiers) */}
+            <div className="rounded-2xl border border-line bg-surface px-4 py-3.5">
+              <div className="text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
+                Répétitions
+              </div>
+              <div className="mt-0.5 flex items-baseline gap-1.5">
+                {editingField === "reps" ? (
+                  <DirectInput
+                    field="reps"
+                    initial={activeRow.reps}
+                    onCommit={(raw) =>
+                      commitDirect(ex.exercise_id, activeIndex, "reps", raw)
+                    }
+                    onCancel={() => setEditingField(null)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingField("reps")}
+                    className="min-h-11 font-oswald text-[34px] font-bold leading-none text-fg"
+                    aria-label="Modifier les répétitions au clavier"
+                  >
+                    {activeRow.reps || 0}
+                  </button>
+                )}
+                <span className="text-sm font-bold text-fg-muted">reps</span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => step(ex.exercise_id, activeIndex, "reps", -1)}
+                  className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
+                  aria-label="Moins 1 répétition"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  onClick={() => step(ex.exercise_id, activeIndex, "reps", 1)}
+                  className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
+                  aria-label="Plus 1 répétition"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={() => toggleWarmup(ex.exercise_id, activeIndex)}
-              className={`text-[11px] font-semibold ${
+              className={`min-h-11 text-left text-[11px] font-semibold ${
                 activeRow.isWarmup ? "text-toi" : "text-fg-faint"
               }`}
             >
@@ -600,5 +791,51 @@ export default function SessionLogger({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Saisie directe au clavier d'une valeur poids/reps (CM-63). Ouvre un pavé
+ * numérique adapté ; accepte la virgule et le point pour les décimales du
+ * poids. Valide au blur ou sur Entrée, annule sur Échap.
+ */
+function DirectInput({
+  field,
+  initial,
+  onCommit,
+  onCancel,
+}: {
+  field: "weight" | "reps";
+  initial: string;
+  onCommit: (raw: string) => void;
+  onCancel: () => void;
+}) {
+  const [val, setVal] = useState(initial);
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.select();
+  }, []);
+
+  return (
+    <input
+      ref={ref}
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={() => onCommit(val)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onCommit(val);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          onCancel();
+        }
+      }}
+      inputMode={field === "weight" ? "decimal" : "numeric"}
+      className="h-11 w-28 rounded-xl border border-energy bg-ink px-2 font-oswald text-[34px] font-bold leading-none text-fg outline-none"
+      aria-label={field === "weight" ? "Saisir le poids" : "Saisir les répétitions"}
+    />
   );
 }

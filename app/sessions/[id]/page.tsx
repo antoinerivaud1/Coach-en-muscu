@@ -22,6 +22,7 @@ import {
   formatDateLong,
   estimatedOneRepMax,
 } from "@/lib/utils/training";
+import { suggestFirstSet } from "@/lib/utils/prefill";
 import SessionLogger, { type LoggerExercise } from "./SessionLogger";
 import { deleteSession, updateSet, deleteSet } from "./actions";
 
@@ -118,18 +119,23 @@ export default async function SessionPage({
       } else {
         const last = lastByExercise[pe.exercise_id] ?? null;
         const count = Math.max(1, pe.target_sets);
+        // CM-68 : seule la série 1 est pré-remplie depuis le passé (suggestion
+        // CM-50 / dernière séance CM-19). Les séries suivantes se remplissent
+        // par propagation à la validation de la série précédente.
+        const firstSuggestion = suggestFirstSet(
+          last,
+          pe.target_reps_min,
+          pe.target_reps_max,
+        );
         initialSets[pe.exercise_id] = Array.from({ length: count }, (_, i) => {
-          const ls = last?.sets[i];
-          if (!ls) return { weight: "", reps: "", isWarmup: false };
-          // Surcharge progressive : si la dernière fois on a atteint le haut de
-          // la fourchette de reps, on suggère +2,5 kg en repartant du bas de la
-          // fourchette. Sinon on reprend la dernière perf.
-          const hitTop = pe.target_reps_max > 0 && ls.reps >= pe.target_reps_max;
-          return {
-            weight: formatWeight(hitTop ? ls.weight_kg + 2.5 : ls.weight_kg),
-            reps: String(hitTop ? Math.max(1, pe.target_reps_min) : ls.reps),
-            isWarmup: false,
-          };
+          if (i === 0 && firstSuggestion) {
+            return {
+              weight: firstSuggestion.weight,
+              reps: firstSuggestion.reps,
+              isWarmup: false,
+            };
+          }
+          return { weight: "", reps: "", isWarmup: false };
         });
       }
     }
