@@ -24,6 +24,10 @@ type ExerciseEntry = {
   rest_seconds: number;
 };
 
+/**
+ * Une séance type en cours d'édition. Le type garde son nom technique
+ * (`program_days` côté base) ; seul le vocabulaire de l'UI parle de « séance ».
+ */
 type DayEntry = {
   id?: string;
   name: string;
@@ -169,9 +173,11 @@ export default function ProgramForm({
   }
 
   function validateStep2(): string | null {
-    if (days.length === 0) return "Ajoute au moins un jour";
+    if (days.length === 0) return "Ajoute au moins une séance";
     for (let i = 0; i < days.length; i++) {
-      if (!days[i].name.trim()) return `Le jour ${i + 1} doit avoir un nom`;
+      if (!days[i].name.trim()) {
+        return "Chaque séance doit avoir un nom : complète les noms manquants";
+      }
     }
     return null;
   }
@@ -179,11 +185,17 @@ export default function ProgramForm({
   function validateStep3(): string | null {
     for (let i = 0; i < days.length; i++) {
       if (days[i].exercises.length === 0) {
-        return `Le jour "${days[i].name}" doit avoir au moins un exercice`;
+        return `La séance « ${days[i].name} » est vide : ajoute au moins un exercice`;
       }
     }
     return null;
   }
+
+  /**
+   * Raison qui empêche l'enregistrement (nom manquant ou séance vide).
+   * Le bouton reste visible mais désactivé, avec la raison affichée.
+   */
+  const blockingReason = validateStep2() ?? validateStep3();
 
   function goToStep(next: Step) {
     setError(null);
@@ -211,6 +223,10 @@ export default function ProgramForm({
 
   function handleSubmit() {
     setError(null);
+    if (blockingReason) {
+      setError(blockingReason);
+      return;
+    }
     startTransition(async () => {
       const mappedDays = days.map((d) => ({
         id: d.id,
@@ -362,9 +378,9 @@ export default function ProgramForm({
         {step === 2 && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-xl font-bold">Jours d&apos;entraînement</h1>
+              <h1 className="text-xl font-bold">Séances</h1>
               <p className="mt-1 text-sm text-fg-muted">
-                Ajoute les séances de ton programme
+                Nomme les séances de ta bibliothèque
               </p>
             </div>
 
@@ -378,7 +394,7 @@ export default function ProgramForm({
                     type="text"
                     value={day.name}
                     onChange={(e) => updateDayName(i, e.target.value)}
-                    placeholder={`ex. Upper A, Lower B, Jour ${i + 1}…`}
+                    placeholder="ex. Dos, Push, Jambes…"
                     className="flex-1 rounded-lg bg-surface2 px-3 py-2 text-white placeholder-fg-faint focus:outline-none focus:ring-2 focus:ring-toi"
                   />
                   {days.length > 1 && (
@@ -386,7 +402,7 @@ export default function ProgramForm({
                       type="button"
                       onClick={() => removeDay(i)}
                       className="rounded px-2 py-1 text-fg-muted hover:text-red-400"
-                      aria-label="Supprimer ce jour"
+                      aria-label="Supprimer cette séance"
                     >
                       ✕
                     </button>
@@ -400,7 +416,7 @@ export default function ProgramForm({
               onClick={addDay}
               className="w-full rounded-lg border border-dashed border-line py-3 text-sm text-fg-muted hover:border-white/25 hover:text-fg"
             >
-              + Ajouter un jour
+              + Ajouter une séance
             </button>
 
             {error && <p className="text-sm text-red-400">{error}</p>}
@@ -430,11 +446,11 @@ export default function ProgramForm({
             <div>
               <h1 className="text-xl font-bold">Exercices</h1>
               <p className="mt-1 text-sm text-fg-muted">
-                Ajoute les exercices pour chaque jour
+                Ajoute les exercices de chaque séance
               </p>
             </div>
 
-            {/* Day selector */}
+            {/* Sélecteur de séance — un point orange marque les séances vides */}
             <div className="flex gap-2 overflow-x-auto pb-1">
               {days.map((day, i) => (
                 <button
@@ -447,16 +463,22 @@ export default function ProgramForm({
                       : "bg-surface2 text-fg-muted"
                   }`}
                 >
-                  {day.name || `Jour ${i + 1}`}
+                  {day.exercises.length === 0 && (
+                    <span className="mr-1 text-flame" aria-hidden>
+                      ●
+                    </span>
+                  )}
+                  {day.name || "Sans nom"}
                 </button>
               ))}
             </div>
 
-            {/* Current day exercises */}
+            {/* Exercices de la séance en cours d'édition */}
             <div className="space-y-2">
               {days[editingDayIndex].exercises.length === 0 && (
-                <p className="rounded-lg bg-surface p-4 text-center text-sm text-fg-muted">
-                  Aucun exercice — choisis dans le catalogue ci-dessous
+                <p className="rounded-lg border border-dashed border-flame/40 bg-flame/10 p-4 text-center text-sm text-flame">
+                  Séance vide : elle ne pourra pas être enregistrée tant qu&apos;elle
+                  n&apos;a aucun exercice. Choisis dans le catalogue ci-dessous.
                 </p>
               )}
               {days[editingDayIndex].exercises.map((ex, exIdx) => (
@@ -621,7 +643,7 @@ export default function ProgramForm({
                             disabled={isCreating}
                             className="flex-1 rounded bg-toi py-2 text-xs font-semibold text-white disabled:opacity-50"
                           >
-                            {isCreating ? "Création…" : "Ajouter au jour"}
+                            {isCreating ? "Création…" : "Ajouter à la séance"}
                           </button>
                         </div>
                       </div>
@@ -716,16 +738,28 @@ export default function ProgramForm({
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-fg-muted text-sm">Jours</span>
+                <span className="text-fg-muted text-sm">Séances</span>
                 <span className="font-medium">{days.length}</span>
               </div>
             </div>
 
             <div className="space-y-3">
               {days.map((day, i) => (
-                <div key={i} className="rounded-lg bg-surface p-3">
-                  <div className="font-medium text-sm mb-2">
-                    {i + 1}. {day.name}
+                <div
+                  key={i}
+                  className={`rounded-lg p-3 ${
+                    day.exercises.length === 0
+                      ? "border border-dashed border-flame/40 bg-flame/10"
+                      : "bg-surface"
+                  }`}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2 text-sm font-medium">
+                    <span>{day.name || "Sans nom"}</span>
+                    {day.exercises.length === 0 && (
+                      <span className="text-xs font-semibold text-flame">
+                        Séance vide
+                      </span>
+                    )}
                   </div>
                   <ul className="space-y-1">
                     {day.exercises.map((ex, ei) => (
@@ -745,6 +779,12 @@ export default function ProgramForm({
               ))}
             </div>
 
+            {blockingReason && (
+              <p className="rounded-lg border border-flame/30 bg-flame/10 px-3 py-2 text-sm text-flame">
+                {blockingReason}
+              </p>
+            )}
+
             {error && <p className="text-sm text-red-400">{error}</p>}
 
             <div className="flex gap-3">
@@ -759,7 +799,7 @@ export default function ProgramForm({
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isPending}
+                disabled={isPending || blockingReason !== null}
                 className="flex-1 rounded-lg bg-toi py-3 font-semibold text-white disabled:opacity-50"
               >
                 {isPending

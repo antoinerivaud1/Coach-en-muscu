@@ -74,7 +74,7 @@ export async function createProgram(
     if (dayError || !dayData) {
       return {
         success: false,
-        error: dayError?.message ?? "Erreur lors de la création du jour",
+        error: dayError?.message ?? "Erreur lors de la création de la séance",
       };
     }
 
@@ -211,8 +211,9 @@ export async function updateProgram(
     return { success: false, error: updErr.message };
   }
 
-  // Jours existants -> supprimer ceux retirés (les séances passées gardent
-  // leur lien grâce à on delete set null sur sessions.program_day_id).
+  // Séances types existantes -> supprimer celles retirées (les séances déjà
+  // réalisées survivent grâce au on delete set null sur
+  // sessions.program_day_id, mais perdent leur rattachement).
   const { data: existingDays } = await supabase
     .from("program_days")
     .select("id")
@@ -254,7 +255,7 @@ export async function updateProgram(
         .select("id")
         .single();
       if (error || !created) {
-        return { success: false, error: error?.message ?? "Erreur jour" };
+        return { success: false, error: error?.message ?? "Erreur séance" };
       }
       dayId = created.id;
     }
