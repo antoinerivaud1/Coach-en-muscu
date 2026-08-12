@@ -19,7 +19,6 @@ type DayLite = {
   exos: number;
   sets: number;
   minutes: number;
-  weekdays: number[];
 };
 
 const WEEK = ["L", "M", "M", "J", "V", "S", "D"];
@@ -94,7 +93,7 @@ export default async function DashboardPage() {
   let q = supabase
     .from("programs")
     .select(
-      "id, name, couple_id, owner_profile_id, created_at, program_days(id, name, order_index, weekdays, program_exercises(target_sets, rest_seconds))",
+      "id, name, couple_id, owner_profile_id, created_at, program_days(id, name, order_index, program_exercises(target_sets, rest_seconds))",
     )
     .order("created_at", { ascending: true });
   q = coupleId
@@ -109,7 +108,6 @@ export default async function DashboardPage() {
         id: string;
         name: string;
         order_index: number;
-        weekdays: number[];
         program_exercises: { target_sets: number; rest_seconds: number }[];
       }[];
     }[]
@@ -133,7 +131,6 @@ export default async function DashboardPage() {
         id: d.id,
         name: d.name,
         order_index: d.order_index,
-        weekdays: d.weekdays ?? [],
         program_name: prog.name,
         couple: prog.couple_id !== null,
         exos: pes.length,
@@ -143,18 +140,9 @@ export default async function DashboardPage() {
     }
   }
 
-  const DAY_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
-  const hasSchedule = days.some((d) => d.weekdays.length > 0);
   let today: DayLite | null = null;
   let upcoming: { day: DayLite; label: string }[] = [];
-  if (hasSchedule) {
-    today = days.find((d) => d.weekdays.includes(todayIdx)) ?? null;
-    for (let k = 1; k <= 7 && upcoming.length < 2; k++) {
-      const wd = (todayIdx + k) % 7;
-      const d = days.find((x) => x.weekdays.includes(wd));
-      if (d) upcoming.push({ day: d, label: k === 1 ? "Demain" : DAY_FR[wd]! });
-    }
-  } else if (days.length > 0) {
+  if (days.length > 0) {
     today = days[sessionCount % days.length]!;
     if (days.length > 1) {
       upcoming = [1, 2].map((k) => {
@@ -163,7 +151,6 @@ export default async function DashboardPage() {
       });
     }
   }
-  const restToday = hasSchedule && !today;
 
   return (
     <main className="min-h-[100dvh] px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -276,18 +263,6 @@ export default async function DashboardPage() {
                 Démarrer la séance
               </button>
             </form>
-          </div>
-        </>
-      ) : restToday ? (
-        <>
-          <p className="mb-2.5 ml-0.5 mt-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
-            Aujourd&apos;hui
-          </p>
-          <div className="rounded-3xl border border-line bg-surface p-[22px]">
-            <h2 className="text-[26px] font-black tracking-tight text-fg">Repos</h2>
-            <p className="mt-1 text-sm text-fg-muted">
-              Aucune séance planifiée aujourd&apos;hui. Profites-en pour récupérer.
-            </p>
           </div>
         </>
       ) : (
