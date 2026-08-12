@@ -33,7 +33,14 @@ function todayLabel(): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  // `startSession` et `deleteProgram` redirigent ici en cas d'échec : le
+  // message voyage en query string et doit être affiché (CM-70).
+  const { error: actionError } = await searchParams;
   const profileId = await requireProfileId();
   const supabase = await createClient();
 
@@ -175,6 +182,15 @@ export default async function DashboardPage() {
           {isElle ? "E" : "L"}
         </span>
       </header>
+
+      {actionError && (
+        <p
+          role="alert"
+          className="mt-5 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-sm text-red-400"
+        >
+          {actionError}
+        </p>
+      )}
 
       {partnerLive && (
         <div
