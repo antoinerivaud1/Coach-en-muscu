@@ -194,7 +194,8 @@ export default function SeanceLibrary({
             {isEmpty ? (
               <p className="mt-3 rounded-xl border border-flame/30 bg-flame/10 px-3 py-2 text-sm text-flame">
                 Cette séance n&apos;a aucun exercice : elle ne peut pas être
-                démarrée. Ajoute au moins un exercice via « Modifier ».
+                démarrée. Ajoute au moins un exercice via « Modifier les
+                exercices », en haut de la page.
               </p>
             ) : (
               <ul className="mt-3 space-y-2">

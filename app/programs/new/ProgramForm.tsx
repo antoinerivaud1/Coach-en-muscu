@@ -82,7 +82,11 @@ export default function ProgramForm({
     useState<SystemExercise["muscle_group"]>("chest");
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const [step, setStep] = useState<Step>(1);
+  // CM-70 : en édition, on ouvre directement sur l'éditeur de séances et
+  // d'exercices (étape 3) plutôt que sur le nom du programme. Ouvrir à
+  // l'étape 1 donnait à « Modifier » l'allure exacte du parcours de création.
+  // Le nom et la portée restent accessibles via « Retour ».
+  const [step, setStep] = useState<Step>(isEdit ? 3 : 1);
   const [name, setName] = useState(initialName ?? "");
   const [scope, setScope] = useState<"individual" | "couple">(
     initialScope ?? "individual",
@@ -716,7 +720,9 @@ export default function ProgramForm({
             <div>
               <h1 className="text-xl font-bold">Récapitulatif</h1>
               <p className="mt-1 text-sm text-fg-muted">
-                Vérifie ton programme avant de le créer
+                {isEdit
+                  ? "Vérifie tes modifications avant d'enregistrer"
+                  : "Vérifie ton programme avant de le créer"}
               </p>
             </div>
 

@@ -100,7 +100,7 @@ export default async function ProgramDetailPage({
             href={`/programs/${id}/edit`}
             className="flex-1 rounded-lg bg-surface2 py-2.5 text-center text-sm font-semibold text-fg"
           >
-            Renommer le programme
+            Modifier les exercices
           </Link>
           <form action={deleteProgram} className="flex-1">
             <input type="hidden" name="program_id" value={id} />

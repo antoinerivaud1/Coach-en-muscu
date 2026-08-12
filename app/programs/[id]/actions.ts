@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getCoupleId } from "@/lib/profile";
+import { requireProfileId } from "@/lib/profile";
 import { countLoggedSessionsForDay } from "@/lib/queries/programs";
 
 /**
@@ -386,65 +386,5 @@ export async function moveSeance(
   }
 
   revalidateLibrary(day.program_id);
-  return { success: true };
-}
-
-/**
- * Modifie le programme lui-même : son nom et sa portée (individuel / partagé).
- *
- * CM-70 : « Modifier » pointait vers l'assistant 4 étapes de `/programs/new`.
- * Celui-ci gère aussi les séances et, en mode édition, supprime toute séance
- * absente de sa liste puis réécrit les exercices de chaque séance — il pouvait
- * donc détruire le travail fait dans la bibliothèque. Depuis CM-65 les séances
- * appartiennent à la bibliothèque ; l'édition du programme se limite à ses
- * propres champs.
- */
-export async function updateProgramMeta(input: {
-  programId: string;
-  name: string;
-  scope: "individual" | "couple";
-}): Promise<SeanceActionResult> {
-  const profileId = await requireProfileId();
-  const supabase = await createClient();
-
-  const name = input.name.trim();
-  if (!name) {
-    return { success: false, error: "Le nom du programme est obligatoire" };
-  }
-
-  const coupleId = await getCoupleId(supabase, profileId);
-  if (input.scope === "couple" && !coupleId) {
-    return {
-      success: false,
-      error: "Tu dois être en couple pour partager un programme",
-    };
-  }
-
-  const { data: program, error: readError } = await supabase
-    .from("programs")
-    .select("id")
-    .eq("id", input.programId)
-    .maybeSingle();
-  if (readError) {
-    return { success: false, error: readError.message };
-  }
-  if (!program) {
-    return { success: false, error: "Programme introuvable" };
-  }
-
-  const { error } = await supabase
-    .from("programs")
-    .update(
-      input.scope === "couple"
-        ? { name, couple_id: coupleId, owner_profile_id: null }
-        : { name, couple_id: null, owner_profile_id: profileId },
-    )
-    .eq("id", input.programId);
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
-
-  revalidateLibrary(input.programId);
   return { success: true };
 }
