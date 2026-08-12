@@ -108,22 +108,37 @@ export async function getDayWithExercises(
 
 // ---- Historique rattaché à une séance type ----
 
+export type LoggedSessionCount =
+  | { ok: true; count: number }
+  | { ok: false; error: string };
+
 /**
  * Nombre de séances RÉELLEMENT réalisées sur cette séance type, c.-à-d. les
  * `sessions` qui ont au moins une ligne dans `session_sets`.
  *
  * Les sessions vides (démarrées puis abandonnées sans aucune série) ne comptent
  * pas : un décompte naïf sur `sessions` donnerait des chiffres faux (CM-65).
+ *
+ * CM-70 : l'erreur est remontée au lieu d'être avalée. Auparavant un échec de
+ * cette requête renvoyait `0`, ce qui désarmait silencieusement le garde-fou
+ * d'historique de `deleteSeance` et détachait les séances déjà réalisées.
  */
 export async function countLoggedSessionsForDay(
   supabase: SupabaseClient<Database>,
   dayId: string,
-): Promise<number> {
-  const { data } = await supabase
+): Promise<LoggedSessionCount> {
+  const { data, error } = await supabase
     .from("sessions")
     .select("id, session_sets(id)")
     .eq("program_day_id", dayId)
     .returns<{ id: string; session_sets: { id: string }[] }[]>();
 
-  return (data ?? []).filter((s) => (s.session_sets ?? []).length > 0).length;
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return {
+    ok: true,
+    count: (data ?? []).filter((s) => (s.session_sets ?? []).length > 0).length,
+  };
 }

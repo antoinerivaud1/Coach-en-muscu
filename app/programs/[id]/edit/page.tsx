@@ -3,11 +3,20 @@ import { createClient } from "@/lib/supabase/server";
 import { requireProfileId, getCoupleId, getCoupleProfileIds } from "@/lib/profile";
 import { getProgramWithDays } from "@/lib/queries/programs";
 import type { ProgramFull } from "@/lib/queries/programs";
-import { getCatalogExercises } from "@/lib/queries/exercises";
-import type { SystemExercise } from "@/lib/queries/exercises";
-import ProgramForm from "@/app/programs/new/ProgramForm";
 import BackButton from "@/components/BackButton";
+import ProgramMetaForm from "./ProgramMetaForm";
 
+/**
+ * Édition d'un programme : son nom et sa portée, pré-remplis.
+ *
+ * CM-70 : cette page montait l'assistant 4 étapes de `/programs/new`. Même
+ * pré-rempli, il se présentait comme le parcours de création et gérait aussi
+ * les séances — alors que depuis CM-65 celles-ci appartiennent à la
+ * bibliothèque de `/programs/[id]`. Pire, son action `updateProgram` supprime
+ * toute séance absente de sa liste : passer par « Modifier » pouvait détruire
+ * le travail fait dans la bibliothèque. L'assistant reste réservé à la
+ * création.
+ */
 export default async function EditProgramPage({
   params,
 }: {
@@ -29,42 +38,21 @@ export default async function EditProgramPage({
         (pid) => pid !== profileId,
       )
     : [];
-  const hasCouple = partnerIds.length > 0;
-
-  const { data: exercisesData } = await getCatalogExercises(supabase, coupleId);
-  const exercises: SystemExercise[] = exercisesData ?? [];
-
-  const initialDays = [...program.program_days]
-    .sort((a, b) => a.order_index - b.order_index)
-    .map((d) => ({
-      id: d.id,
-      name: d.name,
-      exercises: [...d.program_exercises]
-        .sort((a, b) => a.order_index - b.order_index)
-        .map((pe) => ({
-          exercise_id: pe.exercise_id,
-          target_sets: pe.target_sets,
-          target_reps_min: pe.target_reps_min,
-          target_reps_max: pe.target_reps_max,
-          rest_seconds: pe.rest_seconds,
-        })),
-    }));
 
   return (
     <main className="min-h-screen p-4">
-      <div className="mx-auto mb-2 max-w-lg">
-        <BackButton fallback={`/programs/${id}`} />
+      <div className="mx-auto max-w-lg">
+        <div className="mb-2">
+          <BackButton fallback={`/programs/${id}`} />
+        </div>
+        <ProgramMetaForm
+          programId={id}
+          initialName={program.name}
+          initialScope={program.couple_id ? "couple" : "individual"}
+          hasCouple={partnerIds.length > 0}
+          seanceCount={program.program_days.length}
+        />
       </div>
-      <ProgramForm
-        exercises={exercises}
-        hasCouple={hasCouple}
-        canCreateExercise={Boolean(coupleId)}
-        mode="edit"
-        programId={id}
-        initialName={program.name}
-        initialScope={program.couple_id ? "couple" : "individual"}
-        initialDays={initialDays}
-      />
     </main>
   );
 }

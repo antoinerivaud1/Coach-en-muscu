@@ -14,10 +14,13 @@ import ConfirmSubmit from "@/components/ConfirmSubmit";
 
 export default async function ProgramDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { id } = await params;
+  const { error: actionError } = await searchParams;
   await requireProfileId();
   const supabase = await createClient();
 
@@ -83,20 +86,30 @@ export default async function ProgramDetailPage({
           librement la tienne
         </p>
 
-        <div className="mt-4 flex gap-3">
+        {actionError && (
+          <p
+            role="alert"
+            className="mt-4 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+          >
+            {actionError}
+          </p>
+        )}
+
+        <div className="mt-4 flex items-start gap-3">
           <Link
             href={`/programs/${id}/edit`}
             className="flex-1 rounded-lg bg-surface2 py-2.5 text-center text-sm font-semibold text-fg"
           >
-            Modifier
+            Renommer le programme
           </Link>
           <form action={deleteProgram} className="flex-1">
             <input type="hidden" name="program_id" value={id} />
             <ConfirmSubmit
               message="Supprimer ce programme et toutes ses séances types ? Les séances déjà enregistrées sont conservées."
+              confirmLabel="Oui, supprimer"
               className="w-full rounded-lg bg-surface2 py-2.5 text-sm font-semibold text-red-400"
             >
-              Supprimer
+              Supprimer le programme
             </ConfirmSubmit>
           </form>
         </div>

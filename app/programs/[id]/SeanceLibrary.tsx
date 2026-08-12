@@ -46,6 +46,8 @@ export default function SeanceLibrary({
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** Séance dont la suppression attend une confirmation, rendue dans le DOM. */
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   function run(key: string, action: () => Promise<SeanceActionResult>) {
     setErrorKey(null);
@@ -54,6 +56,7 @@ export default function SeanceLibrary({
     startAction(async () => {
       const result = await action();
       setBusyId(null);
+      setConfirmingId(null);
       if (!result.success) {
         setErrorKey(key);
         setErrorMessage(result.error);
@@ -77,11 +80,15 @@ export default function SeanceLibrary({
     });
   }
 
+  /**
+   * CM-70 : la confirmation passait par `window.confirm()`. Ce dialogue natif
+   * est supprimé (et renvoie donc `false`) dans une web app iOS en
+   * `display: standalone` comme dans la WKWebView Capacitor — les deux
+   * contextes de cette app. `handleDelete` sortait avant même d'appeler la
+   * server action : aucune requête, aucune erreur, aucun message. La
+   * confirmation est désormais rendue dans le DOM (voir `confirmingId`).
+   */
   function handleDelete(seance: SeanceView) {
-    const ok = window.confirm(
-      `Supprimer la séance « ${seance.name} » ? Cette action est définitive.`,
-    );
-    if (!ok) return;
     run(seance.id, () => deleteSeance(seance.id));
   }
 
@@ -111,7 +118,12 @@ export default function SeanceLibrary({
           </button>
         </div>
         {errorKey === NEW_SEANCE_KEY && errorMessage && (
-          <p className="mt-2 text-sm text-red-400">{errorMessage}</p>
+          <p
+            role="alert"
+            className="mt-2 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+          >
+            {errorMessage}
+          </p>
         )}
       </section>
 
@@ -237,16 +249,53 @@ export default function SeanceLibrary({
               </button>
               <button
                 type="button"
-                onClick={() => handleDelete(seance)}
+                onClick={() =>
+                  setConfirmingId((prev) =>
+                    prev === seance.id ? null : seance.id,
+                  )
+                }
                 disabled={isPending}
+                aria-expanded={confirmingId === seance.id}
                 className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-red-400 disabled:opacity-50"
               >
                 Supprimer
               </button>
             </div>
 
+            {confirmingId === seance.id && (
+              <div className="mt-3 rounded-xl border border-flame/40 bg-flame/10 p-3">
+                <p className="text-sm font-semibold text-flame">
+                  Supprimer la séance « {seance.name} » ? Cette action est
+                  définitive.
+                </p>
+                <div className="mt-2.5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingId(null)}
+                    disabled={isPending}
+                    className="flex-1 rounded-lg bg-surface2 py-2 text-sm font-semibold text-fg disabled:opacity-50"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(seance)}
+                    disabled={isPending}
+                    className="flex-1 rounded-lg bg-flame py-2 text-sm font-extrabold text-ink disabled:opacity-50"
+                  >
+                    {busy ? "Suppression…" : "Oui, supprimer"}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {errorKey === seance.id && errorMessage && (
-              <p className="mt-2 text-sm text-red-400">{errorMessage}</p>
+              <p
+                role="alert"
+                className="mt-2 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+              >
+                {errorMessage}
+              </p>
             )}
           </section>
         );

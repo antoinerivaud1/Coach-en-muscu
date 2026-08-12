@@ -3,13 +3,23 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId } from "@/lib/profile";
+import { requireProfileId, getCoupleId } from "@/lib/profile";
 import { countLoggedSessionsForDay } from "@/lib/queries/programs";
+
+/**
+ * Les actions déclenchées par un `<form action={...}>` ne peuvent pas renvoyer
+ * de résultat à l'écran d'origine : elles redirigent. On fait donc voyager le
+ * message d'erreur en query string, et la page cible l'affiche (CM-70).
+ */
+function redirectWithError(path: string, message: string): never {
+  const separator = path.includes("?") ? "&" : "?";
+  redirect(`${path}${separator}error=${encodeURIComponent(message)}`);
+}
 
 export async function startSession(formData: FormData) {
   const dayId = String(formData.get("day_id") ?? "").trim();
   if (!dayId) {
-    redirect("/dashboard");
+    redirectWithError("/dashboard", "Séance introuvable : impossible de démarrer.");
   }
 
   const profileId = await requireProfileId();
@@ -22,7 +32,10 @@ export async function startSession(formData: FormData) {
     .single();
 
   if (error || !session) {
-    redirect(`/dashboard?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+    redirectWithError(
+      "/dashboard",
+      `Impossible de démarrer la séance : ${error?.message ?? "erreur inconnue"}`,
+    );
   }
 
   redirect(`/sessions/${session.id}`);
@@ -31,12 +44,20 @@ export async function startSession(formData: FormData) {
 export async function deleteProgram(formData: FormData) {
   const programId = String(formData.get("program_id") ?? "").trim();
   if (!programId) {
-    redirect("/dashboard");
+    redirectWithError("/dashboard", "Programme introuvable : rien n'a été supprimé.");
   }
   await requireProfileId();
   const supabase = await createClient();
 
-  await supabase.from("programs").delete().eq("id", programId);
+  // CM-70 : l'erreur était totalement ignorée, puis on redirigeait vers le
+  // dashboard comme si la suppression avait réussi.
+  const { error } = await supabase.from("programs").delete().eq("id", programId);
+  if (error) {
+    redirectWithError(
+      `/programs/${programId}`,
+      `Impossible de supprimer le programme : ${error.message}`,
+    );
+  }
 
   revalidatePath("/dashboard");
   redirect("/dashboard");
@@ -59,12 +80,17 @@ function revalidateLibrary(programId: string) {
   revalidatePath("/dashboard");
 }
 
-/** `order_index` à donner à une nouvelle séance : max existant + 1. */
+/**
+ * `order_index` à donner à une nouvelle séance : max existant + 1.
+ *
+ * CM-70 : l'erreur est remontée. Elle était avalée et la fonction renvoyait
+ * `0`, ce qui plaçait la nouvelle séance en doublon d'ordre en tête de liste.
+ */
 async function nextOrderIndex(
   supabase: Awaited<ReturnType<typeof createClient>>,
   programId: string,
-): Promise<number> {
-  const { data } = await supabase
+): Promise<{ ok: true; value: number } | { ok: false; error: string }> {
+  const { data, error } = await supabase
     .from("program_days")
     .select("order_index")
     .eq("program_id", programId)
@@ -72,8 +98,12 @@ async function nextOrderIndex(
     .limit(1)
     .returns<{ order_index: number }[]>();
 
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
   const max = data?.[0]?.order_index;
-  return typeof max === "number" ? max + 1 : 0;
+  return { ok: true, value: typeof max === "number" ? max + 1 : 0 };
 }
 
 export async function createSeance(input: {
@@ -88,19 +118,27 @@ export async function createSeance(input: {
     return { success: false, error: "Le nom de la séance est obligatoire" };
   }
 
-  const { data: program } = await supabase
+  const { data: program, error: programError } = await supabase
     .from("programs")
     .select("id")
     .eq("id", input.programId)
     .maybeSingle();
+  if (programError) {
+    return { success: false, error: programError.message };
+  }
   if (!program) {
     return { success: false, error: "Programme introuvable" };
+  }
+
+  const order = await nextOrderIndex(supabase, input.programId);
+  if (!order.ok) {
+    return { success: false, error: order.error };
   }
 
   const { error } = await supabase.from("program_days").insert({
     program_id: input.programId,
     name,
-    order_index: await nextOrderIndex(supabase, input.programId),
+    order_index: order.value,
   });
 
   if (error) {
@@ -121,7 +159,7 @@ export async function duplicateSeance(
   await requireProfileId();
   const supabase = await createClient();
 
-  const { data: source } = await supabase
+  const { data: source, error: sourceError } = await supabase
     .from("program_days")
     .select(
       `id, name, program_id,
@@ -148,8 +186,16 @@ export async function duplicateSeance(
     >()
     .maybeSingle();
 
+  if (sourceError) {
+    return { success: false, error: sourceError.message };
+  }
   if (!source) {
     return { success: false, error: "Séance introuvable" };
+  }
+
+  const order = await nextOrderIndex(supabase, source.program_id);
+  if (!order.ok) {
+    return { success: false, error: order.error };
   }
 
   const { data: copy, error: copyError } = await supabase
@@ -157,7 +203,7 @@ export async function duplicateSeance(
     .insert({
       program_id: source.program_id,
       name: `${source.name} (copie)`,
-      order_index: await nextOrderIndex(supabase, source.program_id),
+      order_index: order.value,
     })
     .select("id")
     .single();
@@ -185,7 +231,18 @@ export async function duplicateSeance(
 
     if (exError) {
       // La copie serait vide et donc inutilisable : on annule tout.
-      await supabase.from("program_days").delete().eq("id", copy.id);
+      const { error: rollbackError } = await supabase
+        .from("program_days")
+        .delete()
+        .eq("id", copy.id);
+      if (rollbackError) {
+        return {
+          success: false,
+          error:
+            `${exError.message}. La copie vide « ${source.name} (copie) » n'a pas pu ` +
+            `être nettoyée (${rollbackError.message}) : supprime-la à la main.`,
+        };
+      }
       return { success: false, error: exError.message };
     }
   }
@@ -207,24 +264,38 @@ export async function deleteSeance(dayId: string): Promise<SeanceActionResult> {
   await requireProfileId();
   const supabase = await createClient();
 
-  const { data: day } = await supabase
+  const { data: day, error: dayError } = await supabase
     .from("program_days")
     .select("id, name, program_id")
     .eq("id", dayId)
     .returns<{ id: string; name: string; program_id: string }[]>()
     .maybeSingle();
 
+  if (dayError) {
+    return { success: false, error: dayError.message };
+  }
   if (!day) {
     return { success: false, error: "Séance introuvable" };
   }
 
   const logged = await countLoggedSessionsForDay(supabase, dayId);
-  if (logged > 0) {
+  // Comptage impossible : on refuse la suppression plutôt que de détacher un
+  // historique par défaut (CM-70).
+  if (!logged.ok) {
     return {
       success: false,
       error:
-        `Impossible de supprimer « ${day.name} » : ${logged} séance${logged > 1 ? "s" : ""} ` +
-        `déjà réalisée${logged > 1 ? "s" : ""} y ${logged > 1 ? "sont rattachées" : "est rattachée"}. ` +
+        `Impossible de vérifier l'historique de « ${day.name} » (${logged.error}). ` +
+        "Suppression annulée par sécurité.",
+    };
+  }
+  if (logged.count > 0) {
+    const n = logged.count;
+    return {
+      success: false,
+      error:
+        `Impossible de supprimer « ${day.name} » : ${n} séance${n > 1 ? "s" : ""} ` +
+        `déjà réalisée${n > 1 ? "s" : ""} y ${n > 1 ? "sont rattachées" : "est rattachée"}. ` +
         "La supprimer détacherait cet historique. Renomme-la ou vide-la de ses exercices.",
     };
   }
@@ -256,28 +327,45 @@ export async function moveSeance(
   await requireProfileId();
   const supabase = await createClient();
 
-  const { data: day } = await supabase
+  const { data: day, error: dayError } = await supabase
     .from("program_days")
     .select("id, program_id")
     .eq("id", dayId)
     .returns<{ id: string; program_id: string }[]>()
     .maybeSingle();
 
+  if (dayError) {
+    return { success: false, error: dayError.message };
+  }
   if (!day) {
     return { success: false, error: "Séance introuvable" };
   }
 
-  const { data: siblings } = await supabase
+  const { data: siblings, error: siblingsError } = await supabase
     .from("program_days")
     .select("id, order_index")
     .eq("program_id", day.program_id)
     .order("order_index", { ascending: true })
     .returns<{ id: string; order_index: number }[]>();
 
+  // CM-70 : une erreur ici renvoyait une liste vide, donc `from === -1`, donc
+  // `{ success: true }` — un échec complet rapporté comme une réussite.
+  if (siblingsError) {
+    return { success: false, error: siblingsError.message };
+  }
+
   const ordered = siblings ?? [];
   const from = ordered.findIndex((d) => d.id === dayId);
+  if (from === -1) {
+    return {
+      success: false,
+      error: "Séance introuvable dans la bibliothèque : réordonnancement annulé.",
+    };
+  }
+
   const to = direction === "up" ? from - 1 : from + 1;
-  if (from === -1 || to < 0 || to >= ordered.length) {
+  // Déjà en butée : rien à faire, ce n'est pas une erreur.
+  if (to < 0 || to >= ordered.length) {
     return { success: true };
   }
 
@@ -298,5 +386,65 @@ export async function moveSeance(
   }
 
   revalidateLibrary(day.program_id);
+  return { success: true };
+}
+
+/**
+ * Modifie le programme lui-même : son nom et sa portée (individuel / partagé).
+ *
+ * CM-70 : « Modifier » pointait vers l'assistant 4 étapes de `/programs/new`.
+ * Celui-ci gère aussi les séances et, en mode édition, supprime toute séance
+ * absente de sa liste puis réécrit les exercices de chaque séance — il pouvait
+ * donc détruire le travail fait dans la bibliothèque. Depuis CM-65 les séances
+ * appartiennent à la bibliothèque ; l'édition du programme se limite à ses
+ * propres champs.
+ */
+export async function updateProgramMeta(input: {
+  programId: string;
+  name: string;
+  scope: "individual" | "couple";
+}): Promise<SeanceActionResult> {
+  const profileId = await requireProfileId();
+  const supabase = await createClient();
+
+  const name = input.name.trim();
+  if (!name) {
+    return { success: false, error: "Le nom du programme est obligatoire" };
+  }
+
+  const coupleId = await getCoupleId(supabase, profileId);
+  if (input.scope === "couple" && !coupleId) {
+    return {
+      success: false,
+      error: "Tu dois être en couple pour partager un programme",
+    };
+  }
+
+  const { data: program, error: readError } = await supabase
+    .from("programs")
+    .select("id")
+    .eq("id", input.programId)
+    .maybeSingle();
+  if (readError) {
+    return { success: false, error: readError.message };
+  }
+  if (!program) {
+    return { success: false, error: "Programme introuvable" };
+  }
+
+  const { error } = await supabase
+    .from("programs")
+    .update(
+      input.scope === "couple"
+        ? { name, couple_id: coupleId, owner_profile_id: null }
+        : { name, couple_id: null, owner_profile_id: profileId },
+    )
+    .eq("id", input.programId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidateLibrary(input.programId);
   return { success: true };
 }
