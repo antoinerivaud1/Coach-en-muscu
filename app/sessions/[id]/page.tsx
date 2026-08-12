@@ -154,7 +154,7 @@ export default async function SessionPage({
   }
 
   // ---------- Mode récap (lecture) ----------
-  // Nom du jour.
+  // Nom de la séance type.
   let dayName = "Séance";
   if (session.program_day_id) {
     const { data: dayData } = await getDayWithExercises(

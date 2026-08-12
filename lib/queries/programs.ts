@@ -29,7 +29,9 @@ export type ProgramWithDays = {
   program_days: { id: string }[];
 };
 
-// ---- Détail complet d'un programme (jours + exos) ----
+// ---- Détail complet d'une bibliothèque (séances types + exos) ----
+// `program_days` = une séance type. Le schéma garde son nom (CM-65) ; seul le
+// vocabulaire de l'UI parle de « séance ».
 
 export type ProgramExerciseFull = {
   id: string;
@@ -83,7 +85,7 @@ export async function getProgramWithDays(
     .maybeSingle();
 }
 
-// ---- Un jour précis avec ses exercices (pour démarrer une séance) ----
+// ---- Une séance type précise avec ses exercices (pour la démarrer) ----
 
 export async function getDayWithExercises(
   supabase: SupabaseClient<Database>,
@@ -102,4 +104,26 @@ export async function getDayWithExercises(
     .eq("id", dayId)
     .returns<ProgramDayFull[]>()
     .maybeSingle();
+}
+
+// ---- Historique rattaché à une séance type ----
+
+/**
+ * Nombre de séances RÉELLEMENT réalisées sur cette séance type, c.-à-d. les
+ * `sessions` qui ont au moins une ligne dans `session_sets`.
+ *
+ * Les sessions vides (démarrées puis abandonnées sans aucune série) ne comptent
+ * pas : un décompte naïf sur `sessions` donnerait des chiffres faux (CM-65).
+ */
+export async function countLoggedSessionsForDay(
+  supabase: SupabaseClient<Database>,
+  dayId: string,
+): Promise<number> {
+  const { data } = await supabase
+    .from("sessions")
+    .select("id, session_sets(id)")
+    .eq("program_day_id", dayId)
+    .returns<{ id: string; session_sets: { id: string }[] }[]>();
+
+  return (data ?? []).filter((s) => (s.session_sets ?? []).length > 0).length;
 }

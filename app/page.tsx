@@ -64,7 +64,7 @@ export default async function Home() {
 
   // Streak par profil (jours consécutifs avec séance)
   const streakByProfile: Record<string, number> = {};
-  // Split par profil (noms des jours de programme)
+  // Split par profil (noms des séances types du programme)
   const splitByProfile: Record<string, string> = {};
 
   if (ids.length > 0) {

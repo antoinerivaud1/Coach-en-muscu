@@ -89,7 +89,7 @@ export default async function DashboardPage() {
   }
   const todayIdx = mondayIdx(now);
 
-  // --- Programmes (jours + estimations) ---
+  // --- Programmes (séances types + estimations) ---
   let q = supabase
     .from("programs")
     .select(
@@ -230,7 +230,7 @@ export default async function DashboardPage() {
           </p>
           <div className="relative overflow-hidden rounded-3xl border border-energy/25 bg-[linear-gradient(150deg,#1c2208,#16161c_60%)] p-[22px]">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-energy/30 bg-energy/15 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-energy">
-              Jour {sessionCount + 1} · {today.program_name}
+              Séance suggérée · {today.program_name}
             </span>
             <h2 className="mt-3.5 text-[30px] font-black leading-none tracking-tight text-fg">
               {today.name}
