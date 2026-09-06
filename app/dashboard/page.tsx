@@ -12,7 +12,10 @@ import { clearProfile } from "@/app/actions";
 import { countSets, deriveMuscleTags, splitVisibleTags } from "@/lib/utils/seances";
 import type { MuscleGroup } from "@/lib/utils/seances";
 import {
+  APP_TIME_ZONE,
   formatLastDone,
+  localDayNumber,
+  localWeekdayIndex,
   pickRecommendedSeance,
   recentMuscleGroups,
   sortByStaleness,
@@ -20,13 +23,13 @@ import {
 import type { SeanceCard, SessionHistoryEntry } from "@/lib/utils/recommendation";
 
 const WEEK = ["L", "M", "M", "J", "V", "S", "D"];
-const mondayIdx = (d: Date) => (d.getDay() + 6) % 7;
 
 /** Nombre de tags musculaires affichés sur une carte de la grille (2 colonnes). */
 const CARD_VISIBLE_TAGS = 2;
 
 function todayLabel(): string {
   const s = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: APP_TIME_ZONE,
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -107,15 +110,15 @@ export default async function DashboardPage({
   const sessions = (sessRows ?? []).filter((s) => (s.session_sets ?? []).length > 0);
   const loggedSessionCount = sessions.length;
 
-  const weekStart = new Date(now);
-  weekStart.setHours(0, 0, 0, 0);
-  weekStart.setDate(weekStart.getDate() - mondayIdx(now));
+  // Semaine ancrée sur `APP_TIME_ZONE`, comme le reste des calculs de jour :
+  // sinon une séance du samedi 1 h du matin cocherait le vendredi.
+  const todayIdx = localWeekdayIndex(now);
+  const weekStartDay = localDayNumber(now) - todayIdx;
   const doneThisWeek = new Set<number>();
   for (const s of sessions) {
     const d = new Date(s.performed_at);
-    if (d >= weekStart) doneThisWeek.add(mondayIdx(d));
+    if (localDayNumber(d) >= weekStartDay) doneThisWeek.add(localWeekdayIndex(d));
   }
-  const todayIdx = mondayIdx(now);
 
   // Dernière exécution par séance type. Les sessions arrivent triées par
   // `performed_at` décroissant : la première rencontrée est la plus récente.

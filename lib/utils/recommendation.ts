@@ -49,24 +49,62 @@ export const MIN_HISTORY_FOR_RECOMMENDATION = 2;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function startOfLocalDay(date: Date): Date {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+/**
+ * Fuseau de référence de l'app.
+ *
+ * L'accueil est un composant serveur : `setHours(0, 0, 0, 0)` y donnerait les
+ * bornes de journée du SERVEUR, c'est-à-dire UTC sur Vercel, pas celles de
+ * l'utilisateur. Une séance enregistrée un samedi à 1 h du matin
+ * (`2026-09-05T23:00:00Z`) serait alors rattachée au vendredi — définitivement,
+ * pas seulement à l'affichage : mauvais jour coché dans le strip de la semaine,
+ * « Il y a n jours » décalé d'un jour, et fenêtre d'équilibre musculaire
+ * calculée sur la mauvaise date.
+ *
+ * Le couple s'entraîne en France : les journées sont donc ancrées ici, une fois
+ * pour toutes, plutôt que laissées à la merci du fuseau du runtime.
+ */
+export const APP_TIME_ZONE = "Europe/Paris";
+
+const dayPartsFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * Numéro de jour absolu (jours depuis l'époque) dans `APP_TIME_ZONE`.
+ *
+ * Passer par la date civile plutôt que par une soustraction de timestamps rend
+ * le calcul exact aux changements d'heure : les journées de 23 h et 25 h n'ont
+ * pas à être arrondies, elles ne sont jamais mesurées.
+ */
+export function localDayNumber(date: Date): number {
+  const parts = dayPartsFormatter.formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes): number =>
+    Number(parts.find((p) => p.type === type)?.value ?? Number.NaN);
+  return Math.round(
+    Date.UTC(part("year"), part("month") - 1, part("day")) / MS_PER_DAY,
+  );
+}
+
+/** Index du jour dans la semaine dans `APP_TIME_ZONE`, lundi = 0. */
+export function localWeekdayIndex(date: Date): number {
+  // Le jour 0 de l'époque (1970-01-01) est un jeudi, soit l'index 3.
+  return (((localDayNumber(date) + 3) % 7) + 7) % 7;
 }
 
 /**
- * Jours pleins écoulés depuis `iso`, comparés au DÉBUT de journée locale des
- * deux dates : une séance faite hier soir compte pour 1 jour même s'il s'est
- * écoulé moins de 24 h. `Math.round` absorbe les journées de 23 h / 25 h des
- * changements d'heure. Jamais négatif : une date future compte pour 0.
- * Une date invalide compte pour 0 (aucune raison de la faire remonter en tête).
+ * Jours pleins écoulés depuis `iso`, comparés au DÉBUT de journée des deux
+ * dates dans `APP_TIME_ZONE` : une séance faite hier soir compte pour 1 jour
+ * même s'il s'est écoulé moins de 24 h. Jamais négatif : une date future
+ * compte pour 0. Une date invalide compte pour 0 (aucune raison de la faire
+ * remonter en tête de liste).
  */
 export function daysSince(iso: string, now: Date): number {
-  const then = startOfLocalDay(new Date(iso));
+  const then = new Date(iso);
   if (Number.isNaN(then.getTime())) return 0;
-  const today = startOfLocalDay(now);
-  return Math.max(0, Math.round((today.getTime() - then.getTime()) / MS_PER_DAY));
+  return Math.max(0, localDayNumber(now) - localDayNumber(then));
 }
 
 /** Ancienneté d'une séance, en jours. `NEVER_DONE_DAYS` si jamais faite. */
