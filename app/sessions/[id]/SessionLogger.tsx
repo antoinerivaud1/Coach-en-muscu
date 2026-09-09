@@ -4,11 +4,20 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { finishSession, type LoggedSet } from "./actions";
 import type { LastExerciseData } from "@/lib/queries/sessions";
-import { formatWeight, formatDateShort } from "@/lib/utils/training";
+import {
+  formatWeight,
+  formatDateShort,
+  formatClock,
+} from "@/lib/utils/training";
 import { resolvePrefill } from "@/lib/utils/prefill";
 import ExerciseInfo from "@/components/ExerciseInfo";
 import { addPending } from "@/lib/pendingSessions";
 import { useWakeLock } from "@/hooks/useWakeLock";
+import { useRestTimer } from "@/hooks/useRestTimer";
+import RestTimerBar, {
+  REST_BAR_CONTENT_HEIGHT,
+  readSafeAreaTop,
+} from "@/components/RestTimerBar";
 import {
   ensureNotificationPermission,
   scheduleRestNotification,
@@ -45,12 +54,6 @@ const FEEDBACK_OPTIONS: { value: Feedback; label: string }[] = [
   { value: "hard", label: "Dur" },
   { value: "failure", label: "Échec" },
 ];
-
-function fmtClock(total: number): string {
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
 
 export default function SessionLogger({
   sessionId,
@@ -104,31 +107,60 @@ export default function SessionLogger({
     return () => clearInterval(t);
   }, []);
 
-  // ----- Minuteur de repos -----
-  const [restRemaining, setRestRemaining] = useState<number | null>(null);
-  const [restTotal, setRestTotal] = useState<number>(0);
+  // ----- Minuteur de repos (CM-73) -----
+  // Instance unique : l'anneau (état grand) et la barre épinglée (état
+  // compact) lisent le même décompte.
+  const rest = useRestTimer();
+  const restCardRef = useRef<HTMLDivElement | null>(null);
+  const [isPinned, setIsPinned] = useState(false);
+  const restState = rest.state;
+  const stopRest = rest.stop;
 
   useEffect(() => {
-    if (restRemaining === null) return;
-    if (restRemaining <= 0) {
-      setRestRemaining(null);
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate?.(400);
-      }
+    if (restState !== "finished") return;
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(400);
+    }
+    stopRest();
+  }, [restState, stopRest]);
+
+  // Bascule grand -> compact. IntersectionObserver et non listener scroll :
+  // le scroll est trop coûteux sur iOS. Le rootMargin haut remonte la
+  // frontière sous la barre épinglée (encoche comprise), pour que la carte
+  // soit considérée sortie pile quand elle passe dessous.
+  useEffect(() => {
+    if (restState !== "running") {
+      setIsPinned(false);
       return;
     }
-    const t = setTimeout(
-      () => setRestRemaining((s) => (s === null ? null : s - 1)),
-      1000,
+    const el = restCardRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+
+    const topInset = readSafeAreaTop() + REST_BAR_CONTENT_HEIGHT;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        // Sortie par le bas (carte encore sous le viewport) : pas d'épinglage.
+        setIsPinned(
+          !entry.isIntersecting && entry.boundingClientRect.top < topInset,
+        );
+      },
+      { threshold: 0, rootMargin: `-${topInset}px 0px 0px 0px` },
     );
-    return () => clearTimeout(t);
-  }, [restRemaining]);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [restState]);
 
   function startRest(seconds: number) {
     const s = seconds > 0 ? seconds : 90;
-    setRestTotal(s);
-    setRestRemaining(s);
+    rest.start(s);
     void scheduleRestNotification(s, `/sessions/${sessionId}`);
+  }
+
+  function skipRest() {
+    rest.stop();
+    void cancelRestNotification();
   }
 
   function step(
@@ -349,8 +381,8 @@ export default function SessionLogger({
 
   const C = 2 * Math.PI * 70;
   const restFrac =
-    restRemaining !== null
-      ? Math.max(0, Math.min(1, restRemaining / (restTotal > 0 ? restTotal : 1)))
+    rest.totalSeconds > 0
+      ? Math.max(0, Math.min(1, rest.remainingSeconds / rest.totalSeconds))
       : 0;
 
   if (offlineSaved) {
@@ -390,7 +422,7 @@ export default function SessionLogger({
           <div className="flex items-center justify-center gap-1.5">
             <span className="h-2 w-2 animate-pulse rounded-full bg-elle" />
             <span className="font-oswald text-lg font-bold tracking-wide text-fg">
-              {fmtClock(elapsed)}
+              {formatClock(elapsed)}
             </span>
           </div>
           <div className="text-[11px] font-semibold text-fg-muted">{dayName}</div>
@@ -420,9 +452,22 @@ export default function SessionLogger({
         </div>
       </div>
 
-      {/* Anneau de repos */}
-      {restRemaining !== null && (
-        <div className="mt-2 flex flex-col items-center gap-3">
+      {/* État compact : barre épinglée tant que la carte est hors écran. */}
+      {isPinned && rest.state === "running" && (
+        <RestTimerBar
+          remainingSeconds={rest.remainingSeconds}
+          totalSeconds={rest.totalSeconds}
+          onAddSeconds={rest.addSeconds}
+          onSkip={skipRest}
+        >
+          {/* CM-67 : la barre de progression de séance se glissera ici,
+              sous le timer (ordre produit imposé). */}
+        </RestTimerBar>
+      )}
+
+      {/* État grand : anneau de repos, à sa place naturelle dans le flux. */}
+      {rest.state === "running" && (
+        <div ref={restCardRef} className="mt-2 flex flex-col items-center gap-3">
           <div className="relative h-[150px] w-[150px]">
             <svg viewBox="0 0 160 160" className="h-full w-full -rotate-90">
               <circle cx="80" cy="80" r="70" fill="none" stroke="#1c1c24" strokeWidth="11" />
@@ -444,34 +489,28 @@ export default function SessionLogger({
                 Repos
               </span>
               <span className="font-oswald text-4xl font-bold tabular-nums text-fg">
-                {fmtClock(restRemaining)}
+                {formatClock(rest.remainingSeconds)}
               </span>
             </div>
           </div>
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setRestRemaining((s) => (s === null ? null : Math.max(0, s - 15)))}
+              onClick={() => rest.addSeconds(-15)}
               className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-white/10"
             >
               − 15 s
             </button>
             <button
               type="button"
-              onClick={() => {
-                setRestRemaining(null);
-                void cancelRestNotification();
-              }}
+              onClick={skipRest}
               className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-white/10"
             >
               Passer
             </button>
             <button
               type="button"
-              onClick={() => {
-                setRestTotal((t) => t + 15);
-                setRestRemaining((s) => (s === null ? null : s + 15));
-              }}
+              onClick={() => rest.addSeconds(15)}
               className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-white/10"
             >
               + 15 s

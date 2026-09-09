@@ -38,6 +38,14 @@ export function formatWeight(kg: number): string {
   return Number.isInteger(kg) ? String(kg) : kg.toFixed(1);
 }
 
+/** Formate une durée en secondes en horloge: 95 -> "1:35". */
+export function formatClock(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 /** Formate une date ISO en court FR: "12 juin". */
 export function formatDateShort(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-FR", {
