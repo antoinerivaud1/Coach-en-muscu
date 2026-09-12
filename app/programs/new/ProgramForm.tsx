@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createProgram, createCustomExercise, updateProgram } from "./actions";
+import { createProgram, updateProgram } from "./actions";
 import type { SystemExercise } from "@/lib/queries/exercises";
+import CreateExerciseForm from "@/components/CreateExerciseForm";
 
 type Props = {
   exercises: SystemExercise[];
@@ -73,14 +74,9 @@ export default function ProgramForm({
   const isEdit = mode === "edit";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [isCreating, startCreate] = useTransition();
 
   const [catalog, setCatalog] = useState<SystemExercise[]>(exercises);
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newGroup, setNewGroup] =
-    useState<SystemExercise["muscle_group"]>("chest");
-  const [createError, setCreateError] = useState<string | null>(null);
 
   // CM-70 : en édition, on ouvre directement sur l'éditeur de séances et
   // d'exercices (étape 3) plutôt que sur le nom du programme. Ouvrir à
@@ -267,27 +263,10 @@ export default function ProgramForm({
     });
   }
 
-  function handleCreateExercise() {
-    setCreateError(null);
-    const trimmed = newName.trim();
-    if (!trimmed) {
-      setCreateError("Le nom est requis");
-      return;
-    }
-    startCreate(async () => {
-      const result = await createCustomExercise({
-        name: trimmed,
-        muscle_group: newGroup,
-      });
-      if (!result.success) {
-        setCreateError(result.error);
-        return;
-      }
-      setCatalog((prev) => [...prev, result.exercise]);
-      addExerciseToDay(editingDayIndex, result.exercise.id);
-      setNewName("");
-      setShowCreate(false);
-    });
+  function handleExerciseCreated(exercise: SystemExercise) {
+    setCatalog((prev) => [...prev, exercise]);
+    addExerciseToDay(editingDayIndex, exercise.id);
+    setShowCreate(false);
   }
 
   function getExerciseName(exercise_id: string): string {
@@ -592,65 +571,17 @@ export default function ProgramForm({
                     {!showCreate ? (
                       <button
                         type="button"
-                        onClick={() => {
-                          setShowCreate(true);
-                          setCreateError(null);
-                        }}
+                        onClick={() => setShowCreate(true)}
                         className="w-full rounded px-3 py-2 text-left text-sm font-medium text-toi hover:bg-surface2"
                       >
                         + Créer un exercice
                       </button>
                     ) : (
-                      <div className="space-y-2 px-1">
-                        <input
-                          type="text"
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          placeholder="Nom de l'exercice"
-                          className="w-full rounded bg-surface2 px-3 py-2 text-sm text-white placeholder-fg-faint focus:outline-none focus:ring-1 focus:ring-toi"
-                        />
-                        <select
-                          value={newGroup}
-                          onChange={(e) =>
-                            setNewGroup(
-                              e.target.value as SystemExercise["muscle_group"],
-                            )
-                          }
-                          className="w-full rounded bg-surface2 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-toi"
-                        >
-                          {Object.entries(MUSCLE_GROUP_LABELS).map(
-                            ([value, label]) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                        {createError && (
-                          <p className="text-xs text-red-400">{createError}</p>
-                        )}
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowCreate(false);
-                              setNewName("");
-                              setCreateError(null);
-                            }}
-                            className="flex-1 rounded bg-surface2 py-2 text-xs font-medium text-fg"
-                          >
-                            Annuler
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCreateExercise}
-                            disabled={isCreating}
-                            className="flex-1 rounded bg-toi py-2 text-xs font-semibold text-white disabled:opacity-50"
-                          >
-                            {isCreating ? "Création…" : "Ajouter à la séance"}
-                          </button>
-                        </div>
-                      </div>
+                      <CreateExerciseForm
+                        submitLabel="Ajouter à la séance"
+                        onCreated={handleExerciseCreated}
+                        onCancel={() => setShowCreate(false)}
+                      />
                     )}
                   </div>
                 )}

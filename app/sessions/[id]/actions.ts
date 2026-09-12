@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfileId, getCurrentProfileId } from "@/lib/profile";
+import { getLastSetsByExercise } from "@/lib/queries/sessions";
+import type { LastExerciseData } from "@/lib/queries/sessions";
 import type { Database } from "@/lib/types/database";
 
 type Feedback = Database["public"]["Enums"]["session_feedback"];
@@ -94,6 +96,29 @@ export async function finishSession(
   revalidatePath("/progress");
   revalidatePath(`/sessions/${input.sessionId}`);
   return { success: true };
+}
+
+/**
+ * « Dernière fois » d'un exercice ajouté en cours de séance (CM-62).
+ *
+ * Même logique que le chargement serveur de la séance, sur un seul exercice :
+ * l'exercice n'étant pas au programme, son historique n'a pas pu être chargé
+ * au rendu initial. Passe par le serveur, donc aucune requête Supabase côté
+ * client.
+ */
+export async function fetchLastForExercise(
+  exerciseId: string,
+  excludeSessionId: string,
+): Promise<LastExerciseData | null> {
+  const profileId = await requireProfileId();
+  const supabase = await createClient();
+  const byExercise = await getLastSetsByExercise(
+    supabase,
+    profileId,
+    [exerciseId],
+    excludeSessionId,
+  );
+  return byExercise[exerciseId] ?? null;
 }
 
 export async function deleteSession(formData: FormData) {

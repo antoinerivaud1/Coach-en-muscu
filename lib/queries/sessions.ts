@@ -125,6 +125,8 @@ export type SessionSetRow = {
   weight_kg: number;
   reps: number;
   is_warmup: boolean;
+  /** Ordre d'apparition des exercices hors programme au rechargement (CM-62). */
+  created_at: string;
 };
 
 export async function getSessionSets(
@@ -133,7 +135,7 @@ export async function getSessionSets(
 ) {
   return supabase
     .from("session_sets")
-    .select("id, exercise_id, set_index, weight_kg, reps, is_warmup")
+    .select("id, exercise_id, set_index, weight_kg, reps, is_warmup, created_at")
     .eq("session_id", sessionId)
     .order("set_index")
     .returns<SessionSetRow[]>();

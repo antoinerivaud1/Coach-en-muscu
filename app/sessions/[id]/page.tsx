@@ -1,9 +1,15 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId } from "@/lib/profile";
+import { requireProfileId, getCoupleId } from "@/lib/profile";
 import { getDayWithExercises } from "@/lib/queries/programs";
 import type { ProgramDayFull } from "@/lib/queries/programs";
+import { getCatalogExercises } from "@/lib/queries/exercises";
+import type { SystemExercise } from "@/lib/queries/exercises";
+import {
+  buildSessionExercises,
+  type ExtraExerciseInput,
+} from "@/lib/utils/sessionExercises";
 import {
   getSession,
   getSessionSets,
@@ -74,27 +80,58 @@ export default async function SessionPage({
       notFound();
     }
 
-    const programExercises = [...day.program_exercises].sort(
-      (a, b) => a.order_index - b.order_index,
+    const programExercises = day.program_exercises;
+    const programIds = new Set(programExercises.map((pe) => pe.exercise_id));
+
+    // CM-62 : toute série dont l'exercice n'est pas au programme du jour
+    // définit un exercice hors programme. Un seul `select` par lot d'ids pour
+    // récupérer nom et groupe musculaire, jamais une requête par exercice.
+    const extraIds = Array.from(
+      new Set(
+        existingSets
+          .map((s) => s.exercise_id)
+          .filter((exId) => !programIds.has(exId)),
+      ),
     );
-    const exerciseIds = programExercises.map((pe) => pe.exercise_id);
+    const extraExercises: ExtraExerciseInput[] = [];
+    if (extraIds.length > 0) {
+      const { data: extraData } = await supabase
+        .from("exercises")
+        .select("id, name, muscle_group")
+        .in("id", extraIds)
+        .returns<{ id: string; name: string; muscle_group: string }[]>();
+      for (const row of extraData ?? []) {
+        extraExercises.push({
+          exerciseId: row.id,
+          name: row.name,
+          muscleGroup: row.muscle_group,
+        });
+      }
+    }
+
+    const sessionExercises = buildSessionExercises(
+      programExercises,
+      existingSets,
+      extraExercises,
+    );
+
     const lastByExercise = await getLastSetsByExercise(
       supabase,
       profileId,
-      exerciseIds,
+      sessionExercises.map((e) => e.exerciseId),
       id,
     );
 
-    const exercises: LoggerExercise[] = programExercises.map((pe) => ({
-      exercise_id: pe.exercise_id,
-      name: pe.exercises?.name ?? "Exercice",
-      target_sets: pe.target_sets,
-      target_reps_min: pe.target_reps_min,
-      target_reps_max: pe.target_reps_max,
-      rest_seconds: pe.rest_seconds,
-      muscle_group: pe.exercises?.muscle_group ?? "other",
-      last: lastByExercise[pe.exercise_id] ?? null,
+    const exercises: LoggerExercise[] = sessionExercises.map((e) => ({
+      ...e,
+      last: lastByExercise[e.exerciseId] ?? null,
     }));
+
+    // Catalogue d'ajout en séance (système + persos du couple), chargé ici
+    // pour que la bottom sheet n'ait aucune requête à faire côté client.
+    const coupleId = await getCoupleId(supabase, profileId);
+    const { data: catalogData } = await getCatalogExercises(supabase, coupleId);
+    const catalog = (catalogData ?? []) as SystemExercise[];
 
     // Pré-remplissage des champs.
     const initialSets: Record<
@@ -106,10 +143,10 @@ export default async function SessionPage({
       (existingByExercise[s.exercise_id] ??= []).push(s);
     }
 
-    for (const pe of programExercises) {
-      const existing = existingByExercise[pe.exercise_id];
+    for (const e of sessionExercises) {
+      const existing = existingByExercise[e.exerciseId];
       if (existing && existing.length > 0) {
-        initialSets[pe.exercise_id] = [...existing]
+        initialSets[e.exerciseId] = [...existing]
           .sort((a, b) => a.set_index - b.set_index)
           .map((s) => ({
             weight: formatWeight(s.weight_kg),
@@ -117,17 +154,17 @@ export default async function SessionPage({
             isWarmup: s.is_warmup,
           }));
       } else {
-        const last = lastByExercise[pe.exercise_id] ?? null;
-        const count = Math.max(1, pe.target_sets);
+        const last = lastByExercise[e.exerciseId] ?? null;
+        const count = Math.max(1, e.targetSets);
         // CM-68 : seule la série 1 est pré-remplie depuis le passé (suggestion
         // CM-50 / dernière séance CM-19). Les séries suivantes se remplissent
         // par propagation à la validation de la série précédente.
         const firstSuggestion = suggestFirstSet(
           last,
-          pe.target_reps_min,
-          pe.target_reps_max,
+          e.targetRepsMin,
+          e.targetRepsMax,
         );
-        initialSets[pe.exercise_id] = Array.from({ length: count }, (_, i) => {
+        initialSets[e.exerciseId] = Array.from({ length: count }, (_, i) => {
           if (i === 0 && firstSuggestion) {
             return {
               weight: firstSuggestion.weight,
@@ -148,6 +185,8 @@ export default async function SessionPage({
           exercises={exercises}
           initialSets={initialSets}
           editing={existingSets.length > 0}
+          catalog={catalog}
+          canCreateExercise={coupleId !== null}
         />
       </main>
     );
