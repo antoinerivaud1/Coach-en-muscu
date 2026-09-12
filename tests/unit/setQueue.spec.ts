@@ -8,6 +8,8 @@ import {
   parseQueueSnapshot,
   pendingIdsOf,
   queueStorageKey,
+  restoredDeletedIds,
+  restoredSets,
   serializeQueue,
   shiftQueue,
   type PendingSet,
@@ -120,6 +122,49 @@ test("seules les séries en attente d'écriture portent une pastille", () => {
   const ids = pendingIdsOf([upsert(aSet("a")), del("b"), upsert(aSet("c"))]);
   expect([...ids].sort()).toEqual(["a", "c"]);
   expect(pendingIdsOf([]).size).toBe(0);
+});
+
+// ---------- Réaffichage d'une file retrouvée ----------
+
+test("les séries en attente se réaffichent dans l'ordre de validation", () => {
+  const q = [upsert(aSet("a", { setIndex: 1 })), upsert(aSet("b", { setIndex: 2 }))];
+  expect(restoredSets(q).map((s) => s.id)).toEqual(["a", "b"]);
+  expect(restoredDeletedIds(q).size).toBe(0);
+});
+
+test("une série validée puis supprimée hors réseau ne se réaffiche pas", () => {
+  const q = [upsert(aSet("a")), upsert(aSet("b")), del("a")];
+  expect(restoredSets(q).map((s) => s.id)).toEqual(["b"]);
+  expect([...restoredDeletedIds(q)]).toEqual(["a"]);
+});
+
+test("une série corrigée se réaffiche avec sa dernière valeur, à sa place", () => {
+  const q = [
+    upsert(aSet("a", { reps: 8 })),
+    upsert(aSet("b")),
+    upsert(aSet("a", { reps: 12 })),
+  ];
+  const back = restoredSets(q);
+  expect(back.map((s) => s.id)).toEqual(["a", "b"]);
+  expect(back[0]?.reps).toBe(12);
+});
+
+test("une série supprimée puis revalidée se réaffiche et n'est plus à supprimer", () => {
+  const q = [upsert(aSet("a")), del("a"), upsert(aSet("a", { reps: 5 }))];
+  expect(restoredSets(q).map((s) => s.id)).toEqual(["a"]);
+  expect(restoredDeletedIds(q).size).toBe(0);
+});
+
+test("une suppression seule ne réaffiche rien mais reste à appliquer", () => {
+  // Série déjà en base, supprimée hors réseau : elle est encore côté serveur.
+  const q = [del("deja-en-base")];
+  expect(restoredSets(q)).toEqual([]);
+  expect([...restoredDeletedIds(q)]).toEqual(["deja-en-base"]);
+});
+
+test("une file vide ne réaffiche ni ne supprime rien", () => {
+  expect(restoredSets([])).toEqual([]);
+  expect(restoredDeletedIds([]).size).toBe(0);
 });
 
 // ---------- Instantané localStorage ----------

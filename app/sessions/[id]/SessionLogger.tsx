@@ -20,7 +20,11 @@ import {
   resumeExerciseIndex,
   type SessionExercise,
 } from "@/lib/utils/sessionExercises";
-import { newSetId, type PendingSet } from "@/lib/utils/setQueue";
+import {
+  newSetId,
+  restoredDeletedIds,
+  restoredSets,
+} from "@/lib/utils/setQueue";
 import { useSetPersistence } from "@/hooks/useSetPersistence";
 import ExerciseInfo from "@/components/ExerciseInfo";
 import AddExerciseSheet from "@/components/AddExerciseSheet";
@@ -619,56 +623,112 @@ export default function SessionLogger({
     if (restoredOps === null || restoredMerged.current) return;
     restoredMerged.current = true;
 
-    const byExercise = new Map<string, PendingSet[]>();
-    for (const op of restoredOps) {
-      if (op.kind !== "upsert") continue;
-      const list = byExercise.get(op.set.exerciseId);
-      if (list) list.push(op.set);
-      else byExercise.set(op.set.exerciseId, [op.set]);
-    }
-    if (byExercise.size === 0) return;
+    // La file décrit l'état voulu des séries : on l'applique dans l'ordre, donc
+    // une série validée puis supprimée hors réseau ne réapparaît pas.
+    const pending = restoredSets(restoredOps);
+    const deleted = restoredDeletedIds(restoredOps);
+    if (pending.length === 0 && deleted.size === 0) return;
 
     // L'effet ne tourne qu'au montage : `sets` et `validated` sont encore ceux
     // du serveur, on peut donc les recomposer sans passer par un updater.
     const nextSets: Record<string, SetField[]> = { ...sets };
     const nextValidated: Record<string, number> = { ...validated };
-    let changed = false;
 
-    for (const [exId, pendingSets] of byExercise) {
-      const rows = nextSets[exId];
-      if (!rows) continue; // Exercice absent de cette séance : rien à afficher.
-      const known = new Set(
-        rows.map((r) => r.id).filter((id): id is string => id !== null),
+    // CM-62 + CM-78 : un exercice hors programme dont aucune série n'est encore
+    // en base est invisible du serveur — il n'existe que par ses séries. Sans
+    // ce rattrapage il disparaîtrait de l'écran, l'utilisateur le rajouterait,
+    // et deux séries différentes viseraient le même (séance, exercice, index).
+    const recreated: LoggerExercise[] = [];
+    for (const set of pending) {
+      if (nextSets[set.exerciseId]) continue;
+      const known = catalogState.find((c) => c.id === set.exerciseId);
+      if (!known) continue; // Introuvable au catalogue : la file l'écrit quand même.
+      recreated.push({
+        exerciseId: known.id,
+        name: known.name,
+        muscleGroup: known.muscle_group,
+        ...EXTRA_EXERCISE_DEFAULTS,
+        source: "extra",
+        last: null,
+      });
+      nextSets[known.id] = Array.from(
+        { length: EXTRA_EXERCISE_DEFAULTS.targetSets },
+        (): SetField => ({
+          id: null,
+          setIndex: null,
+          weight: "",
+          reps: "",
+          isWarmup: false,
+          touched: false,
+        }),
       );
-      const out = [...rows];
-      let cursor = nextValidated[exId] ?? 0;
-      for (const set of pendingSets) {
-        if (known.has(set.id)) continue;
-        const row: SetField = {
-          id: set.id,
-          setIndex: set.setIndex,
-          weight: formatWeight(set.weightKg),
-          reps: String(set.reps),
-          isWarmup: set.isWarmup,
-          touched: true,
-        };
-        if (cursor < out.length) out[cursor] = row;
-        else out.push(row);
-        cursor += 1;
-        changed = true;
-      }
-      nextSets[exId] = out;
-      nextValidated[exId] = cursor;
+      nextValidated[known.id] = 0;
     }
 
-    if (!changed) return;
+    // 1. Les séries supprimées hors réseau quittent l'écran : la file est en
+    //    train de les effacer, les afficher serait mentir.
+    if (deleted.size > 0) {
+      for (const exId of Object.keys(nextSets)) {
+        const rows = nextSets[exId]!;
+        const kept = rows.filter((r) => r.id === null || !deleted.has(r.id));
+        if (kept.length === rows.length) continue;
+        nextSets[exId] = kept;
+        nextValidated[exId] = countPersisted(kept);
+      }
+    }
+
+    // 2. Les séries validées hors réseau reprennent leur place de série faite.
+    for (const set of pending) {
+      const rows = nextSets[set.exerciseId];
+      if (!rows) continue;
+      if (rows.some((r) => r.id === set.id)) continue;
+      const out = [...rows];
+      const cursor = nextValidated[set.exerciseId] ?? 0;
+      const row: SetField = {
+        id: set.id,
+        setIndex: set.setIndex,
+        weight: formatWeight(set.weightKg),
+        reps: String(set.reps),
+        isWarmup: set.isWarmup,
+        touched: true,
+      };
+      if (cursor < out.length) out[cursor] = row;
+      else out.push(row);
+      // La série suivante hérite de celle-ci, comme le fait la propagation
+      // CM-68 quand la page n'a pas été rechargée.
+      const next = out[cursor + 1];
+      if (next && !next.touched && next.id === null && !set.isWarmup) {
+        out[cursor + 1] = { ...next, weight: row.weight, reps: row.reps };
+      }
+      nextSets[set.exerciseId] = out;
+      nextValidated[set.exerciseId] = cursor + 1;
+    }
+
+    if (recreated.length > 0) setExtras((prev) => [...prev, ...recreated]);
     setSets(nextSets);
     setValidated(nextValidated);
-    setCurrentIdx(resumeExerciseIndex(exercises, nextValidated));
+    setCurrentIdx(
+      resumeExerciseIndex([...exercises, ...recreated], nextValidated),
+    );
+
+    // « Dernière fois » d'un exercice hors programme remonté ici : même
+    // chargement que lors de son ajout (CM-62), sinon la carte prétendrait que
+    // c'est la première fois.
+    for (const ex of recreated) {
+      startLoadLast(async () => {
+        const fetched = await fetchLastForExercise(ex.exerciseId, sessionId);
+        if (!fetched) return;
+        setExtras((prev) =>
+          prev.map((e) =>
+            e.exerciseId === ex.exerciseId ? { ...e, last: fetched } : e,
+          ),
+        );
+      });
+    }
     // `sets` et `validated` sont lus une seule fois, au montage : les relire à
     // chaque validation relancerait ce rattrapage à tort.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restoredOps, exercises]);
+  }, [restoredOps, exercises, catalogState, sessionId]);
 
   // On sort du mode saisie clavier dès qu'on change d'exercice ou de série.
   useEffect(() => {

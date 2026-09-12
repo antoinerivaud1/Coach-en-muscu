@@ -33,6 +33,7 @@ import SessionLogger, {
   type LoggerExercise,
   type InitialSet,
 } from "./SessionLogger";
+import PendingSetsSync from "@/components/PendingSetsSync";
 import { deleteSession, updateSet, deleteSet } from "./actions";
 
 const FEEDBACK_LABELS: Record<string, string> = {
@@ -286,6 +287,10 @@ export default async function SessionPage({
 
   return (
     <main className="min-h-screen p-4 pb-24">
+      {/* CM-78 : séance terminée alors que des séries attendaient encore leur
+          écriture. Le logger n'est plus là pour vider la file, ce composant
+          prend le relais et rafraîchit le récap dès qu'elle est vide. */}
+      {isMine && <PendingSetsSync sessionId={id} />}
       <div className="mx-auto max-w-lg">
         <div className="flex items-center justify-between">
           <Link href="/history" className="text-sm text-fg-muted hover:text-fg">

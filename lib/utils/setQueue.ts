@@ -30,12 +30,6 @@ export function queueStorageKey(sessionId: string): string {
   return `${PENDING_SETS_PREFIX}${sessionId}`;
 }
 
-/** Séance visée par une clé de file, `null` si la clé n'en est pas une. */
-export function sessionIdFromQueueKey(key: string): string | null {
-  if (!key.startsWith(PENDING_SETS_PREFIX)) return null;
-  return key.slice(PENDING_SETS_PREFIX.length) || null;
-}
-
 /** Id de la série visée par l'opération. */
 export function opSetId(op: QueuedOp): string {
   return op.kind === "upsert" ? op.set.id : op.id;
@@ -112,6 +106,45 @@ export function pendingIdsOf(queue: readonly QueuedOp[]): Set<string> {
     if (op.kind === "upsert") ids.add(op.set.id);
   }
   return ids;
+}
+
+/**
+ * État des séries tel que la file le décrit, une fois toutes ses opérations
+ * appliquées dans l'ordre : la dernière opération sur une série l'emporte.
+ *
+ * Sert à réafficher, à la réouverture d'une séance, les séries validées hors
+ * réseau qui ne sont pas encore en base. Sans ça l'écran les reproposerait à la
+ * saisie et la même série finirait écrite deux fois.
+ */
+export function restoredSets(queue: readonly QueuedOp[]): PendingSet[] {
+  const order: string[] = [];
+  const latest = new Map<string, PendingSet | null>();
+  for (const op of queue) {
+    const id = opSetId(op);
+    if (!latest.has(id)) order.push(id);
+    latest.set(id, op.kind === "upsert" ? op.set : null);
+  }
+  const out: PendingSet[] = [];
+  for (const id of order) {
+    const set = latest.get(id);
+    if (set) out.push(set);
+  }
+  return out;
+}
+
+/**
+ * Séries que la file finira par supprimer. Une série supprimée hors réseau est
+ * peut-être encore en base : elle ne doit pas réapparaître à la réouverture,
+ * sinon l'écran affiche une ligne que la file est en train d'effacer.
+ */
+export function restoredDeletedIds(queue: readonly QueuedOp[]): Set<string> {
+  const latest = new Map<string, boolean>();
+  for (const op of queue) latest.set(opSetId(op), op.kind === "delete");
+  const out = new Set<string>();
+  for (const [id, isDelete] of latest) {
+    if (isDelete) out.add(id);
+  }
+  return out;
 }
 
 export function serializeQueue(queue: readonly QueuedOp[]): string {
