@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfileId } from "@/lib/profile";
 import {
+  canAccessProgram,
   countLoggedSessionsForDay,
   renameProgramDay,
 } from "@/lib/queries/programs";
@@ -407,7 +408,7 @@ export async function renameSeance(
   dayId: string,
   name: string,
 ): Promise<SeanceActionResult> {
-  await requireProfileId();
+  const profileId = await requireProfileId();
   const supabase = await createClient();
 
   const { data: day, error: dayError } = await supabase
@@ -421,6 +422,22 @@ export async function renameSeance(
     return { success: false, error: dayError.message };
   }
   if (!day) {
+    return { success: false, error: "Séance introuvable" };
+  }
+
+  // `dayId` vient du client : rien ne garantit que la séance appartient à un
+  // programme du profil courant. Le client serveur contourne la RLS
+  // (`service_role`, cf. CM-17), la vérification doit donc être faite ici —
+  // sans quoi un id arbitraire renommerait la séance d'un autre couple. Même
+  // message qu'une séance inexistante : on ne révèle pas qu'elle existe.
+  const access = await canAccessProgram(supabase, day.program_id, profileId);
+  if (!access.ok) {
+    return {
+      success: false,
+      error: `Impossible de vérifier l'accès à cette séance (${access.error}). Renommage annulé.`,
+    };
+  }
+  if (!access.allowed) {
     return { success: false, error: "Séance introuvable" };
   }
 
