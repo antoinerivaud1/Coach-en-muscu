@@ -20,6 +20,30 @@ export async function getProgramsForUser(
   return query.eq("owner_profile_id", profileId);
 }
 
+/**
+ * Id du programme partagé du couple (CM-80).
+ *
+ * Un programme partagé a `couple_id` renseigné et `owner_profile_id` à null —
+ * la contrainte `program_owner_xor` garantit que les deux sont exclusifs. Il
+ * n'y en a qu'un en pratique ; s'il y en avait plusieurs, on retient le plus
+ * ancien pour que l'accueil et le Profil pointent toujours au même endroit.
+ */
+export async function getSharedProgramId(
+  supabase: SupabaseClient<Database>,
+  coupleId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("programs")
+    .select("id")
+    .eq("couple_id", coupleId)
+    .is("owner_profile_id", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .returns<{ id: string }[]>();
+
+  return data?.[0]?.id ?? null;
+}
+
 export type ProgramWithDays = {
   id: string;
   name: string;
@@ -141,4 +165,24 @@ export async function countLoggedSessionsForDay(
     ok: true,
     count: (data ?? []).filter((s) => (s.session_sets ?? []).length > 0).length,
   };
+}
+
+// ---- Renommage d'une séance type (CM-80) ----
+
+/**
+ * Renomme une séance type.
+ *
+ * L'historique n'est pas touché : les `sessions` pointent sur
+ * `program_day_id`, le nouveau nom se propage donc partout (accueil, détail
+ * d'une séance passée, historique) sans autre écriture.
+ *
+ * La validation du nom (non vide, longueur, unicité dans le programme) est
+ * faite en amont par `validateSeanceName` : cette requête ne fait qu'écrire.
+ */
+export async function renameProgramDay(
+  supabase: SupabaseClient<Database>,
+  dayId: string,
+  name: string,
+) {
+  return supabase.from("program_days").update({ name }).eq("id", dayId);
 }

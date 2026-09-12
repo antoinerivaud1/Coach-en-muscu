@@ -7,6 +7,7 @@ import {
   getCoupleProfileIds,
 } from "@/lib/profile";
 import { startSession } from "@/app/programs/[id]/actions";
+import { getSharedProgramId } from "@/lib/queries/programs";
 import BottomNav from "@/components/BottomNav";
 import { clearProfile } from "@/app/actions";
 import { countSets, deriveMuscleTags, splitVisibleTags } from "@/lib/utils/seances";
@@ -189,6 +190,13 @@ export default async function DashboardPage({
       });
     }
   }
+
+  // Point d'entrée vers la bibliothèque partagée « Nos séances » (CM-80).
+  // Sans programme partagé, le lien bascule sur la création existante : on ne
+  // crée jamais de programme automatiquement.
+  const sharedProgramId = coupleId
+    ? await getSharedProgramId(supabase, coupleId)
+    : null;
 
   // La moins faite récemment en premier ; les jamais faites tout en haut.
   const seances = sortByStaleness(library, now);
@@ -382,10 +390,13 @@ export default async function DashboardPage({
         </>
       )}
 
-      {/* Mes programmes (accès complet) */}
+      {/* Bibliothèque de séances types (accès complet) */}
       <div className="mt-7 flex items-center justify-between">
-        <Link href="/programs/new" className="text-sm font-semibold text-energy">
-          + Nouveau programme
+        <Link
+          href={sharedProgramId ? `/programs/${sharedProgramId}` : "/programs/new"}
+          className="text-sm font-semibold text-energy"
+        >
+          {sharedProgramId ? "Gérer mes séances" : "Créer ma première séance"}
         </Link>
         <form action={clearProfile}>
           <button

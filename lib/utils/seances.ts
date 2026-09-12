@@ -56,3 +56,54 @@ export function splitVisibleTags(
 export function countSets(exercises: { target_sets: number }[]): number {
   return exercises.reduce((total, e) => total + (e.target_sets || 0), 0);
 }
+
+// ---- Nom d'une séance type (CM-80) ----
+
+/** Longueur maximale du nom d'une séance type. */
+export const SEANCE_NAME_MAX_LENGTH = 40;
+
+export type SeanceNameCheck =
+  | { ok: true; name: string }
+  | { ok: false; error: string };
+
+/** Clé de comparaison des noms : insensible à la casse et aux espaces de bord. */
+function nameKey(name: string): string {
+  return name.trim().toLocaleLowerCase("fr-FR");
+}
+
+/**
+ * Valide le nom d'une séance type avant enregistrement.
+ *
+ * Même fonction côté client (erreur affichée sous le champ, sans aller-retour)
+ * et côté server action (seule validation qui fait foi) : les deux ne peuvent
+ * pas diverger.
+ *
+ * `otherNames` = les noms des AUTRES séances du même programme ; la séance en
+ * cours de renommage doit en être exclue, sinon se renommer en soi-même
+ * échouerait.
+ */
+export function validateSeanceName(
+  raw: string,
+  otherNames: string[],
+): SeanceNameCheck {
+  const name = raw.trim();
+
+  if (!name) {
+    return { ok: false, error: "Le nom de la séance est obligatoire" };
+  }
+  if (name.length > SEANCE_NAME_MAX_LENGTH) {
+    return {
+      ok: false,
+      error: `${SEANCE_NAME_MAX_LENGTH} caractères maximum (${name.length} saisis)`,
+    };
+  }
+  const key = nameKey(name);
+  if (otherNames.some((other) => nameKey(other) === key)) {
+    return {
+      ok: false,
+      error: `« ${name} » existe déjà dans ce programme`,
+    };
+  }
+
+  return { ok: true, name };
+}
