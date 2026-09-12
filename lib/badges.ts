@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import { getCompletedSessions } from "@/lib/queries/sessions";
 
 export type Badge = {
   id: string;
@@ -34,11 +35,9 @@ export async function getBadges(
   profileId: string,
   weeklyGoal: number,
 ): Promise<{ badges: Badge[]; earnedCount: number; streak: number }> {
-  const { data: sessData } = await supabase
-    .from("sessions")
-    .select("id, performed_at")
-    .eq("profile_id", profileId)
-    .returns<{ id: string; performed_at: string }[]>();
+  // Séances TERMINÉES seulement (CM-83) : une séance en cours ne doit pas
+  // débloquer un badge ni allonger la série de jours d'affilée.
+  const { data: sessData } = await getCompletedSessions(supabase, profileId);
   const sessions = sessData ?? [];
   const sessionCount = sessions.length;
   const ids = sessions.map((s) => s.id);
