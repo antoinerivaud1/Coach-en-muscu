@@ -19,11 +19,7 @@ import SessionProgressBar, {
   SESSION_PROGRESS_BAR_HEIGHT,
 } from "@/components/SessionProgressBar";
 import { computeSessionProgress } from "@/lib/utils/progress";
-import {
-  ensureNotificationPermission,
-  scheduleRestNotification,
-  cancelRestNotification,
-} from "@/lib/restNotifications";
+import { ensureNotificationPermission } from "@/lib/restNotifications";
 
 type Feedback = "easy" | "normal" | "hard" | "failure";
 
@@ -111,7 +107,9 @@ export default function SessionLogger({
   // ----- Minuteur de repos (CM-73) -----
   // Instance unique : l'anneau (état grand) et la barre épinglée (état
   // compact) lisent le même décompte.
-  const rest = useRestTimer();
+  // La notification de fin de repos est planifiée par le hook, sur l'échéance
+  // du timer (CM-74) : aucune planification ici.
+  const rest = useRestTimer({ notificationUrl: `/sessions/${sessionId}` });
   const restCardRef = useRef<HTMLDivElement | null>(null);
   const [isPinned, setIsPinned] = useState(false);
   const restState = rest.state;
@@ -172,14 +170,11 @@ export default function SessionLogger({
   );
 
   function startRest(seconds: number) {
-    const s = seconds > 0 ? seconds : 90;
-    rest.start(s);
-    void scheduleRestNotification(s, `/sessions/${sessionId}`);
+    rest.start(seconds > 0 ? seconds : 90);
   }
 
   function skipRest() {
     rest.stop();
-    void cancelRestNotification();
   }
 
   function step(

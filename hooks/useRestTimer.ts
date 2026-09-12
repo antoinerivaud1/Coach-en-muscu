@@ -1,8 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { cancelRestEnd, scheduleRestEnd } from "@/lib/restNotifications";
 
 export type RestTimerState = "idle" | "running" | "finished";
+
+export interface UseRestTimerOptions {
+  /**
+   * Cible ouverte au clic sur la notification de fin de repos (CM-28).
+   * Par défaut le SW retombe sur le tableau de bord.
+   */
+  notificationUrl?: string;
+}
 
 export interface UseRestTimer {
   state: RestTimerState;
@@ -30,10 +40,18 @@ function remainingFrom(endsAt: number): number {
  * instance doit être montée par séance, puis partagée par les deux rendus
  * (grand + barre compacte). Deux instances = deux décomptes désynchronisés.
  */
-export function useRestTimer(): UseRestTimer {
+export function useRestTimer(options?: UseRestTimerOptions): UseRestTimer {
   const [endsAt, setEndsAt] = useState<number | null>(null);
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
+
+  // L'URL ne doit pas replanifier la notification à elle seule : seul
+  // `endsAt` déclenche une planification.
+  const notificationUrl = options?.notificationUrl;
+  const notificationUrlRef = useRef(notificationUrl);
+  useEffect(() => {
+    notificationUrlRef.current = notificationUrl;
+  }, [notificationUrl]);
 
   useEffect(() => {
     if (endsAt === null) return;
@@ -61,6 +79,20 @@ export function useRestTimer(): UseRestTimer {
       if (intervalId !== null) clearInterval(intervalId);
       document.removeEventListener("visibilitychange", sync);
     };
+  }, [endsAt]);
+
+  /**
+   * La notification suit l'échéance, et rien d'autre (CM-74). Chaque
+   * changement d'`endsAt` (lancement, + 15 s, - 15 s) annule la notification
+   * en attente et en replanifie une seule ; `endsAt` à null (repos passé ou
+   * terminé) n'en laisse aucune.
+   */
+  useEffect(() => {
+    if (endsAt === null) {
+      void cancelRestEnd();
+      return;
+    }
+    void scheduleRestEnd(endsAt, notificationUrlRef.current);
   }, [endsAt]);
 
   const start = useCallback((durationSeconds: number) => {
