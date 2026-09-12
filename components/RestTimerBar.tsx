@@ -9,13 +9,6 @@ const ROW_HEIGHT = 64;
 const PROGRESS_HEIGHT = 3;
 
 /**
- * Hauteur réelle du bloc compact, safe area exclue. Sert aussi à calculer le
- * `rootMargin` de l'IntersectionObserver côté séance, pour que la bascule
- * grand -> compact se fasse pile quand la carte glisse sous la barre.
- */
-export const REST_BAR_CONTENT_HEIGHT = ROW_HEIGHT + PROGRESS_HEIGHT;
-
-/**
  * Mesure `env(safe-area-inset-top)` en pixels. La valeur n'est pas lisible
  * directement en JS : on la fait résoudre par le moteur de style sur un
  * élément sonde éphémère. Renvoie 0 hors encoche (et hors navigateur).
@@ -32,6 +25,12 @@ export function readSafeAreaTop(): number {
 }
 
 type Props = {
+  /**
+   * Timer visible ou non. La barre reste montée en permanence pour porter la
+   * progression de séance (CM-67) ; seul le bloc timer apparaît et disparaît
+   * avec le repos.
+   */
+  showTimer: boolean;
   remainingSeconds: number;
   totalSeconds: number;
   onAddSeconds: (delta: number) => void;
@@ -44,11 +43,14 @@ type Props = {
 };
 
 /**
- * État compact du timer de repos (CM-73) : barre épinglée en haut de l'écran
- * quand la carte du timer est sortie du viewport. `fixed` et non `sticky` :
- * hors du flux, donc son apparition ne décale jamais le contenu.
+ * Barre épinglée en haut de l'écran de séance. Elle porte deux choses :
+ * l'état compact du timer de repos (CM-73), visible quand un repos tourne et
+ * que sa carte est sortie du viewport, et en dessous la progression de séance
+ * (CM-67), elle toujours rendue. `fixed` et non `sticky` : hors du flux, donc
+ * la place est réservée une fois pour toutes par l'écran de séance.
  */
 export default function RestTimerBar({
+  showTimer,
   remainingSeconds,
   totalSeconds,
   onAddSeconds,
@@ -62,56 +64,60 @@ export default function RestTimerBar({
 
   return (
     <div className="fixed inset-x-0 top-0 z-50 border-b border-line bg-ink pt-[env(safe-area-inset-top)]">
-      <div
-        className="mx-auto flex max-w-lg items-center gap-3 px-5"
-        style={{ height: ROW_HEIGHT }}
-      >
-        <div className="flex flex-col justify-center">
-          <span className="text-[9px] font-extrabold uppercase leading-none tracking-[0.18em] text-fg-muted">
-            Repos
-          </span>
-          <span
-            role="timer"
-            aria-label="Temps de repos restant"
-            className="mt-1 font-oswald text-3xl font-bold leading-none tabular-nums text-energy"
+      {showTimer && (
+        <>
+          <div
+            className="mx-auto flex max-w-lg items-center gap-3 px-5"
+            style={{ height: ROW_HEIGHT }}
           >
-            {formatClock(remainingSeconds)}
-          </span>
-        </div>
+            <div className="flex flex-col justify-center">
+              <span className="text-[9px] font-extrabold uppercase leading-none tracking-[0.18em] text-fg-muted">
+                Repos
+              </span>
+              <span
+                role="timer"
+                aria-label="Temps de repos restant"
+                className="mt-1 font-oswald text-3xl font-bold leading-none tabular-nums text-energy"
+              >
+                {formatClock(remainingSeconds)}
+              </span>
+            </div>
 
-        <div className="ml-auto flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => onAddSeconds(-15)}
-            className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-white/10"
-            aria-label="Retirer 15 secondes de repos"
-          >
-            −15
-          </button>
-          <button
-            type="button"
-            onClick={onSkip}
-            className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-white/10"
-          >
-            Passer
-          </button>
-          <button
-            type="button"
-            onClick={() => onAddSeconds(15)}
-            className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-white/10"
-            aria-label="Ajouter 15 secondes de repos"
-          >
-            +15
-          </button>
-        </div>
-      </div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onAddSeconds(-15)}
+                className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+                aria-label="Retirer 15 secondes de repos"
+              >
+                −15
+              </button>
+              <button
+                type="button"
+                onClick={onSkip}
+                className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+              >
+                Passer
+              </button>
+              <button
+                type="button"
+                onClick={() => onAddSeconds(15)}
+                className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+                aria-label="Ajouter 15 secondes de repos"
+              >
+                +15
+              </button>
+            </div>
+          </div>
 
-      <div className="bg-surface2" style={{ height: PROGRESS_HEIGHT }}>
-        <div
-          className="h-full bg-energy"
-          style={{ width: `${frac * 100}%`, transition: "width 250ms linear" }}
-        />
-      </div>
+          <div className="bg-surface2" style={{ height: PROGRESS_HEIGHT }}>
+            <div
+              className="h-full bg-energy"
+              style={{ width: `${frac * 100}%`, transition: "width 250ms linear" }}
+            />
+          </div>
+        </>
+      )}
 
       {children}
     </div>

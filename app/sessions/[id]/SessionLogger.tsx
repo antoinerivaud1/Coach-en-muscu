@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { finishSession, type LoggedSet } from "./actions";
 import type { LastExerciseData } from "@/lib/queries/sessions";
@@ -14,10 +14,11 @@ import ExerciseInfo from "@/components/ExerciseInfo";
 import { addPending } from "@/lib/pendingSessions";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useRestTimer } from "@/hooks/useRestTimer";
-import RestTimerBar, {
-  REST_BAR_CONTENT_HEIGHT,
-  readSafeAreaTop,
-} from "@/components/RestTimerBar";
+import RestTimerBar, { readSafeAreaTop } from "@/components/RestTimerBar";
+import SessionProgressBar, {
+  SESSION_PROGRESS_BAR_HEIGHT,
+} from "@/components/SessionProgressBar";
+import { computeSessionProgress } from "@/lib/utils/progress";
 import {
   ensureNotificationPermission,
   scheduleRestNotification,
@@ -136,7 +137,9 @@ export default function SessionLogger({
     const el = restCardRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
 
-    const topInset = readSafeAreaTop() + REST_BAR_CONTENT_HEIGHT;
+    // La barre épinglée mesure la seule progression tant que le timer n'y est
+    // pas encore : c'est cette hauteur-là que la carte doit franchir.
+    const topInset = readSafeAreaTop() + SESSION_PROGRESS_BAR_HEIGHT;
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
@@ -151,6 +154,22 @@ export default function SessionLogger({
     observer.observe(el);
     return () => observer.disconnect();
   }, [restState]);
+
+  // ----- Progression de séance (CM-67) -----
+  // Dérivée de l'état déjà en place (séries validées par exercice) : aucune
+  // requête supplémentaire, aucun état global. Recalculée à chaque validation
+  // ou suppression de série.
+  const progress = useMemo(
+    () =>
+      computeSessionProgress(
+        exercises.map((e) => ({
+          exerciseId: e.exercise_id,
+          plannedSets: e.target_sets,
+          loggedSets: validated[e.exercise_id] ?? 0,
+        })),
+      ),
+    [exercises, validated],
+  );
 
   function startRest(seconds: number) {
     const s = seconds > 0 ? seconds : 90;
@@ -358,6 +377,9 @@ export default function SessionLogger({
   const activeIndex = vcount;
   const activeRow = rows[activeIndex];
   const exerciseDone = rows.length > 0 && vcount >= rows.length;
+  const exProgress = progress.perExercise.find(
+    (p) => p.exerciseId === ex.exercise_id,
+  );
   const isLast = currentIdx === exercises.length - 1;
   const last = ex.last;
 
@@ -378,6 +400,12 @@ export default function SessionLogger({
   useEffect(() => {
     setEditingField(null);
   }, [currentIdx, activeIndex]);
+
+  // La barre épinglée est `fixed` : on réserve sa hauteur en haut du flux
+  // (encoche comprise) pour qu'elle ne recouvre jamais le contenu.
+  const contentPaddingTop = `calc(env(safe-area-inset-top) + ${
+    SESSION_PROGRESS_BAR_HEIGHT + 2
+  }px)`;
 
   const C = 2 * Math.PI * 70;
   const restFrac =
@@ -404,7 +432,10 @@ export default function SessionLogger({
   }
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] max-w-lg flex-col px-5 pb-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
+    <div
+      className="mx-auto flex min-h-[100dvh] max-w-lg flex-col px-5 pb-6"
+      style={{ paddingTop: contentPaddingTop }}
+    >
       {/* Top bar */}
       <div className="flex items-center justify-between gap-2 py-2">
         <button
@@ -452,18 +483,21 @@ export default function SessionLogger({
         </div>
       </div>
 
-      {/* État compact : barre épinglée tant que la carte est hors écran. */}
-      {isPinned && rest.state === "running" && (
-        <RestTimerBar
-          remainingSeconds={rest.remainingSeconds}
-          totalSeconds={rest.totalSeconds}
-          onAddSeconds={rest.addSeconds}
-          onSkip={skipRest}
-        >
-          {/* CM-67 : la barre de progression de séance se glissera ici,
-              sous le timer (ordre produit imposé). */}
-        </RestTimerBar>
-      )}
+      {/* Barre épinglée : la progression y reste en permanence (CM-67), le
+          timer ne s'ajoute au-dessus que pendant un repos sorti de l'écran. */}
+      <RestTimerBar
+        showTimer={isPinned && rest.state === "running"}
+        remainingSeconds={rest.remainingSeconds}
+        totalSeconds={rest.totalSeconds}
+        onAddSeconds={rest.addSeconds}
+        onSkip={skipRest}
+      >
+        <SessionProgressBar
+          done={progress.done}
+          total={progress.total}
+          exercisesRemaining={progress.exercisesRemaining}
+        />
+      </RestTimerBar>
 
       {/* État grand : anneau de repos, à sa place naturelle dans le flux. */}
       {rest.state === "running" && (
@@ -519,16 +553,32 @@ export default function SessionLogger({
         </div>
       )}
 
-      {/* Carte exercice courant */}
-      <div className="mt-4 flex-1">
+      {/* Carte exercice courant — atténuée quand toutes les séries prévues
+          sont faites, mais jamais verrouillée : on peut encore en ajouter. */}
+      <div
+        className={`mt-4 flex-1 ${exProgress?.isComplete ? "opacity-60" : ""}`}
+      >
         <div className="flex items-start justify-between gap-2">
-          <div>
+          <div className="min-w-0">
             <div className="text-[11px] font-bold uppercase tracking-wide text-toi">
               Exercice {currentIdx + 1}
             </div>
-            <h1 className="mt-0.5 text-2xl font-black tracking-tight text-fg">
-              {ex.name}
-            </h1>
+            <div className="mt-0.5 flex items-baseline gap-2">
+              <h1 className="text-2xl font-black tracking-tight text-fg">
+                {ex.name}
+              </h1>
+              {exProgress && (
+                <span
+                  className={`flex-none font-oswald text-xs font-bold ${
+                    exProgress.isComplete ? "text-energy" : "text-fg-muted"
+                  }`}
+                >
+                  {exProgress.isComplete
+                    ? `✓ ${exProgress.done} / ${exProgress.planned}`
+                    : `${exProgress.done} / ${exProgress.planned}`}
+                </span>
+              )}
+            </div>
           </div>
           <ExerciseInfo name={ex.name} muscleGroup={ex.muscle_group} />
         </div>
