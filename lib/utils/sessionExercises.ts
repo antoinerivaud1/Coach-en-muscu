@@ -151,3 +151,25 @@ export function buildSessionExercises(
 
   return [...fromProgram, ...fromExtras];
 }
+
+/**
+ * Exercice à afficher à la reprise d'une séance en cours (CM-78).
+ *
+ * Le premier exercice dont les séries prévues ne sont pas toutes validées,
+ * sinon le dernier : reprendre une séance, c'est retomber sur le premier
+ * exercice qui reste à faire, et sur le dernier quand tout est fait. Un
+ * exercice sans cible compte pour une série, comme dans la progression
+ * (CM-67), sans quoi il serait toujours « terminé ».
+ */
+export function resumeExerciseIndex(
+  exercises: readonly { exerciseId: string; targetSets: number }[],
+  validatedCounts: Readonly<Record<string, number>>,
+): number {
+  if (exercises.length === 0) return 0;
+  for (let i = 0; i < exercises.length; i += 1) {
+    const ex = exercises[i]!;
+    const planned = ex.targetSets > 0 ? ex.targetSets : 1;
+    if ((validatedCounts[ex.exerciseId] ?? 0) < planned) return i;
+  }
+  return exercises.length - 1;
+}

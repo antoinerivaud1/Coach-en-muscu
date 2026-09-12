@@ -24,7 +24,7 @@ export default function PendingSync() {
       for (const it of items) {
         try {
           const r = await finishSession(it);
-          if (!r.success) remaining.push(it);
+          if (!r.ok) remaining.push(it);
         } catch {
           remaining.push(it);
         }
