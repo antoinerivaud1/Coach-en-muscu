@@ -2,15 +2,21 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { finishSession, type LoggedSet } from "./actions";
+import { finishSession, fetchLastForExercise, type LoggedSet } from "./actions";
 import type { LastExerciseData } from "@/lib/queries/sessions";
+import type { SystemExercise } from "@/lib/queries/exercises";
 import {
   formatWeight,
   formatDateShort,
   formatClock,
 } from "@/lib/utils/training";
-import { resolvePrefill } from "@/lib/utils/prefill";
+import { resolvePrefill, suggestFirstSet } from "@/lib/utils/prefill";
+import {
+  EXTRA_EXERCISE_DEFAULTS,
+  type SessionExercise,
+} from "@/lib/utils/sessionExercises";
 import ExerciseInfo from "@/components/ExerciseInfo";
+import AddExerciseSheet from "@/components/AddExerciseSheet";
 import { addPending } from "@/lib/pendingSessions";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useRestTimer } from "@/hooks/useRestTimer";
@@ -23,14 +29,11 @@ import { ensureNotificationPermission } from "@/lib/restNotifications";
 
 type Feedback = "easy" | "normal" | "hard" | "failure";
 
-export type LoggerExercise = {
-  exercise_id: string;
-  name: string;
-  target_sets: number;
-  target_reps_min: number;
-  target_reps_max: number;
-  rest_seconds: number;
-  muscle_group: string;
+/**
+ * Un exercice de la séance, du programme ou ajouté en cours de route (CM-62) :
+ * forme unique (`SessionExercise`), plus l'historique « dernière fois ».
+ */
+export type LoggerExercise = SessionExercise & {
   last: LastExerciseData | null;
 };
 
@@ -43,6 +46,9 @@ type Props = {
   exercises: LoggerExercise[];
   initialSets: Record<string, InitialSet[]>;
   editing: boolean;
+  /** Catalogue d'ajout en séance : exercices système + persos du couple. */
+  catalog: SystemExercise[];
+  canCreateExercise: boolean;
 };
 
 const FEEDBACK_OPTIONS: { value: Feedback; label: string }[] = [
@@ -58,6 +64,8 @@ export default function SessionLogger({
   exercises,
   initialSets,
   editing,
+  catalog,
+  canCreateExercise,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -66,19 +74,38 @@ export default function SessionLogger({
   const [sets, setSets] = useState<Record<string, SetField[]>>(() => {
     const out: Record<string, SetField[]> = {};
     for (const ex of exercises) {
-      const rows = initialSets[ex.exercise_id] ?? [];
-      out[ex.exercise_id] = rows.map((r) => ({ ...r, touched: editing }));
+      const rows = initialSets[ex.exerciseId] ?? [];
+      out[ex.exerciseId] = rows.map((r) => ({ ...r, touched: editing }));
     }
     return out;
   });
   const [validated, setValidated] = useState<Record<string, number>>(() => {
     const out: Record<string, number> = {};
     for (const ex of exercises) {
-      const rows = initialSets[ex.exercise_id] ?? [];
-      out[ex.exercise_id] = editing ? rows.length : 0;
+      const rows = initialSets[ex.exerciseId] ?? [];
+      out[ex.exerciseId] = editing ? rows.length : 0;
     }
     return out;
   });
+
+  // ----- Exercices ajoutés en cours de séance (CM-62) -----
+  // `exercises` contient déjà le programme puis les exercices hors programme
+  // reconstruits depuis les séries en base : les ajouts de la session courante
+  // se contentent donc de s'empiler à la suite, l'ordre reste « programme
+  // d'abord ». Tant qu'aucune série n'est validée, un ajout ne laisse aucune
+  // trace en base et disparaît au rechargement — c'est voulu.
+  const [extras, setExtras] = useState<LoggerExercise[]>([]);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [catalogState, setCatalogState] = useState<SystemExercise[]>(catalog);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [isLoadingLast, startLoadLast] = useTransition();
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const scrollToCard = useRef(false);
+
+  const allExercises = useMemo(
+    () => [...exercises, ...extras],
+    [exercises, extras],
+  );
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -157,17 +184,99 @@ export default function SessionLogger({
   // Dérivée de l'état déjà en place (séries validées par exercice) : aucune
   // requête supplémentaire, aucun état global. Recalculée à chaque validation
   // ou suppression de série.
+  // CM-62 : la liste passée ici inclut les exercices ajoutés, donc le total
+  // augmente à l'ajout et la barre recule légèrement. Aucun cas particulier.
   const progress = useMemo(
     () =>
       computeSessionProgress(
-        exercises.map((e) => ({
-          exerciseId: e.exercise_id,
-          plannedSets: e.target_sets,
-          loggedSets: validated[e.exercise_id] ?? 0,
+        allExercises.map((e) => ({
+          exerciseId: e.exerciseId,
+          plannedSets: e.targetSets,
+          loggedSets: validated[e.exerciseId] ?? 0,
         })),
       ),
-    [exercises, validated],
+    [allExercises, validated],
   );
+
+  // ----- Ajout / retrait d'un exercice hors programme (CM-62) -----
+
+  /**
+   * Ajoute un exercice du catalogue à la séance : cibles par défaut, séries
+   * vides, puis chargement de la « dernière fois » (toutes séances confondues)
+   * pour pré-remplir la première série comme n'importe quel autre exercice.
+   */
+  function addExtraExercise(exercise: SystemExercise) {
+    if (allExercises.some((e) => e.exerciseId === exercise.id)) return;
+
+    const added: LoggerExercise = {
+      exerciseId: exercise.id,
+      name: exercise.name,
+      muscleGroup: exercise.muscle_group,
+      ...EXTRA_EXERCISE_DEFAULTS,
+      source: "extra",
+      last: null,
+    };
+
+    setExtras((prev) => [...prev, added]);
+    setSets((prev) => ({
+      ...prev,
+      [exercise.id]: Array.from({ length: added.targetSets }, () => ({
+        weight: "",
+        reps: "",
+        isWarmup: false,
+        touched: false,
+      })),
+    }));
+    setValidated((prev) => ({ ...prev, [exercise.id]: 0 }));
+    setError(null);
+    setCurrentIdx(allExercises.length);
+    scrollToCard.current = true;
+
+    startLoadLast(async () => {
+      const last = await fetchLastForExercise(exercise.id, sessionId);
+      if (!last) return;
+      setExtras((prev) =>
+        prev.map((e) => (e.exerciseId === exercise.id ? { ...e, last } : e)),
+      );
+      const suggestion = suggestFirstSet(
+        last,
+        added.targetRepsMin,
+        added.targetRepsMax,
+      );
+      if (!suggestion) return;
+      // Seule la série 1 est pré-remplie depuis le passé (CM-68), et jamais
+      // sur une valeur déjà saisie.
+      setSets((prev) => {
+        const rows = prev[exercise.id];
+        const first = rows?.[0];
+        if (!rows || !first || first.touched) return prev;
+        const next = [...rows];
+        next[0] = { ...first, weight: suggestion.weight, reps: suggestion.reps };
+        return { ...prev, [exercise.id]: next };
+      });
+    });
+  }
+
+  /** Retrait d'un exercice ajouté, possible tant qu'aucune série n'est validée. */
+  function removeExtraExercise(exerciseId: string) {
+    setConfirmRemoveId(null);
+    const index = allExercises.findIndex((e) => e.exerciseId === exerciseId);
+    setExtras((prev) => prev.filter((e) => e.exerciseId !== exerciseId));
+    setSets((prev) => {
+      const next = { ...prev };
+      delete next[exerciseId];
+      return next;
+    });
+    setValidated((prev) => {
+      const next = { ...prev };
+      delete next[exerciseId];
+      return next;
+    });
+    setError(null);
+    if (index >= 0) {
+      setCurrentIdx((i) => (i >= index ? Math.max(0, i - 1) : i));
+    }
+  }
 
   function startRest(seconds: number) {
     rest.start(seconds > 0 ? seconds : 90);
@@ -323,8 +432,10 @@ export default function SessionLogger({
   function handleFinish() {
     setError(null);
     const payload: LoggedSet[] = [];
-    for (const ex of exercises) {
-      const rows = sets[ex.exercise_id] ?? [];
+    // CM-62 : un exercice ajouté passe par exactement la même sauvegarde, avec
+    // `exercise_id` et `set_index`. Aucun champ, aucune table en plus.
+    for (const ex of allExercises) {
+      const rows = sets[ex.exerciseId] ?? [];
       let idx = 0;
       for (const r of rows) {
         const reps = parseInt(r.reps, 10);
@@ -332,7 +443,7 @@ export default function SessionLogger({
         if (r.touched && Number.isFinite(reps) && reps > 0 && Number.isFinite(weight)) {
           idx += 1;
           payload.push({
-            exercise_id: ex.exercise_id,
+            exercise_id: ex.exerciseId,
             set_index: idx,
             weight_kg: weight,
             reps,
@@ -366,17 +477,24 @@ export default function SessionLogger({
     });
   }
 
-  const ex = exercises[currentIdx]!;
-  const rows = sets[ex.exercise_id] ?? [];
-  const vcount = validated[ex.exercise_id] ?? 0;
+  const ex = allExercises[Math.min(currentIdx, allExercises.length - 1)]!;
+  const rows = sets[ex.exerciseId] ?? [];
+  const vcount = validated[ex.exerciseId] ?? 0;
   const activeIndex = vcount;
   const activeRow = rows[activeIndex];
   const exerciseDone = rows.length > 0 && vcount >= rows.length;
   const exProgress = progress.perExercise.find(
-    (p) => p.exerciseId === ex.exercise_id,
+    (p) => p.exerciseId === ex.exerciseId,
   );
-  const isLast = currentIdx === exercises.length - 1;
+  const isLast = currentIdx >= allExercises.length - 1;
   const last = ex.last;
+  // La croix de retrait ne vit que tant que l'exercice ajouté n'a aucune série
+  // enregistrée : dès la première validation, il n'est plus « retirable ».
+  const canRemove = ex.source === "extra" && vcount === 0;
+  const usedExerciseIds = useMemo(
+    () => allExercises.map((e) => e.exerciseId),
+    [allExercises],
+  );
 
   // Delta CM-64 : comparaison alignée sur l'index de série (série i vs série i
   // de la dernière fois), affichée quand la saisie en cours diffère.
@@ -395,6 +513,19 @@ export default function SessionLogger({
   useEffect(() => {
     setEditingField(null);
   }, [currentIdx, activeIndex]);
+
+  // On referme la confirmation de retrait en quittant l'exercice.
+  useEffect(() => {
+    setConfirmRemoveId(null);
+  }, [currentIdx]);
+
+  // CM-62 : scroll doux jusqu'à la carte du nouvel exercice, une seule fois,
+  // après que le rendu l'a réellement placée.
+  useEffect(() => {
+    if (!scrollToCard.current) return;
+    scrollToCard.current = false;
+    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [currentIdx]);
 
   // La barre épinglée est `fixed` : on réserve sa hauteur en haut du flux
   // (encoche comprise) pour qu'elle ne recouvre jamais le contenu.
@@ -464,11 +595,11 @@ export default function SessionLogger({
             ‹
           </button>
           <span className="font-oswald text-[13px] font-bold text-energy">
-            {currentIdx + 1}/{exercises.length}
+            {currentIdx + 1}/{allExercises.length}
           </span>
           <button
             type="button"
-            onClick={() => setCurrentIdx((i) => Math.min(exercises.length - 1, i + 1))}
+            onClick={() => setCurrentIdx((i) => Math.min(allExercises.length - 1, i + 1))}
             disabled={isLast}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface2 text-fg disabled:opacity-30"
             aria-label="Exercice suivant"
@@ -551,12 +682,30 @@ export default function SessionLogger({
       {/* Carte exercice courant — atténuée quand toutes les séries prévues
           sont faites, mais jamais verrouillée : on peut encore en ajouter. */}
       <div
+        ref={cardRef}
         className={`mt-4 flex-1 ${exProgress?.isComplete ? "opacity-60" : ""}`}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-toi">
-              Exercice {currentIdx + 1}
+            <div className="flex items-center gap-2">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-toi">
+                Exercice {currentIdx + 1}
+              </div>
+              {ex.source === "extra" && (
+                <span className="text-xs font-semibold text-fg-muted">
+                  Hors programme
+                </span>
+              )}
+              {canRemove && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmRemoveId(ex.exerciseId)}
+                  className="text-fg-faint hover:text-fg"
+                  aria-label={`Retirer ${ex.name} de la séance`}
+                >
+                  ✕
+                </button>
+              )}
             </div>
             <div className="mt-0.5 flex items-baseline gap-2">
               <h1 className="text-2xl font-black tracking-tight text-fg">
@@ -575,11 +724,37 @@ export default function SessionLogger({
               )}
             </div>
           </div>
-          <ExerciseInfo name={ex.name} muscleGroup={ex.muscle_group} />
+          <ExerciseInfo name={ex.name} muscleGroup={ex.muscleGroup} />
         </div>
         <p className="mt-1 text-xs text-fg-muted">
-          Objectif {ex.target_sets} × {ex.target_reps_min}–{ex.target_reps_max}
+          Objectif {ex.targetSets} × {ex.targetRepsMin}–{ex.targetRepsMax}
         </p>
+
+        {/* Confirmation de retrait en ligne : `window.confirm` est inerte en
+            PWA iOS standalone et dans la WKWebView Capacitor (cf. CM-70). */}
+        {confirmRemoveId === ex.exerciseId && (
+          <div className="mt-3 rounded-xl border border-flame/40 bg-flame/10 p-2.5">
+            <p className="text-xs font-semibold text-flame">
+              Retirer « {ex.name} » de la séance ?
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => removeExtraExercise(ex.exerciseId)}
+                className="flex-1 rounded-lg bg-flame py-2 text-xs font-extrabold text-ink"
+              >
+                Oui
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmRemoveId(null)}
+                className="flex-1 rounded-lg bg-surface2 py-2 text-xs font-semibold text-fg"
+              >
+                Non
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Rappel « dernière fois » (CM-64) — lecture seule, distinct d'un champ. */}
         {last && last.sets.length > 0 ? (
@@ -595,7 +770,9 @@ export default function SessionLogger({
           </div>
         ) : (
           <div className="mt-3 rounded-xl bg-surface/50 px-3.5 py-2.5 text-sm text-fg-muted">
-            Première fois sur cet exercice
+            {isLoadingLast && ex.source === "extra"
+              ? "Recherche de ton historique…"
+              : "Première fois sur cet exercice"}
           </div>
         )}
 
@@ -674,7 +851,7 @@ export default function SessionLogger({
                     field="weight"
                     initial={activeRow.weight}
                     onCommit={(raw) =>
-                      commitDirect(ex.exercise_id, activeIndex, "weight", raw)
+                      commitDirect(ex.exerciseId, activeIndex, "weight", raw)
                     }
                     onCancel={() => setEditingField(null)}
                   />
@@ -693,7 +870,7 @@ export default function SessionLogger({
               <div className="mt-3 grid grid-cols-4 gap-2">
                 <button
                   type="button"
-                  onClick={() => step(ex.exercise_id, activeIndex, "weight", -2.5)}
+                  onClick={() => step(ex.exerciseId, activeIndex, "weight", -2.5)}
                   className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 font-oswald text-base font-semibold text-fg active:bg-white/10"
                   aria-label="Moins 2,5 kg"
                 >
@@ -701,7 +878,7 @@ export default function SessionLogger({
                 </button>
                 <button
                   type="button"
-                  onClick={() => step(ex.exercise_id, activeIndex, "weight", -1)}
+                  onClick={() => step(ex.exerciseId, activeIndex, "weight", -1)}
                   className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
                   aria-label="Moins 1 kg"
                 >
@@ -709,7 +886,7 @@ export default function SessionLogger({
                 </button>
                 <button
                   type="button"
-                  onClick={() => step(ex.exercise_id, activeIndex, "weight", 1)}
+                  onClick={() => step(ex.exerciseId, activeIndex, "weight", 1)}
                   className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
                   aria-label="Plus 1 kg"
                 >
@@ -717,7 +894,7 @@ export default function SessionLogger({
                 </button>
                 <button
                   type="button"
-                  onClick={() => step(ex.exercise_id, activeIndex, "weight", 2.5)}
+                  onClick={() => step(ex.exerciseId, activeIndex, "weight", 2.5)}
                   className="flex h-11 items-center justify-center rounded-2xl bg-energy font-oswald text-base font-bold text-ink"
                   aria-label="Plus 2,5 kg"
                 >
@@ -737,7 +914,7 @@ export default function SessionLogger({
                     field="reps"
                     initial={activeRow.reps}
                     onCommit={(raw) =>
-                      commitDirect(ex.exercise_id, activeIndex, "reps", raw)
+                      commitDirect(ex.exerciseId, activeIndex, "reps", raw)
                     }
                     onCancel={() => setEditingField(null)}
                   />
@@ -756,7 +933,7 @@ export default function SessionLogger({
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => step(ex.exercise_id, activeIndex, "reps", -1)}
+                  onClick={() => step(ex.exerciseId, activeIndex, "reps", -1)}
                   className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
                   aria-label="Moins 1 répétition"
                 >
@@ -764,7 +941,7 @@ export default function SessionLogger({
                 </button>
                 <button
                   type="button"
-                  onClick={() => step(ex.exercise_id, activeIndex, "reps", 1)}
+                  onClick={() => step(ex.exerciseId, activeIndex, "reps", 1)}
                   className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
                   aria-label="Plus 1 répétition"
                 >
@@ -775,7 +952,7 @@ export default function SessionLogger({
 
             <button
               type="button"
-              onClick={() => toggleWarmup(ex.exercise_id, activeIndex)}
+              onClick={() => toggleWarmup(ex.exerciseId, activeIndex)}
               className={`min-h-11 text-left text-[11px] font-semibold ${
                 activeRow.isWarmup ? "text-toi" : "text-fg-faint"
               }`}
@@ -788,7 +965,7 @@ export default function SessionLogger({
         {exerciseDone && (
           <button
             type="button"
-            onClick={() => addRow(ex.exercise_id)}
+            onClick={() => addRow(ex.exerciseId)}
             className="mt-3 w-full rounded-xl border border-dashed border-line py-2.5 text-xs font-semibold text-fg-muted active:bg-white/5"
           >
             + Ajouter une série
@@ -825,6 +1002,18 @@ export default function SessionLogger({
         )}
       </div>
 
+      {/* CM-62 : hors de la carte, qui s'atténue une fois l'exercice terminé —
+          le bouton reste lisible même quand toute la séance est faite. Une
+          machine occupée ou une envie qui change n'attend pas ; le programme,
+          lui, n'est jamais modifié. */}
+      <button
+        type="button"
+        onClick={() => setSheetOpen(true)}
+        className="mt-5 w-full rounded-xl border border-dashed border-line py-3 text-sm font-semibold text-fg-muted active:bg-white/5"
+      >
+        + Ajouter un exercice
+      </button>
+
       {/* Action principale */}
       <div className="sticky bottom-0 -mx-5 mt-4 bg-ink/90 px-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
         {!exerciseDone ? (
@@ -832,8 +1021,8 @@ export default function SessionLogger({
             type="button"
             onClick={() =>
               activeRow
-                ? validateSet(ex.exercise_id, activeIndex, ex.rest_seconds)
-                : addRow(ex.exercise_id)
+                ? validateSet(ex.exerciseId, activeIndex, ex.restSeconds)
+                : addRow(ex.exerciseId)
             }
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[17px] font-extrabold text-ink"
           >
@@ -854,7 +1043,7 @@ export default function SessionLogger({
         ) : (
           <button
             type="button"
-            onClick={() => setCurrentIdx((i) => Math.min(exercises.length - 1, i + 1))}
+            onClick={() => setCurrentIdx((i) => Math.min(allExercises.length - 1, i + 1))}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[17px] font-extrabold text-ink"
           >
             Exercice suivant
@@ -874,6 +1063,19 @@ export default function SessionLogger({
           </button>
         )}
       </div>
+
+      <AddExerciseSheet
+        open={sheetOpen}
+        catalog={catalogState}
+        usedExerciseIds={usedExerciseIds}
+        canCreateExercise={canCreateExercise}
+        onSelect={addExtraExercise}
+        onCreated={(exercise) => {
+          setCatalogState((prev) => [...prev, exercise]);
+          addExtraExercise(exercise);
+        }}
+        onClose={() => setSheetOpen(false)}
+      />
     </div>
   );
 }

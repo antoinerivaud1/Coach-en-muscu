@@ -111,3 +111,25 @@ test("un exercice ajouté en cours de séance fait reculer la barre", () => {
   expect(before.done / before.total).toBe(1);
   expect(after.done / after.total).toBe(0.5);
 });
+
+test("CM-62 : un exercice hors programme ajoute ses 3 séries au total", () => {
+  const program = [
+    { exerciseId: "a", plannedSets: 4, loggedSets: 4 },
+    { exerciseId: "b", plannedSets: 3, loggedSets: 1 },
+  ];
+  const before = computeSessionProgress(program);
+  expect(before.done).toBe(5);
+  expect(before.total).toBe(7);
+
+  // Cibles par défaut d'un exercice ajouté (EXTRA_EXERCISE_DEFAULTS) : 3 séries.
+  const after = computeSessionProgress([
+    ...program,
+    { exerciseId: "extra", plannedSets: 3, loggedSets: 0 },
+  ]);
+  expect(after.done).toBe(5);
+  expect(after.total).toBe(10);
+  expect(after.exercisesRemaining).toBe(2);
+
+  // Retiré avant toute série, le total revient exactement à son état initial.
+  expect(computeSessionProgress(program)).toEqual(before);
+});
