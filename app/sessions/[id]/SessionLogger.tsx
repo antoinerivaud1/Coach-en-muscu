@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { finishSession, fetchLastForExercise, type LoggedSet } from "./actions";
+import {
+  finishSession,
+  fetchLastForExercise,
+  type FinishSessionInput,
+} from "./actions";
 import type { LastExerciseData } from "@/lib/queries/sessions";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import {
@@ -13,8 +17,11 @@ import {
 import { resolvePrefill, suggestFirstSet } from "@/lib/utils/prefill";
 import {
   EXTRA_EXERCISE_DEFAULTS,
+  resumeExerciseIndex,
   type SessionExercise,
 } from "@/lib/utils/sessionExercises";
+import { newSetId, type PendingSet } from "@/lib/utils/setQueue";
+import { useSetPersistence } from "@/hooks/useSetPersistence";
 import ExerciseInfo from "@/components/ExerciseInfo";
 import AddExerciseSheet from "@/components/AddExerciseSheet";
 import { addPending } from "@/lib/pendingSessions";
@@ -37,15 +44,26 @@ export type LoggerExercise = SessionExercise & {
   last: LastExerciseData | null;
 };
 
-type InitialSet = { weight: string; reps: string; isWarmup: boolean };
-type SetField = { weight: string; reps: string; isWarmup: boolean; touched: boolean };
+/**
+ * Série transmise par le serveur. `id` non nul = série déjà en base (séance en
+ * cours reprise, ou séance terminée rouverte en modification) ; `id` nul =
+ * ligne vide ou pré-remplie, qui n'existera en base qu'à sa validation.
+ */
+export type InitialSet = {
+  id: string | null;
+  setIndex: number | null;
+  weight: string;
+  reps: string;
+  isWarmup: boolean;
+};
+
+type SetField = InitialSet & { touched: boolean };
 
 type Props = {
   sessionId: string;
   dayName: string;
   exercises: LoggerExercise[];
   initialSets: Record<string, InitialSet[]>;
-  editing: boolean;
   /** Catalogue d'ajout en séance : exercices système + persos du couple. */
   catalog: SystemExercise[];
   canCreateExercise: boolean;
@@ -58,12 +76,18 @@ const FEEDBACK_OPTIONS: { value: Feedback; label: string }[] = [
   { value: "failure", label: "Échec" },
 ];
 
+/** Séries déjà en base d'un exercice : les lignes de tête qui portent un id. */
+function countPersisted(rows: readonly { id: string | null }[]): number {
+  let n = 0;
+  while (n < rows.length && rows[n]!.id !== null) n += 1;
+  return n;
+}
+
 export default function SessionLogger({
   sessionId,
   dayName,
   exercises,
   initialSets,
-  editing,
   catalog,
   canCreateExercise,
 }: Props) {
@@ -71,19 +95,23 @@ export default function SessionLogger({
   const [isPending, startTransition] = useTransition();
   const startedAt = useRef<number>(Date.now());
 
+  // CM-78 : toute série validée part en base immédiatement, par cette file.
+  const persistence = useSetPersistence(sessionId);
+  const { enqueueUpsert, enqueueDelete } = persistence;
+
   const [sets, setSets] = useState<Record<string, SetField[]>>(() => {
     const out: Record<string, SetField[]> = {};
     for (const ex of exercises) {
       const rows = initialSets[ex.exerciseId] ?? [];
-      out[ex.exerciseId] = rows.map((r) => ({ ...r, touched: editing }));
+      // Une série déjà en base est forcément « touchée » : elle a été saisie.
+      out[ex.exerciseId] = rows.map((r) => ({ ...r, touched: r.id !== null }));
     }
     return out;
   });
   const [validated, setValidated] = useState<Record<string, number>>(() => {
     const out: Record<string, number> = {};
     for (const ex of exercises) {
-      const rows = initialSets[ex.exerciseId] ?? [];
-      out[ex.exerciseId] = editing ? rows.length : 0;
+      out[ex.exerciseId] = countPersisted(initialSets[ex.exerciseId] ?? []);
     }
     return out;
   });
@@ -107,9 +135,22 @@ export default function SessionLogger({
     [exercises, extras],
   );
 
-  const [currentIdx, setCurrentIdx] = useState(0);
+  // Reprise d'une séance en cours (CM-78) : on rouvre sur le premier exercice
+  // qui n'est pas terminé, pas sur le premier de la liste.
+  const [currentIdx, setCurrentIdx] = useState(() => {
+    const counts: Record<string, number> = {};
+    for (const ex of exercises) {
+      counts[ex.exerciseId] = countPersisted(initialSets[ex.exerciseId] ?? []);
+    }
+    return resumeExerciseIndex(exercises, counts);
+  });
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Série validée dont la suppression attend confirmation : `exId:index`. */
+  const [confirmDeleteSet, setConfirmDeleteSet] = useState<string | null>(null);
+  /** Confirmation « terminer alors que des séries restent en attente ». */
+  const [confirmFinish, setConfirmFinish] = useState(false);
+  const [isFlushing, setIsFlushing] = useState(false);
   const [offlineSaved, setOfflineSaved] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   // Champ en cours d'édition au clavier (CM-63) sur la série active.
@@ -221,6 +262,8 @@ export default function SessionLogger({
     setSets((prev) => ({
       ...prev,
       [exercise.id]: Array.from({ length: added.targetSets }, () => ({
+        id: null,
+        setIndex: null,
         weight: "",
         reps: "",
         isWarmup: false,
@@ -295,6 +338,8 @@ export default function SessionLogger({
     setSets((prev) => {
       const rows = prev[exId] ? [...prev[exId]!] : [];
       const current = rows[rowIndex] ?? {
+        id: null,
+        setIndex: null,
         weight: "",
         reps: "",
         isWarmup: false,
@@ -375,6 +420,8 @@ export default function SessionLogger({
         firstSetSuggestion: null,
       });
       rows.push({
+        id: null,
+        setIndex: null,
         weight: resolved.weight,
         reps: resolved.reps,
         isWarmup: false,
@@ -393,13 +440,29 @@ export default function SessionLogger({
       setError("Renseigne les répétitions avant de valider la série.");
       return;
     }
+    const weight = row.weight === "" ? 0 : Number(row.weight.replace(",", "."));
+    if (!Number.isFinite(weight) || weight < 0) {
+      setError("Poids invalide.");
+      return;
+    }
     setError(null);
     setEditingField(null);
+
+    // CM-78 : id généré ici, jamais par la base, pour qu'un réessai rejoue la
+    // même ligne. `set_index` est celui de la validation et ne bouge plus : une
+    // suppression ne renumérote rien en base, l'affichage se recale seul.
+    const id = row.id ?? newSetId();
+    const maxSetIndex = rows.reduce(
+      (max, r) => Math.max(max, r.setIndex ?? 0),
+      0,
+    );
+    const setIndex = row.setIndex ?? maxSetIndex + 1;
+
     setSets((prev) => {
       const r = prev[exId] ? [...prev[exId]!] : [];
       const validatedRow = r[activeIndex];
       if (!validatedRow) return prev;
-      r[activeIndex] = { ...validatedRow, touched: true };
+      r[activeIndex] = { ...validatedRow, id, setIndex, touched: true };
       // CM-68 : propagation vers la série suivante non touchée. Un échauffement
       // ne sert jamais de source de propagation vers une série effective.
       const nextIndex = activeIndex + 1;
@@ -426,45 +489,62 @@ export default function SessionLogger({
       return { ...prev, [exId]: r };
     });
     setValidated((v) => ({ ...v, [exId]: (v[exId] ?? 0) + 1 }));
+
+    // L'écriture part en tâche de fond : ni attente, ni spinner. Le repos
+    // démarre exactement comme avant.
+    enqueueUpsert({
+      id,
+      sessionId,
+      exerciseId: exId,
+      setIndex,
+      weightKg: weight,
+      reps,
+      isWarmup: row.isWarmup,
+      rpe: null,
+    });
     startRest(restSeconds);
   }
 
-  function handleFinish() {
+  /**
+   * Supprime une série déjà validée : retrait local immédiat, puis suppression
+   * en base. Les séries suivantes gardent leur `set_index` en base — seule la
+   * numérotation affichée se recale, sur l'ordre des lignes.
+   */
+  function removeValidatedSet(exId: string, rowIndex: number) {
+    setConfirmDeleteSet(null);
+    const row = sets[exId]?.[rowIndex];
+    if (!row) return;
     setError(null);
-    const payload: LoggedSet[] = [];
-    // CM-62 : un exercice ajouté passe par exactement la même sauvegarde, avec
-    // `exercise_id` et `set_index`. Aucun champ, aucune table en plus.
-    for (const ex of allExercises) {
-      const rows = sets[ex.exerciseId] ?? [];
-      let idx = 0;
-      for (const r of rows) {
-        const reps = parseInt(r.reps, 10);
-        const weight = r.weight === "" ? 0 : Number(r.weight.replace(",", "."));
-        if (r.touched && Number.isFinite(reps) && reps > 0 && Number.isFinite(weight)) {
-          idx += 1;
-          payload.push({
-            exercise_id: ex.exerciseId,
-            set_index: idx,
-            weight_kg: weight,
-            reps,
-            is_warmup: r.isWarmup,
-          });
-        }
-      }
-    }
+    setSets((prev) => {
+      const r = prev[exId] ? [...prev[exId]!] : [];
+      if (!r[rowIndex]) return prev;
+      r.splice(rowIndex, 1);
+      return { ...prev, [exId]: r };
+    });
+    setValidated((v) => ({ ...v, [exId]: Math.max(0, (v[exId] ?? 0) - 1) }));
+    if (row.id) enqueueDelete(row.id);
+  }
 
-    if (payload.length === 0) {
-      setError("Saisis au moins une série (reps > 0) avant de terminer.");
-      return;
-    }
+  /** Séries validées, toutes exercices confondus. */
+  const validatedCount = useMemo(
+    () => Object.values(validated).reduce((sum, n) => sum + n, 0),
+    [validated],
+  );
 
+  /**
+   * Clôture la séance. Les séries sont déjà en base : il ne reste que la durée
+   * et le ressenti. La file est vidée si possible, mais ne bloque jamais — ce
+   * qui reste dedans est rejoué à la prochaine ouverture de la séance.
+   */
+  function finish() {
+    setConfirmFinish(false);
     const durationSeconds = Math.round((Date.now() - startedAt.current) / 1000);
-    const input = { sessionId, sets: payload, feedback, durationSeconds };
+    const input: FinishSessionInput = { sessionId, feedback, durationSeconds };
 
     startTransition(async () => {
       try {
         const result = await finishSession(input);
-        if (!result.success) {
+        if (!result.ok) {
           setError(result.error);
           return;
         }
@@ -474,6 +554,26 @@ export default function SessionLogger({
         addPending(input);
         setOfflineSaved(true);
       }
+    });
+  }
+
+  function handleFinish() {
+    setError(null);
+    if (validatedCount === 0) {
+      setError("Valide au moins une série avant de terminer.");
+      return;
+    }
+    if (!persistence.hasPending) {
+      finish();
+      return;
+    }
+    // Dernière chance donnée au réseau, 5 s au plus : au-delà, on demande, on
+    // ne bloque pas.
+    setIsFlushing(true);
+    void persistence.flush(5000).then((drained) => {
+      setIsFlushing(false);
+      if (drained) finish();
+      else setConfirmFinish(true);
     });
   }
 
@@ -509,14 +609,76 @@ export default function SessionLogger({
       : null;
   const deltaKg = rawDelta !== null && Math.abs(rawDelta) >= 0.01 ? rawDelta : null;
 
+  // CM-78 : séries validées hors réseau lors d'une ouverture précédente de la
+  // page, retrouvées dans la file. Elles ne sont pas encore en base, donc
+  // absentes de `initialSets` : sans ce rattrapage l'écran les proposerait de
+  // nouveau à la saisie, et la même série finirait écrite deux fois.
+  const restoredMerged = useRef(false);
+  const restoredOps = persistence.restored;
+  useEffect(() => {
+    if (restoredOps === null || restoredMerged.current) return;
+    restoredMerged.current = true;
+
+    const byExercise = new Map<string, PendingSet[]>();
+    for (const op of restoredOps) {
+      if (op.kind !== "upsert") continue;
+      const list = byExercise.get(op.set.exerciseId);
+      if (list) list.push(op.set);
+      else byExercise.set(op.set.exerciseId, [op.set]);
+    }
+    if (byExercise.size === 0) return;
+
+    // L'effet ne tourne qu'au montage : `sets` et `validated` sont encore ceux
+    // du serveur, on peut donc les recomposer sans passer par un updater.
+    const nextSets: Record<string, SetField[]> = { ...sets };
+    const nextValidated: Record<string, number> = { ...validated };
+    let changed = false;
+
+    for (const [exId, pendingSets] of byExercise) {
+      const rows = nextSets[exId];
+      if (!rows) continue; // Exercice absent de cette séance : rien à afficher.
+      const known = new Set(
+        rows.map((r) => r.id).filter((id): id is string => id !== null),
+      );
+      const out = [...rows];
+      let cursor = nextValidated[exId] ?? 0;
+      for (const set of pendingSets) {
+        if (known.has(set.id)) continue;
+        const row: SetField = {
+          id: set.id,
+          setIndex: set.setIndex,
+          weight: formatWeight(set.weightKg),
+          reps: String(set.reps),
+          isWarmup: set.isWarmup,
+          touched: true,
+        };
+        if (cursor < out.length) out[cursor] = row;
+        else out.push(row);
+        cursor += 1;
+        changed = true;
+      }
+      nextSets[exId] = out;
+      nextValidated[exId] = cursor;
+    }
+
+    if (!changed) return;
+    setSets(nextSets);
+    setValidated(nextValidated);
+    setCurrentIdx(resumeExerciseIndex(exercises, nextValidated));
+    // `sets` et `validated` sont lus une seule fois, au montage : les relire à
+    // chaque validation relancerait ce rattrapage à tort.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restoredOps, exercises]);
+
   // On sort du mode saisie clavier dès qu'on change d'exercice ou de série.
   useEffect(() => {
     setEditingField(null);
   }, [currentIdx, activeIndex]);
 
-  // On referme la confirmation de retrait en quittant l'exercice.
+  // On referme les confirmations en ligne en quittant l'exercice.
   useEffect(() => {
     setConfirmRemoveId(null);
+    setConfirmDeleteSet(null);
   }, [currentIdx]);
 
   // CM-62 : scroll doux jusqu'à la carte du nouvel exercice, une seule fois,
@@ -781,9 +943,13 @@ export default function SessionLogger({
           {rows.map((row, i) => {
             const done = i < vcount;
             const active = i === activeIndex;
+            // CM-78 : écriture pas encore confirmée. Un point gris, discret :
+            // rien n'est perdu, rien n'est à faire, la file s'en occupe.
+            const waiting = row.id !== null && persistence.pendingIds.has(row.id);
+            const deleteKey = `${ex.exerciseId}:${i}`;
             return (
               <div
-                key={i}
+                key={row.id ?? `row-${i}`}
                 className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 ${
                   active
                     ? "border-[1.5px] border-energy bg-energy/[0.08]"
@@ -804,19 +970,60 @@ export default function SessionLogger({
                   {done ? "✓" : i + 1}
                 </span>
                 <span
-                  className={`flex-1 text-[13px] font-bold ${
+                  className={`flex flex-1 items-center gap-1.5 text-[13px] font-bold ${
                     active ? "text-energy" : "text-fg-muted"
                   }`}
                 >
                   {row.isWarmup ? "Échauffement" : done ? `Série ${i + 1}` : active ? "En cours" : "À venir"}
+                  {waiting && (
+                    <span
+                      className="h-1.5 w-1.5 flex-none rounded-full bg-fg-faint"
+                      aria-label="Enregistrement en cours"
+                      title="Enregistrement en cours"
+                    />
+                  )}
                 </span>
-                <span className="font-oswald text-base text-fg">
-                  {done || (active && row.weight !== "")
-                    ? `${row.weight || 0} kg `
-                    : "— kg "}
-                  <span className="text-fg-muted">×</span>{" "}
-                  {done || (active && row.reps !== "") ? row.reps || 0 : "—"}
-                </span>
+                {confirmDeleteSet === deleteKey ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-semibold text-flame">
+                      Supprimer ?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeValidatedSet(ex.exerciseId, i)}
+                      className="rounded-lg bg-flame px-2 py-1 text-[11px] font-extrabold text-ink"
+                    >
+                      Oui
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteSet(null)}
+                      className="rounded-lg bg-surface2 px-2 py-1 text-[11px] font-semibold text-fg"
+                    >
+                      Non
+                    </button>
+                  </span>
+                ) : (
+                  <>
+                    <span className="font-oswald text-base text-fg">
+                      {done || (active && row.weight !== "")
+                        ? `${row.weight || 0} kg `
+                        : "— kg "}
+                      <span className="text-fg-muted">×</span>{" "}
+                      {done || (active && row.reps !== "") ? row.reps || 0 : "—"}
+                    </span>
+                    {done && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteSet(deleteKey)}
+                        className="-mr-1 flex-none px-1 text-fg-faint hover:text-flame"
+                        aria-label={`Supprimer la série ${i + 1}`}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             );
           })}
@@ -1035,10 +1242,10 @@ export default function SessionLogger({
           <button
             type="button"
             onClick={handleFinish}
-            disabled={isPending}
+            disabled={isPending || isFlushing}
             className="w-full rounded-2xl bg-energy py-4 text-[17px] font-extrabold text-ink disabled:opacity-50"
           >
-            {isPending ? "Enregistrement…" : "Terminer la séance"}
+            {isPending || isFlushing ? "Enregistrement…" : "Terminer la séance"}
           </button>
         ) : (
           <button
@@ -1056,11 +1263,48 @@ export default function SessionLogger({
           <button
             type="button"
             onClick={handleFinish}
-            disabled={isPending}
+            disabled={isPending || isFlushing}
             className="mt-2 w-full py-1 text-center text-xs font-semibold text-fg-muted hover:text-fg disabled:opacity-50"
           >
-            Terminer maintenant
+            {isFlushing ? "Enregistrement…" : "Terminer maintenant"}
           </button>
+        )}
+
+        {/* CM-78 : la file n'a pas réussi à écrire trois fois de suite. On le
+            dit, sans alarmer ni bloquer — le réessai est automatique. */}
+        {persistence.isStalled && !confirmFinish && (
+          <p className="mt-2 text-center text-[11px] font-medium text-fg-muted">
+            Enregistrement en attente, réessai automatique
+          </p>
+        )}
+
+        {/* Confirmation custom : `window.confirm` est inerte en PWA iOS
+            standalone (cf. CM-70). Terminer sans attendre ne perd rien, la file
+            est rejouée à la prochaine ouverture de la séance. */}
+        {confirmFinish && (
+          <div className="mt-2 rounded-xl border border-flame/40 bg-flame/10 p-3">
+            <p className="text-xs font-semibold text-flame">
+              Certaines séries ne sont pas encore enregistrées. Terminer quand
+              même ?
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={finish}
+                disabled={isPending}
+                className="flex-1 rounded-lg bg-flame py-2 text-xs font-extrabold text-ink disabled:opacity-50"
+              >
+                Terminer
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmFinish(false)}
+                className="flex-1 rounded-lg bg-surface2 py-2 text-xs font-semibold text-fg"
+              >
+                Attendre
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

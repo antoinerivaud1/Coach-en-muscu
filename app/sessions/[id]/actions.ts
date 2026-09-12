@@ -20,15 +20,30 @@ export type LoggedSet = {
 
 export type FinishSessionInput = {
   sessionId: string;
-  sets: LoggedSet[];
   feedback: Feedback | null;
   durationSeconds: number | null;
+  notes?: string | null;
+  /**
+   * Rattrapage des séances mises de côté par l'ancienne version (CM-18) : leur
+   * lot de séries n'a jamais été écrit, il vit encore dans `localStorage`.
+   * Depuis CM-78 le client n'envoie plus jamais ce champ, les séries partent
+   * une par une au moment de leur validation.
+   */
+  sets?: LoggedSet[];
 };
 
 export type FinishSessionResult =
-  | { success: true }
-  | { success: false; error: string };
+  | { ok: true }
+  | { ok: false; error: string };
 
+/**
+ * Clôture d'une séance (CM-78).
+ *
+ * N'écrit plus aucune série : elles sont déjà en base, écrites une par une à
+ * leur validation (`lib/actions/sessionSets.ts`). Cette action ne fait que
+ * marquer la séance terminée — `duration_seconds` non nul est précisément ce
+ * qui distingue une séance terminée d'une séance en cours.
+ */
 export async function finishSession(
   input: FinishSessionInput,
 ): Promise<FinishSessionResult> {
@@ -40,42 +55,41 @@ export async function finishSession(
     .from("sessions")
     .select("id, profile_id")
     .eq("id", input.sessionId)
+    .returns<{ id: string; profile_id: string }[]>()
     .maybeSingle();
 
   if (sessionError) {
-    return { success: false, error: sessionError.message };
+    return { ok: false, error: sessionError.message };
   }
   if (!session || session.profile_id !== profileId) {
-    return { success: false, error: "Séance introuvable" };
+    return { ok: false, error: "Séance introuvable" };
   }
 
-  // On remplace les séries existantes (permet la ré-édition).
-  const { error: deleteError } = await supabase
-    .from("session_sets")
-    .delete()
-    .eq("session_id", input.sessionId);
-
-  if (deleteError) {
-    return { success: false, error: deleteError.message };
-  }
-
-  const validSets = input.sets.filter(
+  const legacySets = (input.sets ?? []).filter(
     (s) => s.reps > 0 && s.weight_kg >= 0 && Number.isFinite(s.weight_kg),
   );
+  if (legacySets.length > 0) {
+    // Une séance en attente d'avant CM-78 : on n'insère que si la séance est
+    // encore vide, pour ne jamais dupliquer des séries déjà écrites par la file.
+    const { count } = await supabase
+      .from("session_sets")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", input.sessionId);
 
-  if (validSets.length > 0) {
-    const { error: insertError } = await supabase.from("session_sets").insert(
-      validSets.map((s) => ({
-        session_id: input.sessionId,
-        exercise_id: s.exercise_id,
-        set_index: s.set_index,
-        weight_kg: s.weight_kg,
-        reps: s.reps,
-        is_warmup: s.is_warmup,
-      })),
-    );
-    if (insertError) {
-      return { success: false, error: insertError.message };
+    if ((count ?? 0) === 0) {
+      const { error: insertError } = await supabase.from("session_sets").insert(
+        legacySets.map((s) => ({
+          session_id: input.sessionId,
+          exercise_id: s.exercise_id,
+          set_index: s.set_index,
+          weight_kg: s.weight_kg,
+          reps: s.reps,
+          is_warmup: s.is_warmup,
+        })),
+      );
+      if (insertError) {
+        return { ok: false, error: insertError.message };
+      }
     }
   }
 
@@ -84,18 +98,19 @@ export async function finishSession(
     .update({
       feedback: input.feedback,
       duration_seconds: input.durationSeconds,
+      ...(input.notes === undefined ? {} : { notes: input.notes }),
     })
     .eq("id", input.sessionId);
 
   if (updateError) {
-    return { success: false, error: updateError.message };
+    return { ok: false, error: updateError.message };
   }
 
   revalidatePath("/dashboard");
   revalidatePath("/history");
   revalidatePath("/progress");
   revalidatePath(`/sessions/${input.sessionId}`);
-  return { success: true };
+  return { ok: true };
 }
 
 /**

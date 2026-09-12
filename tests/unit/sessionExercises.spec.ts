@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
   buildSessionExercises,
+  resumeExerciseIndex,
   EXTRA_EXERCISE_DEFAULTS,
   type ExistingSetInput,
   type ExtraExerciseInput,
@@ -146,4 +147,40 @@ test("exercice inconnu du catalogue : libellés de repli, jamais de crash", () =
       source: "extra",
     },
   ]);
+});
+
+// ---------- Reprise d'une séance en cours (CM-78) ----------
+
+test("reprise : on rouvre sur le premier exercice non terminé", () => {
+  const exercises = [
+    { exerciseId: "a", targetSets: 3 },
+    { exerciseId: "b", targetSets: 4 },
+    { exerciseId: "c", targetSets: 3 },
+  ];
+  expect(resumeExerciseIndex(exercises, { a: 3, b: 2 })).toBe(1);
+  expect(resumeExerciseIndex(exercises, {})).toBe(0);
+  expect(resumeExerciseIndex(exercises, { a: 3, b: 4 })).toBe(2);
+});
+
+test("reprise : séance entièrement validée, on rouvre sur le dernier exercice", () => {
+  const exercises = [
+    { exerciseId: "a", targetSets: 2 },
+    { exerciseId: "b", targetSets: 2 },
+  ];
+  expect(resumeExerciseIndex(exercises, { a: 2, b: 2 })).toBe(1);
+  // Plus de séries que prévu compte quand même comme terminé.
+  expect(resumeExerciseIndex(exercises, { a: 5, b: 3 })).toBe(1);
+});
+
+test("reprise : un exercice sans cible est terminé dès sa première série", () => {
+  const exercises = [
+    { exerciseId: "a", targetSets: 0 },
+    { exerciseId: "b", targetSets: 3 },
+  ];
+  expect(resumeExerciseIndex(exercises, {})).toBe(0);
+  expect(resumeExerciseIndex(exercises, { a: 1 })).toBe(1);
+});
+
+test("reprise : une séance sans exercice ne plante pas", () => {
+  expect(resumeExerciseIndex([], {})).toBe(0);
 });

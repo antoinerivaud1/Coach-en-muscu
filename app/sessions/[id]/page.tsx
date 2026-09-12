@@ -29,7 +29,10 @@ import {
   estimatedOneRepMax,
 } from "@/lib/utils/training";
 import { suggestFirstSet } from "@/lib/utils/prefill";
-import SessionLogger, { type LoggerExercise } from "./SessionLogger";
+import SessionLogger, {
+  type LoggerExercise,
+  type InitialSet,
+} from "./SessionLogger";
 import { deleteSession, updateSet, deleteSet } from "./actions";
 
 const FEEDBACK_LABELS: Record<string, string> = {
@@ -64,7 +67,12 @@ export default async function SessionPage({
   const { data: setsData } = await getSessionSets(supabase, id);
   const existingSets = (setsData ?? []) as SessionSetRow[];
 
-  const loggerMode = isMine && (existingSets.length === 0 || edit === "1");
+  // CM-78 : depuis l'écriture incrémentale, « la séance a des séries » ne veut
+  // plus dire « la séance est terminée » — la première série part en base au
+  // premier « Valider ». Le seul marqueur de fin est `duration_seconds`, celui
+  // que le dashboard utilise déjà pour la séance en cours du partenaire.
+  const inProgress = session.duration_seconds === null;
+  const loggerMode = isMine && (inProgress || edit === "1");
 
   // ---------- Mode saisie ----------
   if (loggerMode) {
@@ -134,10 +142,7 @@ export default async function SessionPage({
     const catalog = (catalogData ?? []) as SystemExercise[];
 
     // Pré-remplissage des champs.
-    const initialSets: Record<
-      string,
-      { weight: string; reps: string; isWarmup: boolean }[]
-    > = {};
+    const initialSets: Record<string, InitialSet[]> = {};
     const existingByExercise: Record<string, SessionSetRow[]> = {};
     for (const s of existingSets) {
       (existingByExercise[s.exercise_id] ??= []).push(s);
@@ -145,36 +150,62 @@ export default async function SessionPage({
 
     for (const e of sessionExercises) {
       const existing = existingByExercise[e.exerciseId];
-      if (existing && existing.length > 0) {
-        initialSets[e.exerciseId] = [...existing]
-          .sort((a, b) => a.set_index - b.set_index)
-          .map((s) => ({
-            weight: formatWeight(s.weight_kg),
-            reps: String(s.reps),
-            isWarmup: s.is_warmup,
-          }));
-      } else {
-        const last = lastByExercise[e.exerciseId] ?? null;
-        const count = Math.max(1, e.targetSets);
-        // CM-68 : seule la série 1 est pré-remplie depuis le passé (suggestion
-        // CM-50 / dernière séance CM-19). Les séries suivantes se remplissent
-        // par propagation à la validation de la série précédente.
-        const firstSuggestion = suggestFirstSet(
-          last,
-          e.targetRepsMin,
-          e.targetRepsMax,
-        );
-        initialSets[e.exerciseId] = Array.from({ length: count }, (_, i) => {
-          if (i === 0 && firstSuggestion) {
+      const logged = [...(existing ?? [])]
+        .sort((a, b) => a.set_index - b.set_index)
+        .map<InitialSet>((s) => ({
+          id: s.id,
+          setIndex: s.set_index,
+          weight: formatWeight(s.weight_kg),
+          reps: String(s.reps),
+          isWarmup: s.is_warmup,
+        }));
+
+      if (logged.length > 0 && !inProgress) {
+        // Mode « Modifier » d'une séance terminée : exactement ses séries.
+        initialSets[e.exerciseId] = logged;
+        continue;
+      }
+
+      const last = lastByExercise[e.exerciseId] ?? null;
+      const count = Math.max(1, e.targetSets);
+      // CM-68 : seule la série 1 est pré-remplie depuis le passé (suggestion
+      // CM-50 / dernière séance CM-19). Les séries suivantes se remplissent
+      // par propagation à la validation de la série précédente.
+      const firstSuggestion = suggestFirstSet(
+        last,
+        e.targetRepsMin,
+        e.targetRepsMax,
+      );
+      // CM-78, reprise : les séries déjà écrites, puis de quoi finir
+      // l'exercice. La première ligne vide hérite de la dernière série
+      // effective de la séance, comme le ferait la propagation si la page
+      // n'avait jamais été rechargée.
+      const lastEffective = [...logged]
+        .reverse()
+        .find((r) => !r.isWarmup && (r.weight !== "" || r.reps !== ""));
+      const empty = Math.max(0, count - logged.length);
+      initialSets[e.exerciseId] = [
+        ...logged,
+        ...Array.from({ length: empty }, (_, i): InitialSet => {
+          const blank = { id: null, setIndex: null, isWarmup: false };
+          if (i > 0) return { ...blank, weight: "", reps: "" };
+          if (lastEffective) {
             return {
-              weight: firstSuggestion.weight,
-              reps: firstSuggestion.reps,
-              isWarmup: false,
+              ...blank,
+              weight: lastEffective.weight,
+              reps: lastEffective.reps,
             };
           }
-          return { weight: "", reps: "", isWarmup: false };
-        });
-      }
+          if (firstSuggestion && logged.length === 0) {
+            return {
+              ...blank,
+              weight: firstSuggestion.weight,
+              reps: firstSuggestion.reps,
+            };
+          }
+          return { ...blank, weight: "", reps: "" };
+        }),
+      ];
     }
 
     return (
@@ -184,7 +215,6 @@ export default async function SessionPage({
           dayName={day.name}
           exercises={exercises}
           initialSets={initialSets}
-          editing={existingSets.length > 0}
           catalog={catalog}
           canCreateExercise={coupleId !== null}
         />
