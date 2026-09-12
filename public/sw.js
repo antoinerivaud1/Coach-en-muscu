@@ -44,15 +44,32 @@ self.addEventListener("fetch", (event) => {
 });
 
 // --- Timer de repos : notification locale planifiée (CM-28) ---
-// Approche 100% client : l'app poste un message au SW au lancement du repos,
-// le SW programme une notification via setTimeout (sans backend push en V1).
+// Approche 100% client : l'app poste au SW l'échéance absolue du repos
+// (`endsAt`), le SW en déduit son délai à la réception et programme une
+// notification via setTimeout (sans backend push en V1).
+// Une seule notification en attente à la fois : toute nouvelle planification
+// remplace la précédente, ce qui rend « + 15 s » / « - 15 s » fiables (CM-74).
 let restTimerId = null;
+
+function clearRestTimer() {
+  if (restTimerId) {
+    clearTimeout(restTimerId);
+    restTimerId = null;
+  }
+}
 
 self.addEventListener("message", (event) => {
   const data = event.data || {};
   if (data.type === "schedule-rest") {
-    if (restTimerId) clearTimeout(restTimerId);
-    const delay = Math.max(0, Number(data.ms) || 0);
+    clearRestTimer();
+    const endsAt = Number(data.endsAt);
+    if (!Number.isFinite(endsAt)) return;
+    // Délai calculé au moment de la réception : la latence du message ne
+    // décale pas l'échéance.
+    const delay = endsAt - Date.now();
+    // Échéance déjà passée : rien à planifier.
+    if (delay <= 0) return;
+    const url = data.url || "/dashboard";
     restTimerId = setTimeout(() => {
       restTimerId = null;
       self.registration.showNotification("Repos terminé 💪", {
@@ -62,14 +79,11 @@ self.addEventListener("message", (event) => {
         tag: "rest-timer",
         renotify: true,
         vibrate: [300, 100, 300],
-        data: { url: data.url || "/dashboard" },
+        data: { url },
       });
     }, delay);
   } else if (data.type === "cancel-rest") {
-    if (restTimerId) {
-      clearTimeout(restTimerId);
-      restTimerId = null;
-    }
+    clearRestTimer();
   }
 });
 
