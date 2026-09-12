@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAllProfiles } from "@/lib/profile";
+import { getCompletedSessionsSince } from "@/lib/queries/sessions";
 import { selectProfile } from "./actions";
 
 function DumbbellIcon({ className }: { className?: string }) {
@@ -70,12 +71,13 @@ export default async function Home() {
   if (ids.length > 0) {
     const since = new Date();
     since.setDate(since.getDate() - 60);
-    const { data: sessRows } = await supabase
-      .from("sessions")
-      .select("profile_id, performed_at")
-      .in("profile_id", ids)
-      .gte("performed_at", since.toISOString())
-      .returns<{ profile_id: string; performed_at: string }[]>();
+    // Séances TERMINÉES seulement (CM-83) : une séance en cours ne doit pas
+    // allonger la série de jours d'affilée affichée sur le sélecteur.
+    const { data: sessRows } = await getCompletedSessionsSince(
+      supabase,
+      ids,
+      since.toISOString(),
+    );
 
     const datesByProfile: Record<string, string[]> = {};
     for (const r of sessRows ?? []) {

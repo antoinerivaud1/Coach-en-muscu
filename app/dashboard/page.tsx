@@ -8,7 +8,14 @@ import {
 } from "@/lib/profile";
 import { startSession } from "@/app/programs/[id]/actions";
 import { getSharedProgramId } from "@/lib/queries/programs";
+import {
+  getCompletedSessionsForDashboard,
+  getCurrentSession,
+  purgeAbandonedEmptySessions,
+} from "@/lib/queries/sessions";
+import { resumeBannerState } from "@/lib/utils/currentSession";
 import BottomNav from "@/components/BottomNav";
+import ResumeSessionBanner from "@/components/ResumeSessionBanner";
 import { clearProfile } from "@/app/actions";
 import { countSets, deriveMuscleTags, splitVisibleTags } from "@/lib/utils/seances";
 import type { MuscleGroup } from "@/lib/utils/seances";
@@ -82,32 +89,37 @@ export default async function DashboardPage({
 
   const now = new Date();
 
+  // --- Séance en cours (bandeau de reprise, CM-83) ---
+  //
+  // Le nettoyage tourne AVANT la lecture : une séance vide et abandonnée depuis
+  // plus de 2 h ne doit pas être proposée en reprise, elle ne contient rien.
+  // Nettoyage opportuniste et idempotent, volontairement sans cron ni job.
+  await purgeAbandonedEmptySessions(supabase, profileId, now);
+  const currentSession = await getCurrentSession(supabase, profileId);
+  const banner = resumeBannerState(
+    currentSession && {
+      id: currentSession.id,
+      performedAt: currentSession.performed_at,
+      setCreatedAt: (currentSession.session_sets ?? []).map((s) => s.created_at),
+    },
+    now,
+  );
+
   // --- Historique du profil ---
   //
-  // Le RLS n'isole PAS les deux profils du couple : le `.eq("profile_id", …)`
-  // est le seul filtrage, il est obligatoire.
-  const { data: sessRows } = await supabase
-    .from("sessions")
-    .select(
-      "id, performed_at, program_day_id, session_sets ( id, exercises ( muscle_group ) )",
-    )
-    .eq("profile_id", profileId)
-    .order("performed_at", { ascending: false })
-    .returns<
-      {
-        id: string;
-        performed_at: string;
-        program_day_id: string | null;
-        session_sets: { id: string; exercises: { muscle_group: MuscleGroup } | null }[];
-      }[]
-    >();
+  // Séances TERMINÉES uniquement : une séance en cours a des séries dès le
+  // premier « Valider » (CM-78), la compter cocherait le jour dans le strip et
+  // daterait la « dernière fois » d'une séance pas encore finie (CM-83). Le
+  // critère est centralisé dans `lib/queries/sessions.ts`.
+  const { data: sessRows } = await getCompletedSessionsForDashboard(
+    supabase,
+    profileId,
+  );
 
-  // Une séance démarrée puis abandonnée n'a aucune série enregistrée. La
-  // compter fausserait les trois lectures qui suivent : le strip d'assiduité
-  // afficherait un jour « fait » sans qu'un seul kilo ait été soulevé, la
-  // dernière exécution d'une séance serait datée d'un simple tap, et la
-  // recommandation en découlerait. C'est un changement de comportement assumé
-  // pour le strip, qui comptait auparavant toutes les sessions (CM-66).
+  // Une séance terminée sans aucune série (démarrée puis clôturée à vide) ne
+  // compte pas non plus : le strip d'assiduité afficherait un jour « fait » sans
+  // qu'un seul kilo ait été soulevé, et la dernière exécution d'une séance serait
+  // datée d'un simple tap. C'est le comportement retenu depuis CM-66.
   const sessions = (sessRows ?? []).filter((s) => (s.session_sets ?? []).length > 0);
   const loggedSessionCount = sessions.length;
 
@@ -286,6 +298,17 @@ export default async function DashboardPage({
         })}
       </div>
 
+      {/* Séance en cours : toujours visible, même si la bibliothèque est vide.
+          Ne bloque rien, la grille en dessous reste tapable (CM-83). */}
+      {banner.kind === "banner" && (
+        <ResumeSessionBanner
+          sessionId={banner.sessionId}
+          dayName={currentSession?.program_days?.name ?? "Séance"}
+          setCount={banner.setCount}
+          stale={banner.stale}
+        />
+      )}
+
       {seances.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-line bg-surface p-6 text-center">
           <p className="text-fg">Aucun programme pour l&apos;instant</p>
@@ -306,8 +329,10 @@ export default async function DashboardPage({
           </p>
 
           {/* Bandeau de suggestion : une seule ligne, purement indicatif. Rien
-              n'est verrouillé, taper une autre carte reste immédiat. */}
-          {recommended && (
+              n'est verrouillé, taper une autre carte reste immédiat. Masqué
+              quand une séance est en cours : le bandeau de reprise occupe déjà
+              cette place (CM-83). */}
+          {banner.kind !== "banner" && recommended && (
             <form action={startSession} className="mb-2.5">
               <input type="hidden" name="day_id" value={recommended.id} />
               <button

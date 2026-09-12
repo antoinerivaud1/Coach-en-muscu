@@ -4,7 +4,10 @@ import {
   getCoupleId,
   getCoupleProfileIds,
 } from "@/lib/profile";
-import { getAllSetsForProgress } from "@/lib/queries/sessions";
+import {
+  getAllSetsForProgress,
+  getCompletedSessionsSince,
+} from "@/lib/queries/sessions";
 import type { ProgressRow } from "@/lib/queries/sessions";
 import {
   bestE1RM,
@@ -164,12 +167,13 @@ export default async function ProgressPage({
 
   // Objectif hebdo (nb de séances cette semaine) + comparaison couple
   const WEEK_GOAL = selectedProfile?.weekly_goal ?? 4;
-  const { data: weekSess } = await supabase
-    .from("sessions")
-    .select("id, profile_id, performed_at")
-    .in("profile_id", ids)
-    .gte("performed_at", new Date(thisMonday).toISOString())
-    .returns<{ id: string; profile_id: string; performed_at: string }[]>();
+  // Séances TERMINÉES seulement : l'anneau d'objectif et la comparaison du
+  // couple ne doivent pas compter une séance encore ouverte (CM-83).
+  const { data: weekSess } = await getCompletedSessionsSince(
+    supabase,
+    ids,
+    new Date(thisMonday).toISOString(),
+  );
   const weekSessions = (weekSess ?? []).filter(
     (s) => s.profile_id === selectedProfileId,
   ).length;

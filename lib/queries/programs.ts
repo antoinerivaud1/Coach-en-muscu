@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import { completedSessionsQuery } from "@/lib/queries/sessions";
 
 export async function getProgramsForUser(
   supabase: SupabaseClient<Database>,
@@ -201,10 +202,13 @@ export type LoggedSessionCount =
 
 /**
  * Nombre de séances RÉELLEMENT réalisées sur cette séance type, c.-à-d. les
- * `sessions` qui ont au moins une ligne dans `session_sets`.
+ * `sessions` TERMINÉES qui ont au moins une ligne dans `session_sets`.
  *
  * Les sessions vides (démarrées puis abandonnées sans aucune série) ne comptent
  * pas : un décompte naïf sur `sessions` donnerait des chiffres faux (CM-65).
+ * Depuis CM-83 les séances en cours ne comptent pas non plus : elles ont des
+ * séries dès le premier « Valider » (CM-78), le compteur bougeait donc pendant
+ * la séance et le garde-fou de `deleteSeance` s'armait avant qu'elle soit finie.
  *
  * CM-70 : l'erreur est remontée au lieu d'être avalée. Auparavant un échec de
  * cette requête renvoyait `0`, ce qui désarmait silencieusement le garde-fou
@@ -214,9 +218,10 @@ export async function countLoggedSessionsForDay(
   supabase: SupabaseClient<Database>,
   dayId: string,
 ): Promise<LoggedSessionCount> {
-  const { data, error } = await supabase
-    .from("sessions")
-    .select("id, session_sets(id)")
+  const { data, error } = await completedSessionsQuery(
+    supabase,
+    "id, session_sets(id)",
+  )
     .eq("program_day_id", dayId)
     .returns<{ id: string; session_sets: { id: string }[] }[]>();
 

@@ -36,6 +36,10 @@ export default async function HistoryPage() {
   const profiles: Record<string, ProfileRow> = {};
   for (const p of profilesData ?? []) profiles[p.id] = p;
 
+  // `getHistory` ne renvoie que des séances TERMINÉES (CM-83) : une séance en
+  // cours n'apparaît donc plus ici avec un compteur de séries qui bouge. Le
+  // filtre restant écarte les séances terminées à vide, qui n'ont rien à
+  // montrer.
   const { data: historyData } = await getHistory(supabase, ids);
   const sessions = ((historyData ?? []) as HistorySessionRow[]).filter(
     (s) => s.session_sets.length > 0,
