@@ -20,6 +20,93 @@ export async function getProgramsForUser(
   return query.eq("owner_profile_id", profileId);
 }
 
+/**
+ * Id du programme partagé du couple (CM-80).
+ *
+ * Un programme partagé a `couple_id` renseigné et `owner_profile_id` à null —
+ * la contrainte `program_owner_xor` garantit que les deux sont exclusifs. Il
+ * n'y en a qu'un en pratique ; s'il y en avait plusieurs, on retient le plus
+ * ancien pour que l'accueil et le Profil pointent toujours au même endroit.
+ */
+export async function getSharedProgramId(
+  supabase: SupabaseClient<Database>,
+  coupleId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("programs")
+    .select("id")
+    .eq("couple_id", coupleId)
+    .is("owner_profile_id", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .returns<{ id: string }[]>();
+
+  return data?.[0]?.id ?? null;
+}
+
+export type ProgramAccess =
+  | { ok: true; allowed: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Le profil courant a-t-il le droit d'agir sur ce programme ?
+ *
+ * Le client serveur utilise la clé `service_role` et contourne donc la RLS
+ * (cf. `lib/supabase/server.ts`, CM-17) : `auth.uid()` est toujours null,
+ * l'app identifie le profil par cookie. Le périmètre des données est garanti
+ * par le code, pas par la base — une server action qui reçoit un id arbitraire
+ * doit donc vérifier elle-même à qui appartient la ligne visée.
+ *
+ * Accès accordé si le programme est personnel et appartient au profil, ou s'il
+ * est partagé et que le profil est membre de ce couple. `allowed: false`
+ * couvre aussi le programme inexistant : l'appelant ne doit pas distinguer les
+ * deux cas dans son message.
+ *
+ * `ok: false` = la vérification n'a pas pu aboutir ; l'appelant refuse
+ * l'action plutôt que de l'autoriser par défaut.
+ */
+export async function canAccessProgram(
+  supabase: SupabaseClient<Database>,
+  programId: string,
+  profileId: string,
+): Promise<ProgramAccess> {
+  const { data: program, error } = await supabase
+    .from("programs")
+    .select("id, owner_profile_id, couple_id")
+    .eq("id", programId)
+    .returns<
+      { id: string; owner_profile_id: string | null; couple_id: string | null }[]
+    >()
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  if (!program) {
+    return { ok: true, allowed: false };
+  }
+  if (program.owner_profile_id === profileId) {
+    return { ok: true, allowed: true };
+  }
+  if (!program.couple_id) {
+    return { ok: true, allowed: false };
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("couple_members")
+    .select("couple_id")
+    .eq("couple_id", program.couple_id)
+    .eq("profile_id", profileId)
+    .returns<{ couple_id: string }[]>()
+    .maybeSingle();
+
+  if (membershipError) {
+    return { ok: false, error: membershipError.message };
+  }
+
+  return { ok: true, allowed: Boolean(membership) };
+}
+
 export type ProgramWithDays = {
   id: string;
   name: string;
@@ -141,4 +228,24 @@ export async function countLoggedSessionsForDay(
     ok: true,
     count: (data ?? []).filter((s) => (s.session_sets ?? []).length > 0).length,
   };
+}
+
+// ---- Renommage d'une séance type (CM-80) ----
+
+/**
+ * Renomme une séance type.
+ *
+ * L'historique n'est pas touché : les `sessions` pointent sur
+ * `program_day_id`, le nouveau nom se propage donc partout (accueil, détail
+ * d'une séance passée, historique) sans autre écriture.
+ *
+ * La validation du nom (non vide, longueur, unicité dans le programme) est
+ * faite en amont par `validateSeanceName` : cette requête ne fait qu'écrire.
+ */
+export async function renameProgramDay(
+  supabase: SupabaseClient<Database>,
+  dayId: string,
+  name: string,
+) {
+  return supabase.from("program_days").update({ name }).eq("id", dayId);
 }

@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfileId } from "@/lib/profile";
-import { countLoggedSessionsForDay } from "@/lib/queries/programs";
+import {
+  canAccessProgram,
+  countLoggedSessionsForDay,
+  renameProgramDay,
+} from "@/lib/queries/programs";
+import { validateSeanceName } from "@/lib/utils/seances";
 
 /**
  * Les actions déclenchées par un `<form action={...}>` ne peuvent pas renvoyer
@@ -383,6 +388,87 @@ export async function moveSeance(
     if (error) {
       return { success: false, error: error.message };
     }
+  }
+
+  revalidateLibrary(day.program_id);
+  return { success: true };
+}
+
+/**
+ * Renomme une séance type depuis la bibliothèque (CM-80).
+ *
+ * Le nom est revalidé ici même si le client l'a déjà fait : c'est la seule
+ * validation qui fait foi. L'unicité est vérifiée sur les autres séances du
+ * même programme, casse ignorée.
+ *
+ * `revalidateLibrary` rafraîchit la bibliothèque ET l'accueil, dont les cartes
+ * de la grille affichent le nom de la séance.
+ */
+export async function renameSeance(
+  dayId: string,
+  name: string,
+): Promise<SeanceActionResult> {
+  const profileId = await requireProfileId();
+  const supabase = await createClient();
+
+  const { data: day, error: dayError } = await supabase
+    .from("program_days")
+    .select("id, program_id")
+    .eq("id", dayId)
+    .returns<{ id: string; program_id: string }[]>()
+    .maybeSingle();
+
+  if (dayError) {
+    return { success: false, error: dayError.message };
+  }
+  if (!day) {
+    return { success: false, error: "Séance introuvable" };
+  }
+
+  // `dayId` vient du client : rien ne garantit que la séance appartient à un
+  // programme du profil courant. Le client serveur contourne la RLS
+  // (`service_role`, cf. CM-17), la vérification doit donc être faite ici —
+  // sans quoi un id arbitraire renommerait la séance d'un autre couple. Même
+  // message qu'une séance inexistante : on ne révèle pas qu'elle existe.
+  const access = await canAccessProgram(supabase, day.program_id, profileId);
+  if (!access.ok) {
+    return {
+      success: false,
+      error: `Impossible de vérifier l'accès à cette séance (${access.error}). Renommage annulé.`,
+    };
+  }
+  if (!access.allowed) {
+    return { success: false, error: "Séance introuvable" };
+  }
+
+  const { data: siblings, error: siblingsError } = await supabase
+    .from("program_days")
+    .select("id, name")
+    .eq("program_id", day.program_id)
+    .returns<{ id: string; name: string }[]>();
+
+  // Sans la liste des voisines, l'unicité ne peut pas être vérifiée : on
+  // refuse plutôt que d'écrire un doublon (même logique que `deleteSeance`).
+  if (siblingsError) {
+    return {
+      success: false,
+      error:
+        `Impossible de vérifier les noms déjà pris (${siblingsError.message}). ` +
+        "Renommage annulé.",
+    };
+  }
+
+  const check = validateSeanceName(
+    name,
+    (siblings ?? []).filter((d) => d.id !== dayId).map((d) => d.name),
+  );
+  if (!check.ok) {
+    return { success: false, error: check.error };
+  }
+
+  const { error } = await renameProgramDay(supabase, dayId, check.name);
+  if (error) {
+    return { success: false, error: error.message };
   }
 
   revalidateLibrary(day.program_id);
