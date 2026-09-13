@@ -7,6 +7,7 @@ import { requireProfileId } from "@/lib/profile";
 import {
   canAccessProgram,
   countLoggedSessionsForDay,
+  nextOrderIndex,
   renameProgramDay,
 } from "@/lib/queries/programs";
 import { validateSeanceName } from "@/lib/utils/seances";
@@ -83,32 +84,6 @@ export type SeanceActionResult =
 function revalidateLibrary(programId: string) {
   revalidatePath(`/programs/${programId}`);
   revalidatePath("/dashboard");
-}
-
-/**
- * `order_index` à donner à une nouvelle séance : max existant + 1.
- *
- * CM-70 : l'erreur est remontée. Elle était avalée et la fonction renvoyait
- * `0`, ce qui plaçait la nouvelle séance en doublon d'ordre en tête de liste.
- */
-async function nextOrderIndex(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  programId: string,
-): Promise<{ ok: true; value: number } | { ok: false; error: string }> {
-  const { data, error } = await supabase
-    .from("program_days")
-    .select("order_index")
-    .eq("program_id", programId)
-    .order("order_index", { ascending: false })
-    .limit(1)
-    .returns<{ order_index: number }[]>();
-
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-
-  const max = data?.[0]?.order_index;
-  return { ok: true, value: typeof max === "number" ? max + 1 : 0 };
 }
 
 export async function createSeance(input: {

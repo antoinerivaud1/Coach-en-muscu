@@ -107,3 +107,102 @@ export function validateSeanceName(
 
   return { ok: true, name };
 }
+
+/**
+ * Nom court d'un groupe musculaire, pour composer le nom d'une séance
+ * (CM-81). Distinct de `MUSCLE_GROUP_LABELS` : « Pec & Triceps » se lit d'un
+ * coup d'œil sur une carte, « Pectoraux & Triceps » déborde.
+ */
+export const MUSCLE_GROUP_SHORT_LABELS: Record<MuscleGroup, string> = {
+  chest: "Pec",
+  back: "Dos",
+  shoulders: "Épaules",
+  biceps: "Biceps",
+  triceps: "Triceps",
+  quads: "Quadris",
+  hamstrings: "Ischios",
+  glutes: "Fessiers",
+  calves: "Mollets",
+  core: "Abdos",
+  other: "Autre",
+};
+
+/** Nombre de groupes retenus dans un nom proposé. */
+const SUGGESTED_NAME_GROUPS = 2;
+
+/**
+ * Nom proposé d'après les groupes musculaires dominants (CM-81).
+ *
+ * `groups` = le groupe de CHAQUE exercice de la séance, répétitions comprises,
+ * comme pour `deriveMuscleTags`. Renvoie "" sans exercice.
+ *
+ * Règle : les deux groupes les plus représentés (ordre de `deriveMuscleTags`,
+ * donc à égalité l'ordre d'apparition), libellés courts, joints par " & ".
+ * Un seul groupe = ce seul libellé.
+ */
+export function suggestSeanceName(groups: MuscleGroup[]): string {
+  return deriveMuscleTags(groups)
+    .slice(0, SUGGESTED_NAME_GROUPS)
+    .map((tag) => MUSCLE_GROUP_SHORT_LABELS[tag.group] ?? tag.label)
+    .join(" & ");
+}
+
+/**
+ * Rend un nom proposé libre dans le programme, en le suffixant " 2", " 3"…
+ * jusqu'à ce qu'il ne collisionne plus (CM-81).
+ *
+ * Même comparaison que `validateSeanceName` : casse et espaces de bord
+ * ignorés, sans quoi le nom proposé passerait ici pour libre puis serait
+ * refusé à l'enregistrement. Une base vide reste vide : il n'y a rien à
+ * rendre unique tant que la séance n'a aucun exercice.
+ */
+export function uniqueSeanceName(base: string, otherNames: string[]): string {
+  const trimmed = base.trim();
+  if (!trimmed) return "";
+
+  const taken = new Set(otherNames.map(nameKey));
+  if (!taken.has(nameKey(trimmed))) return trimmed;
+
+  let suffix = 2;
+  while (taken.has(nameKey(`${trimmed} ${suffix}`))) suffix += 1;
+  return `${trimmed} ${suffix}`;
+}
+
+// ---- Brouillon de séance de l'écran unique (CM-81) ----
+
+/**
+ * Un exercice tel que l'écran de création / édition le manipule : les
+ * colonnes de `program_exercises` utiles, plus le nom et le groupe nécessaires
+ * à l'affichage et au nom proposé. `order_index` n'y est pas — c'est la
+ * position dans le tableau qui fait foi, et elle est réécrite à
+ * l'enregistrement.
+ */
+export type SeanceDraftExercise = {
+  exerciseId: string;
+  name: string;
+  muscleGroup: MuscleGroup;
+  targetSets: number;
+  targetRepsMin: number;
+  targetRepsMax: number;
+  restSeconds: number;
+};
+
+/**
+ * Bornes des cibles d'un exercice. Appliquées côté client (les boutons − / +
+ * s'y arrêtent) ET côté serveur (seule validation qui fait foi) : un brouillon
+ * bricolé ne doit pas pouvoir écrire 999 séries.
+ */
+export const SEANCE_DRAFT_LIMITS = {
+  sets: { min: 1, max: 10, step: 1 },
+  reps: { min: 1, max: 50, step: 1 },
+  rest: { min: 0, max: 600, step: 15 },
+} as const;
+
+/** Ramène une valeur dans ses bornes. */
+export function clampDraftValue(
+  value: number,
+  bounds: { min: number; max: number },
+): number {
+  if (!Number.isFinite(value)) return bounds.min;
+  return Math.min(bounds.max, Math.max(bounds.min, Math.round(value)));
+}
