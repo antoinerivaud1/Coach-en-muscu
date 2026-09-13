@@ -33,13 +33,27 @@ export type SessionHistoryEntry = {
 
 /**
  * Ancienneté attribuée à une séance jamais faite. Volontairement énorme devant
- * `MAX_OVERLAP_PENALTY_DAYS` : une séance jamais faite passe toujours devant,
- * quel que soit son recouvrement musculaire.
+ * `MAX_OVERLAP_PENALTY_DAYS` : à muscles égaux, une séance jamais faite passe
+ * toujours devant. Seule exception (CM-77) : si ses muscles principaux viennent
+ * d'être travaillés, voir `effectiveStalenessDays`.
  */
 export const NEVER_DONE_DAYS = 9999;
 
 /** Fenêtre glissante servant à repérer les groupes musculaires déjà sollicités. */
 export const BALANCE_WINDOW_DAYS = 7;
+
+/**
+ * Fenêtre de « muscles encore chauds » (CM-77) : un groupe travaillé il y a
+ * moins de ce nombre de jours pleins (aujourd'hui ou hier, soit < 48 h) est
+ * considéré comme non récupéré.
+ */
+export const FRESH_MUSCLE_WINDOW_DAYS = 2;
+
+/**
+ * Part minimale des exercices d'une séance dont le groupe est encore chaud pour
+ * que l'on considère que ses muscles PRINCIPAUX viennent d'être travaillés.
+ */
+export const FRESH_MUSCLE_MAJORITY = 0.5;
 
 /** Pénalité maximale, en « jours d'ancienneté », d'un recouvrement musculaire total. */
 export const MAX_OVERLAP_PENALTY_DAYS = 7;
@@ -136,33 +150,71 @@ export function sortByStaleness(seances: SeanceCard[], now: Date): SeanceCard[] 
     .map((entry) => entry.seance);
 }
 
-/** Groupes musculaires travaillés sur les `BALANCE_WINDOW_DAYS` derniers jours. */
-export function recentMuscleGroups(
+/**
+ * Récence musculaire : pour chaque groupe travaillé sur les
+ * `BALANCE_WINDOW_DAYS` derniers jours, le nombre de jours pleins écoulés depuis
+ * la DERNIÈRE fois qu'il l'a été. Les groupes absents n'ont pas été sollicités
+ * dans la fenêtre.
+ */
+export type MuscleRecency = ReadonlyMap<MuscleGroup, number>;
+
+export function muscleRecency(
   history: SessionHistoryEntry[],
   now: Date,
-): Set<MuscleGroup> {
-  const recent = new Set<MuscleGroup>();
+): Map<MuscleGroup, number> {
+  const recency = new Map<MuscleGroup, number>();
   for (const entry of history) {
-    if (daysSince(entry.performedAt, now) >= BALANCE_WINDOW_DAYS) continue;
-    for (const group of entry.groups) recent.add(group);
+    const days = daysSince(entry.performedAt, now);
+    if (days >= BALANCE_WINDOW_DAYS) continue;
+    for (const group of entry.groups) {
+      const previous = recency.get(group);
+      if (previous === undefined || days < previous) recency.set(group, days);
+    }
   }
-  return recent;
+  return recency;
 }
 
 /**
- * Score de recommandation : l'ancienneté, diminuée d'au plus
+ * Ancienneté servant au SCORE (CM-77), distincte de celle du tri.
+ *
+ * Une séance déjà faite garde son ancienneté réelle. Une séance jamais faite
+ * garde `NEVER_DONE_DAYS`, sauf si la majorité de ses exercices ciblent des
+ * groupes encore chauds (travaillés il y a moins de
+ * `FRESH_MUSCLE_WINDOW_DAYS` jours) : elle est alors traitée comme si elle
+ * avait été faite le jour où ces muscles l'ont été, ce qui la ramène dans la
+ * portée de la pénalité de recouvrement au lieu de la laisser hors d'atteinte.
+ */
+export function effectiveStalenessDays(
+  seance: SeanceCard,
+  recency: MuscleRecency,
+  now: Date,
+): number {
+  if (seance.lastDoneAt !== null || seance.groups.length === 0) {
+    return stalenessDays(seance, now);
+  }
+  const freshDays = seance.groups
+    .map((group) => recency.get(group))
+    .filter((days): days is number => days !== undefined && days < FRESH_MUSCLE_WINDOW_DAYS);
+  if (freshDays.length / seance.groups.length < FRESH_MUSCLE_MAJORITY) {
+    return NEVER_DONE_DAYS;
+  }
+  return Math.min(...freshDays);
+}
+
+/**
+ * Score de recommandation : l'ancienneté effective, diminuée d'au plus
  * `MAX_OVERLAP_PENALTY_DAYS` proportionnellement à la part des exercices dont
  * le groupe a déjà été travaillé dans la fenêtre. Une séance sans exercice
  * renvoie son ancienneté brute (rien à recouvrir).
  */
 export function recommendationScore(
   seance: SeanceCard,
-  recentGroups: ReadonlySet<MuscleGroup>,
+  recency: MuscleRecency,
   now: Date,
 ): number {
-  const staleness = stalenessDays(seance, now);
+  const staleness = effectiveStalenessDays(seance, recency, now);
   if (seance.groups.length === 0) return staleness;
-  const overlapping = seance.groups.filter((group) => recentGroups.has(group)).length;
+  const overlapping = seance.groups.filter((group) => recency.has(group)).length;
   return staleness - (overlapping / seance.groups.length) * MAX_OVERLAP_PENALTY_DAYS;
 }
 
@@ -176,7 +228,7 @@ export function recommendationScore(
  */
 export function pickRecommendedSeance(
   seances: SeanceCard[],
-  recentGroups: ReadonlySet<MuscleGroup>,
+  recency: MuscleRecency,
   loggedSessionCount: number,
   now: Date,
 ): SeanceCard | null {
@@ -188,7 +240,7 @@ export function pickRecommendedSeance(
   let best: SeanceCard | null = null;
   let bestScore = Number.NEGATIVE_INFINITY;
   for (const seance of startable) {
-    const score = recommendationScore(seance, recentGroups, now);
+    const score = recommendationScore(seance, recency, now);
     if (score > bestScore) {
       bestScore = score;
       best = seance;
