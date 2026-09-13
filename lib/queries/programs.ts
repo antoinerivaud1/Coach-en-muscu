@@ -2,25 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { completedSessionsQuery } from "@/lib/queries/sessions";
 
-export async function getProgramsForUser(
-  supabase: SupabaseClient<Database>,
-  profileId: string,
-  coupleId: string | null,
-) {
-  const query = supabase
-    .from("programs")
-    .select("id, name, couple_id, owner_profile_id, created_at, program_days(id)")
-    .order("created_at", { ascending: false });
-
-  if (coupleId) {
-    return query.or(
-      `owner_profile_id.eq.${profileId},couple_id.eq.${coupleId}`,
-    );
-  }
-
-  return query.eq("owner_profile_id", profileId);
-}
-
 /**
  * Id du programme partagé du couple (CM-80).
  *
@@ -107,15 +88,6 @@ export async function canAccessProgram(
 
   return { ok: true, allowed: Boolean(membership) };
 }
-
-export type ProgramWithDays = {
-  id: string;
-  name: string;
-  couple_id: string | null;
-  owner_profile_id: string | null;
-  created_at: string;
-  program_days: { id: string }[];
-};
 
 // ---- Détail complet d'une bibliothèque (séances types + exos) ----
 // `program_days` = une séance type. Le schéma garde son nom (CM-65) ; seul le
@@ -336,24 +308,4 @@ export async function countLoggedSessionsForDay(
     ok: true,
     count: (data ?? []).filter((s) => (s.session_sets ?? []).length > 0).length,
   };
-}
-
-// ---- Renommage d'une séance type (CM-80) ----
-
-/**
- * Renomme une séance type.
- *
- * L'historique n'est pas touché : les `sessions` pointent sur
- * `program_day_id`, le nouveau nom se propage donc partout (accueil, détail
- * d'une séance passée, historique) sans autre écriture.
- *
- * La validation du nom (non vide, longueur, unicité dans le programme) est
- * faite en amont par `validateSeanceName` : cette requête ne fait qu'écrire.
- */
-export async function renameProgramDay(
-  supabase: SupabaseClient<Database>,
-  dayId: string,
-  name: string,
-) {
-  return supabase.from("program_days").update({ name }).eq("id", dayId);
 }

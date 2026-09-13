@@ -84,8 +84,8 @@ export default function BottomNav() {
         {left.map(tab)}
         <div className="flex w-14 justify-center">
           <Link
-            href="/programs/new"
-            aria-label="Nouveau programme"
+            href="/seances/new"
+            aria-label="Nouvelle séance"
             className="-mt-7 flex h-14 w-14 items-center justify-center rounded-full border-4 border-ink bg-energy shadow-[0_8px_24px_rgba(204,255,2,0.4)]"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="#0B0B0F" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">

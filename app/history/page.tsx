@@ -58,13 +58,13 @@ export default async function HistoryPage() {
           <div className="mt-6 rounded-xl bg-surface p-6 text-center">
             <p className="text-fg">Aucune séance pour l&apos;instant</p>
             <p className="mt-1 text-sm text-fg-muted">
-              Lance une séance depuis un de tes programmes.
+              Lance une séance depuis l&apos;accueil.
             </p>
             <Link
               href="/dashboard"
               className="mt-4 inline-block rounded-lg bg-toi px-5 py-2.5 font-semibold text-white"
             >
-              Voir mes programmes
+              Voir mes séances
             </Link>
           </div>
         ) : (

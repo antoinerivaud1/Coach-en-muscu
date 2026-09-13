@@ -101,7 +101,7 @@ export function validateSeanceName(
   if (otherNames.some((other) => nameKey(other) === key)) {
     return {
       ok: false,
-      error: `« ${name} » existe déjà dans ce programme`,
+      error: `« ${name} » existe déjà dans tes séances`,
     };
   }
 

@@ -69,7 +69,7 @@ export default async function EditSeancePage({
       otherNames={otherNames}
       catalog={catalog}
       canCreateExercise={Boolean(coupleId)}
-      backHref={`/programs/${day.program_id}`}
+      backHref="/seances"
     />
   );
 }
