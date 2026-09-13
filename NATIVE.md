@@ -13,18 +13,56 @@ Le bundle autonome (sans dépendre de Vercel) viendra en Phase 6 (auth + RLS + d
 ```bash
 npm install
 # Génère les projets natifs (créent les dossiers ios/ et android/)
-npx cap add ios
-npx cap add android
+npx cap add ios      # déjà fait (CM-43) : ios/ est versionné, ne pas relancer
+npx cap add android  # pas encore fait (CM-47)
 npx cap sync
 ```
 
 ## Lancer / builder
+
+### iOS
+Testé pour CM-43 avec Xcode 26.6, CocoaPods 1.17.0 (`brew install cocoapods`),
+Node 24, simulateur **iPhone 17 (iOS 26.5)**.
+
+`ios/` est versionné, mais `ios/App/Pods/`, `ios/App/App/public/`,
+`ios/App/App/capacitor.config.json` et `ios/capacitor-cordova-ios-plugins/` ne le
+sont pas (gitignore de Capacitor + `.gitignore` racine). Après un clone, ou après
+un changement de `capacitor.config.ts` / plugins, les régénérer :
 ```bash
-# iOS : ouvre Xcode, choisir un device/simulateur, Run
-npm run cap:ios
-# Android : ouvre Android Studio, Run
+npm ci
+npx cap sync ios   # copie capacitor/www + capacitor.config.json, puis pod install
+# si pod install échoue (Apple Silicon, specs périmées) :
+cd ios/App && pod install --repo-update
+```
+
+Depuis Xcode : `npm run cap:ios` (ouvre `ios/App/App.xcworkspace`), choisir un
+simulateur iPhone, ▶︎.
+
+En ligne de commande, sans ouvrir Xcode :
+```bash
+xcrun simctl list devices available | grep iPhone   # choisir un simulateur
+
+xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug \
+  -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -derivedDataPath ios/DerivedData build CODE_SIGNING_ALLOWED=NO
+
+xcrun simctl boot "iPhone 17" || true
+open -a Simulator
+xcrun simctl install booted ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
+xcrun simctl launch booted com.antoinerivaud.coachenmuscu
+xcrun simctl io booted screenshot /tmp/capture.png
+```
+Écran blanc ou erreur réseau : vérifier `server.url`, puis lire les logs
+`xcrun simctl spawn booted log stream --predicate 'subsystem contains "com.antoinerivaud"' --level debug`.
+
+### Android
+```bash
+# Ouvre Android Studio, Run (projet android/ pas encore généré : CM-47)
 npm run cap:android
-# Après tout changement de config/plugins :
+```
+
+### Après tout changement de config/plugins
+```bash
 npm run cap:sync
 ```
 
@@ -43,7 +81,7 @@ splash, ou montée de version pour les stores.
 ## Notes
 - `appId` : `com.antoinerivaud.coachenmuscu` (modifiable avant le premier `cap add`).
 - URL de prod actuelle : https://v0-gym-workout-tracker-silk.vercel.app (à garder synchro dans `capacitor.config.ts`).
-- Les dossiers `ios/` et `android/` sont générés par `cap add` sur ta machine ; tu peux les committer ensuite si tu veux les versionner.
+- `ios/` est généré et versionné (CM-43) ; `android/` sera généré et versionné avec CM-47.
 
 ## Icône & splash (CM-44)
 Les sources sont dans `assets/` (icône encre + haltère vert acide, splash). Pour

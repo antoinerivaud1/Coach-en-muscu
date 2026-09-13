@@ -17,3 +17,10 @@ next-env.d.ts
 .vscode/
 test-results/
 playwright-report/
+
+# Capacitor iOS (CM-43) : dépendances et artefacts de build locaux
+ios/App/Pods/
+ios/App/build/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/DerivedData/
