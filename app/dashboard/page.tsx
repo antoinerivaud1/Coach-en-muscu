@@ -24,8 +24,8 @@ import {
   formatLastDone,
   localDayNumber,
   localWeekdayIndex,
+  muscleRecency,
   pickRecommendedSeance,
-  recentMuscleGroups,
   sortByStaleness,
 } from "@/lib/utils/recommendation";
 import type { SeanceCard, SessionHistoryEntry } from "@/lib/utils/recommendation";
@@ -148,7 +148,7 @@ export default async function DashboardPage({
       .map((set) => set.exercises?.muscle_group)
       .filter((g): g is MuscleGroup => Boolean(g)),
   }));
-  const recentGroups = recentMuscleGroups(history, now);
+  const recency = muscleRecency(history, now);
 
   // --- Bibliothèque de séances types ---
   //
@@ -214,7 +214,7 @@ export default async function DashboardPage({
   const seances = sortByStaleness(library, now);
   const recommended = pickRecommendedSeance(
     seances,
-    recentGroups,
+    recency,
     loggedSessionCount,
     now,
   );
