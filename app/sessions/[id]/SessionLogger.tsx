@@ -37,6 +37,7 @@ import SessionProgressBar, {
 } from "@/components/SessionProgressBar";
 import { computeSessionProgress } from "@/lib/utils/progress";
 import { ensureNotificationPermission } from "@/lib/restNotifications";
+import { elapsedSecondsSince } from "@/lib/utils/currentSession";
 
 type Feedback = "easy" | "normal" | "hard" | "failure";
 
@@ -66,12 +67,39 @@ type SetField = InitialSet & { touched: boolean };
 type Props = {
   sessionId: string;
   dayName: string;
+  /**
+   * Début de la séance (`sessions.performed_at`, ISO). Le chrono part de là,
+   * pas du montage du composant : une séance reprise après un rechargement
+   * garde son temps (CM-79).
+   */
+  startedAt: string;
+  /**
+   * Durée déjà enregistrée quand on rouvre une séance TERMINÉE en
+   * « Modifier » ; `null` pour une séance en cours. Elle est affichée telle
+   * quelle et renvoyée telle quelle au « Terminer » : corriger une série ne
+   * change pas le temps passé à la salle (CM-79).
+   */
+  finishedDurationSeconds: number | null;
+  /** Ressenti déjà enregistré, à conserver en « Modifier » (CM-79). */
+  initialFeedback: Feedback | null;
   exercises: LoggerExercise[];
   initialSets: Record<string, InitialSet[]>;
   /** Catalogue d'ajout en séance : exercices système + persos du couple. */
   catalog: SystemExercise[];
   canCreateExercise: boolean;
 };
+
+/** Ligne vide, non touchée : un emplacement « à venir ». */
+function blankRow(): SetField {
+  return {
+    id: null,
+    setIndex: null,
+    weight: "",
+    reps: "",
+    isWarmup: false,
+    touched: false,
+  };
+}
 
 const FEEDBACK_OPTIONS: { value: Feedback; label: string }[] = [
   { value: "easy", label: "Facile" },
@@ -90,6 +118,9 @@ function countPersisted(rows: readonly { id: string | null }[]): number {
 export default function SessionLogger({
   sessionId,
   dayName,
+  startedAt,
+  finishedDurationSeconds,
+  initialFeedback,
   exercises,
   initialSets,
   catalog,
@@ -97,7 +128,6 @@ export default function SessionLogger({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const startedAt = useRef<number>(Date.now());
 
   // CM-78 : toute série validée part en base immédiatement, par cette file.
   const persistence = useSetPersistence(sessionId);
@@ -148,7 +178,7 @@ export default function SessionLogger({
     }
     return resumeExerciseIndex(exercises, counts);
   });
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(initialFeedback);
   const [error, setError] = useState<string | null>(null);
   /** Série validée dont la suppression attend confirmation : `exId:index`. */
   const [confirmDeleteSet, setConfirmDeleteSet] = useState<string | null>(null);
@@ -156,7 +186,9 @@ export default function SessionLogger({
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [isFlushing, setIsFlushing] = useState(false);
   const [offlineSaved, setOfflineSaved] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
+  // Valeur initiale sans `Date.now()` : le rendu serveur et l'hydratation
+  // doivent afficher la même chose, l'effet ci-dessous recale aussitôt.
+  const [elapsed, setElapsed] = useState(finishedDurationSeconds ?? 0);
   // Champ en cours d'édition au clavier (CM-63) sur la série active.
   const [editingField, setEditingField] = useState<"weight" | "reps" | null>(
     null,
@@ -168,13 +200,15 @@ export default function SessionLogger({
     ensureNotificationPermission();
   }, []);
 
+  // CM-79 : le chrono court depuis le début réel de la séance. Une séance
+  // terminée rouverte en « Modifier » affiche sa durée figée, sans compter.
   useEffect(() => {
-    const t = setInterval(
-      () => setElapsed(Math.round((Date.now() - startedAt.current) / 1000)),
-      1000,
-    );
+    if (finishedDurationSeconds !== null) return;
+    const tick = () => setElapsed(elapsedSecondsSince(startedAt, Date.now()));
+    tick();
+    const t = setInterval(tick, 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [startedAt, finishedDurationSeconds]);
 
   // ----- Minuteur de repos (CM-73) -----
   // Instance unique : l'anneau (état grand) et la barre épinglée (état
@@ -513,6 +547,10 @@ export default function SessionLogger({
    * Supprime une série déjà validée : retrait local immédiat, puis suppression
    * en base. Les séries suivantes gardent leur `set_index` en base — seule la
    * numérotation affichée se recale, sur l'ordre des lignes.
+   *
+   * CM-79 : le nombre d'emplacements ne change pas. La série retirée libère un
+   * emplacement « à venir » en fin de liste, l'exercice reste à faire en
+   * entier, pas sur une série de moins.
    */
   function removeValidatedSet(exId: string, rowIndex: number) {
     setConfirmDeleteSet(null);
@@ -523,6 +561,7 @@ export default function SessionLogger({
       const r = prev[exId] ? [...prev[exId]!] : [];
       if (!r[rowIndex]) return prev;
       r.splice(rowIndex, 1);
+      r.push(blankRow());
       return { ...prev, [exId]: r };
     });
     setValidated((v) => ({ ...v, [exId]: Math.max(0, (v[exId] ?? 0) - 1) }));
@@ -542,7 +581,10 @@ export default function SessionLogger({
    */
   function finish() {
     setConfirmFinish(false);
-    const durationSeconds = Math.round((Date.now() - startedAt.current) / 1000);
+    // CM-79 : durée depuis le début réel de la séance ; en « Modifier » d'une
+    // séance terminée, la durée déjà enregistrée est conservée.
+    const durationSeconds =
+      finishedDurationSeconds ?? elapsedSecondsSince(startedAt, Date.now());
     const input: FinishSessionInput = { sessionId, feedback, durationSeconds };
 
     startTransition(async () => {

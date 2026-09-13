@@ -54,8 +54,13 @@ export default function AddExerciseSheet({
 
   if (!open) return null;
 
+  // CM-79 : le composant reste monté sheet fermée, son état aussi. Recherche
+  // et chip sont donc remis à zéro à la fermeture, pour que chaque ouverture
+  // reparte du catalogue complet.
   function close() {
     setShowCreate(false);
+    setSearch("");
+    setGroup(null);
     onClose();
   }
 
