@@ -214,6 +214,9 @@ export default async function SessionPage({
         <SessionLogger
           sessionId={id}
           dayName={day.name}
+          startedAt={session.performed_at}
+          finishedDurationSeconds={session.duration_seconds}
+          initialFeedback={session.feedback}
           exercises={exercises}
           initialSets={initialSets}
           catalog={catalog}

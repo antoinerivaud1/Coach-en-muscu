@@ -113,6 +113,10 @@ export async function getLastSetsByExercise(
   for (const row of data) {
     const performedAt = row.sessions?.performed_at;
     if (!performedAt) continue;
+    // CM-79 : la séance courante est déjà exclue par la requête ; ceinture et
+    // bretelles ici, pour qu'une « dernière fois » ne puisse jamais être la
+    // séance en cours d'édition.
+    if (excludeSessionId && row.session_id === excludeSessionId) continue;
     const current = latestSessionByExercise[row.exercise_id];
     if (!current || performedAt > current.performedAt) {
       latestSessionByExercise[row.exercise_id] = {

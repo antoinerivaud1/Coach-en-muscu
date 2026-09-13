@@ -113,3 +113,15 @@ export function closingDurationSeconds(
 
   return Math.max(1, Math.round((lastAt - startedAt) / 1000));
 }
+
+/**
+ * Chrono de l'écran de séance (CM-79) : secondes écoulées depuis
+ * `performed_at`, jamais négatives. Une séance reprise après un rechargement
+ * repart donc de son vrai début, pas de zéro. Une date invalide vaut « à
+ * l'instant » plutôt qu'un chrono absurde.
+ */
+export function elapsedSecondsSince(performedAt: string, nowMs: number): number {
+  const startedAt = new Date(performedAt).getTime();
+  if (Number.isNaN(startedAt)) return 0;
+  return Math.max(0, Math.round((nowMs - startedAt) / 1000));
+}

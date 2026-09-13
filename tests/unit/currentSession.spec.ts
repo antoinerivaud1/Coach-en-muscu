@@ -3,6 +3,7 @@ import {
   ABANDONED_EMPTY_SESSION_MS,
   STALE_SESSION_MS,
   closingDurationSeconds,
+  elapsedSecondsSince,
   resumeBannerState,
   type CurrentSessionInput,
 } from "@/lib/utils/currentSession";
@@ -148,5 +149,28 @@ test.describe("closingDurationSeconds (CM-83)", () => {
         "2026-09-12T07:50:00.000Z",
       ]),
     ).toBe(1);
+  });
+});
+
+test.describe("elapsedSecondsSince (CM-79)", () => {
+  const start = Date.parse("2026-09-12T18:00:00Z");
+
+  test("compte depuis le début réel de la séance, pas depuis le montage", () => {
+    expect(elapsedSecondsSince("2026-09-12T18:00:00Z", start + 25 * 60 * 1000)).toBe(
+      1500,
+    );
+  });
+
+  test("arrondit à la seconde", () => {
+    expect(elapsedSecondsSince("2026-09-12T18:00:00Z", start + 1499)).toBe(1);
+    expect(elapsedSecondsSince("2026-09-12T18:00:00Z", start + 1500)).toBe(2);
+  });
+
+  test("jamais négatif si l'horloge du client est en retard sur le serveur", () => {
+    expect(elapsedSecondsSince("2026-09-12T18:00:00Z", start - 5000)).toBe(0);
+  });
+
+  test("une date invalide vaut « à l'instant »", () => {
+    expect(elapsedSecondsSince("pas une date", start)).toBe(0);
   });
 });
