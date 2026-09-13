@@ -175,6 +175,14 @@ export async function getProgramWithDays(
 
 // ---- Une séance type précise avec ses exercices (pour la démarrer) ----
 
+/**
+ * Une séance chargée seule, hors de son programme, porte en plus son
+ * `program_id` : sans lui, une server action qui reçoit un `dayId` ne pourrait
+ * pas appeler `canAccessProgram` (CM-81). Reste assignable à `ProgramDayFull`
+ * pour les appelants qui l'ignorent.
+ */
+export type ProgramDayWithProgram = ProgramDayFull & { program_id: string };
+
 export async function getDayWithExercises(
   supabase: SupabaseClient<Database>,
   dayId: string,
@@ -182,7 +190,7 @@ export async function getDayWithExercises(
   return supabase
     .from("program_days")
     .select(
-      `id, name, order_index,
+      `id, name, order_index, program_id,
        program_exercises (
          id, exercise_id, target_sets, target_reps_min, target_reps_max,
          rest_seconds, order_index,
@@ -190,8 +198,103 @@ export async function getDayWithExercises(
        )`,
     )
     .eq("id", dayId)
-    .returns<ProgramDayFull[]>()
+    .returns<ProgramDayWithProgram[]>()
     .maybeSingle();
+}
+
+/** Noms des séances d'un programme, avec leur id (unicité du nom, CM-81). */
+export async function getProgramDayNames(
+  supabase: SupabaseClient<Database>,
+  programId: string,
+): Promise<{ ok: true; days: { id: string; name: string }[] } | { ok: false; error: string }> {
+  const { data, error } = await supabase
+    .from("program_days")
+    .select("id, name")
+    .eq("program_id", programId)
+    .returns<{ id: string; name: string }[]>();
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, days: data ?? [] };
+}
+
+// ---- Écriture : programme partagé et ordre des séances ----
+
+export type OrderIndexResult =
+  | { ok: true; value: number }
+  | { ok: false; error: string };
+
+/**
+ * `order_index` à donner à une nouvelle séance : max existant + 1.
+ *
+ * CM-70 : l'erreur est remontée. Elle était avalée et la fonction renvoyait
+ * `0`, ce qui plaçait la nouvelle séance en doublon d'ordre en tête de liste.
+ */
+export async function nextOrderIndex(
+  supabase: SupabaseClient<Database>,
+  programId: string,
+): Promise<OrderIndexResult> {
+  const { data, error } = await supabase
+    .from("program_days")
+    .select("order_index")
+    .eq("program_id", programId)
+    .order("order_index", { ascending: false })
+    .limit(1)
+    .returns<{ order_index: number }[]>();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  const max = data?.[0]?.order_index;
+  return { ok: true, value: typeof max === "number" ? max + 1 : 0 };
+}
+
+/** Nom du programme partagé, jamais montré à l'utilisateur (CM-81). */
+export const SHARED_PROGRAM_NAME = "Nos séances";
+
+export type EnsureSharedProgram =
+  | { ok: true; programId: string }
+  | { ok: false; error: string };
+
+/**
+ * Id du programme partagé du couple, créé à la volée s'il n'existe pas encore
+ * (CM-81).
+ *
+ * La notion de programme a disparu de l'UI : Antoine et Léa n'ont qu'une
+ * bibliothèque de séances. Le schéma, lui, exige toujours un `programs` parent
+ * (`program_days.program_id` est NOT NULL), d'où cette ligne unique créée en
+ * silence à la première séance puis toujours réutilisée.
+ *
+ * Seule fonction de ce module qui écrit : elle est ici pour que l'appel reste
+ * un « donne-moi l'id du programme partagé » côté action, et pour qu'il n'y
+ * ait qu'un seul endroit capable de créer ce programme.
+ */
+export async function ensureSharedProgram(
+  supabase: SupabaseClient<Database>,
+  coupleId: string,
+): Promise<EnsureSharedProgram> {
+  const existing = await getSharedProgramId(supabase, coupleId);
+  if (existing) return { ok: true, programId: existing };
+
+  const { data, error } = await supabase
+    .from("programs")
+    .insert({
+      name: SHARED_PROGRAM_NAME,
+      couple_id: coupleId,
+      owner_profile_id: null,
+    })
+    .select("id")
+    .returns<{ id: string }[]>()
+    .single();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      error: error?.message ?? "Impossible de créer la bibliothèque du couple",
+    };
+  }
+
+  return { ok: true, programId: data.id };
 }
 
 // ---- Historique rattaché à une séance type ----
