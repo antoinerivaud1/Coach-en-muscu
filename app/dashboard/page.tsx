@@ -6,9 +6,9 @@ import {
   getCoupleId,
   getCoupleProfileIds,
 } from "@/lib/profile";
-import { startSession } from "@/app/programs/[id]/actions";
-import { getSharedProgramId } from "@/lib/queries/programs";
+import { startSession } from "@/app/seances/actions";
 import {
+  buildLastDoneByDay,
   getCompletedSessionsForDashboard,
   getCurrentSession,
   purgeAbandonedEmptySessions,
@@ -50,8 +50,8 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  // `startSession` et `deleteProgram` redirigent ici en cas d'échec : le
-  // message voyage en query string et doit être affiché (CM-70).
+  // `startSession` redirige ici en cas d'échec : le message voyage en query
+  // string et doit être affiché (CM-70).
   const { error: actionError } = await searchParams;
   const profileId = await requireProfileId();
   const supabase = await createClient();
@@ -133,14 +133,10 @@ export default async function DashboardPage({
     if (localDayNumber(d) >= weekStartDay) doneThisWeek.add(localWeekdayIndex(d));
   }
 
-  // Dernière exécution par séance type. Les sessions arrivent triées par
-  // `performed_at` décroissant : la première rencontrée est la plus récente.
-  const lastDoneByDay = new Map<string, string>();
-  for (const s of sessions) {
-    if (s.program_day_id && !lastDoneByDay.has(s.program_day_id)) {
-      lastDoneByDay.set(s.program_day_id, s.performed_at);
-    }
-  }
+  // Dernière exécution par séance type. Même calcul que la bibliothèque
+  // (`/seances`), partagé dans `lib/queries/sessions.ts` : l'accueil a déjà ses
+  // séances terminées en main, il n'a donc pas besoin de la requête dédiée.
+  const lastDoneByDay = buildLastDoneByDay(sessions);
 
   const history: SessionHistoryEntry[] = sessions.map((s) => ({
     performedAt: s.performed_at,
@@ -202,13 +198,6 @@ export default async function DashboardPage({
       });
     }
   }
-
-  // Point d'entrée vers la bibliothèque partagée « Nos séances » (CM-80).
-  // Sans programme partagé, le lien bascule sur la création existante : on ne
-  // crée jamais de programme automatiquement.
-  const sharedProgramId = coupleId
-    ? await getSharedProgramId(supabase, coupleId)
-    : null;
 
   // La moins faite récemment en premier ; les jamais faites tout en haut.
   const seances = sortByStaleness(library, now);
@@ -311,15 +300,15 @@ export default async function DashboardPage({
 
       {seances.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-line bg-surface p-6 text-center">
-          <p className="text-fg">Aucun programme pour l&apos;instant</p>
+          <p className="text-fg">Aucune séance type pour l&apos;instant</p>
           <p className="mt-1 text-sm text-fg-muted">
-            Crée ton premier programme pour commencer à t&apos;entraîner
+            Compose ta première séance pour commencer à t&apos;entraîner
           </p>
           <Link
-            href="/programs/new"
+            href="/seances/new"
             className="mt-4 inline-block rounded-xl bg-energy px-5 py-2.5 font-extrabold text-ink"
           >
-            Créer mon premier programme
+            Créer ma première séance
           </Link>
         </div>
       ) : (
@@ -417,11 +406,8 @@ export default async function DashboardPage({
 
       {/* Bibliothèque de séances types (accès complet) */}
       <div className="mt-7 flex items-center justify-between">
-        <Link
-          href={sharedProgramId ? `/programs/${sharedProgramId}` : "/programs/new"}
-          className="text-sm font-semibold text-energy"
-        >
-          {sharedProgramId ? "Gérer mes séances" : "Créer ma première séance"}
+        <Link href="/seances" className="text-sm font-semibold text-energy">
+          Gérer mes séances
         </Link>
         <form action={clearProfile}>
           <button

@@ -385,3 +385,69 @@ export async function purgeAbandonedEmptySessions(
     .in("id", emptyIds)
     .eq("profile_id", profileId);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// « Dernière fois » par séance type (CM-81)
+//
+// L'accueil et la bibliothèque affichent tous les deux « Hier », « Il y a
+// 6 jours »… sous chaque séance type. Le calcul est ici, en un seul endroit :
+// l'accueil charge déjà ses séances terminées pour le strip hebdo et la
+// suggestion, il réutilise donc la partie pure ; la bibliothèque, qui ne charge
+// rien d'autre, passe par la requête dédiée.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Une séance terminée, réduite à ce dont « dernière fois » a besoin. */
+export type LastDoneSession = {
+  program_day_id: string | null;
+  performed_at: string;
+};
+
+/**
+ * Dernière exécution de chaque séance type, indexée par `program_day_id`.
+ *
+ * L'ordre d'arrivée n'est pas supposé trié : on garde le `performed_at` le plus
+ * grand. Les séances hors séance type (`program_day_id` null, exercices ajoutés
+ * à la volée) sont ignorées.
+ */
+export function buildLastDoneByDay(
+  sessions: LastDoneSession[],
+): Map<string, string> {
+  const lastDone = new Map<string, string>();
+  for (const session of sessions) {
+    const dayId = session.program_day_id;
+    if (!dayId) continue;
+    const known = lastDone.get(dayId);
+    if (!known || session.performed_at > known) {
+      lastDone.set(dayId, session.performed_at);
+    }
+  }
+  return lastDone;
+}
+
+/**
+ * Dernière exécution des séances types demandées, pour le profil courant.
+ *
+ * Une séance terminée SANS aucune série ne compte pas : elle daterait la
+ * « dernière fois » d'un simple tap sur une carte (même règle que l'accueil
+ * depuis CM-66). Le `.eq("profile_id", …)` est obligatoire, la RLS n'isole pas
+ * les deux profils du couple côté serveur (CM-17).
+ */
+export async function getLastDoneByDay(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+  dayIds: string[],
+): Promise<Map<string, string>> {
+  if (dayIds.length === 0) return new Map();
+
+  const { data } = await completedSessionsQuery(
+    supabase,
+    "program_day_id, performed_at, session_sets ( id )",
+  )
+    .eq("profile_id", profileId)
+    .in("program_day_id", dayIds)
+    .returns<(LastDoneSession & { session_sets: { id: string }[] })[]>();
+
+  return buildLastDoneByDay(
+    (data ?? []).filter((s) => (s.session_sets ?? []).length > 0),
+  );
+}

@@ -1,17 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  createSeance,
   deleteSeance,
   duplicateSeance,
   moveSeance,
-  renameSeance,
   startSession,
   type SeanceActionResult,
 } from "./actions";
-import { validateSeanceName } from "@/lib/utils/seances";
+import { daysSince, formatLastDone } from "@/lib/utils/recommendation";
 
 export type SeanceExerciseView = {
   id: string;
@@ -29,38 +28,41 @@ export type SeanceView = {
   setCount: number;
   tags: string[];
   extraTags: number;
+  /** Dernière exécution TERMINÉE de cette séance par le profil courant. */
+  lastDoneAt: string | null;
   exercises: SeanceExerciseView[];
 };
 
-const NEW_SEANCE_KEY = "__new__";
+/**
+ * Au-delà de ce nombre de jours, la « dernière fois » passe en orange : la
+ * séance commence à dater (maquette CM-81).
+ */
+const STALE_DAYS = 5;
 
 /**
- * Clé d'erreur du renommage, distincte de celle des autres actions de la
- * carte : le message doit s'afficher sous le champ, pas en bas de la carte.
+ * Bibliothèque « Mes séances ».
+ *
+ * `now` est calculé par le serveur et transmis ici : les libellés « Hier »,
+ * « Il y a 6 jours » doivent être identiques au rendu serveur, sinon
+ * l'hydratation diverge.
  */
-function renameKey(dayId: string): string {
-  return `rename:${dayId}`;
-}
-
 export default function SeanceLibrary({
-  programId,
   seances,
+  now,
 }: {
-  programId: string;
   seances: SeanceView[];
+  now: string;
 }) {
   const router = useRouter();
   const [isPending, startAction] = useTransition();
-  const [newName, setNewName] = useState("");
   /** Erreur courante, rattachée à l'id de la séance concernée. */
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   /** Séance dont la suppression attend une confirmation, rendue dans le DOM. */
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  /** Séance dont le titre est passé en champ texte (CM-80). */
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
+
+  const nowDate = new Date(now);
 
   function run(key: string, action: () => Promise<SeanceActionResult>) {
     setErrorKey(null);
@@ -79,20 +81,6 @@ export default function SeanceLibrary({
     });
   }
 
-  function handleCreate() {
-    const name = newName.trim();
-    if (!name) {
-      setErrorKey(NEW_SEANCE_KEY);
-      setErrorMessage("Le nom de la séance est obligatoire");
-      return;
-    }
-    run(NEW_SEANCE_KEY, async () => {
-      const result = await createSeance({ programId, name });
-      if (result.success) setNewName("");
-      return result;
-    });
-  }
-
   /**
    * CM-70 : la confirmation passait par `window.confirm()`. Ce dialogue natif
    * est supprimé (et renvoie donc `false`) dans une web app iOS en
@@ -105,101 +93,16 @@ export default function SeanceLibrary({
     run(seance.id, () => deleteSeance(seance.id));
   }
 
-  // ---- Renommage en place (CM-80) ----
-  //
-  // Pas de modal, pas de `prompt()` : ce dernier est supprimé en PWA iOS
-  // standalone, exactement comme `confirm()` (cf. CM-70 plus haut).
-
-  function startRename(seance: SeanceView) {
-    setErrorKey(null);
-    setErrorMessage(null);
-    setConfirmingId(null);
-    setRenamingId(seance.id);
-    setRenameValue(seance.name);
-  }
-
-  function cancelRename() {
-    setRenamingId(null);
-    setRenameValue("");
-    setErrorKey(null);
-    setErrorMessage(null);
-  }
-
-  function handleRename(seance: SeanceView) {
-    const key = renameKey(seance.id);
-    // Validation immédiate côté client, avec la même fonction que la server
-    // action : l'erreur s'affiche sans aller-retour. La server action
-    // revalide de son côté, c'est elle qui fait foi.
-    const check = validateSeanceName(
-      renameValue,
-      seances.filter((s) => s.id !== seance.id).map((s) => s.name),
-    );
-    if (!check.ok) {
-      setErrorKey(key);
-      setErrorMessage(check.error);
-      return;
-    }
-    // Nom inchangé : on referme sans écrire.
-    if (check.name === seance.name) {
-      cancelRename();
-      return;
-    }
-    run(key, async () => {
-      const result = await renameSeance(seance.id, check.name);
-      if (result.success) {
-        setRenamingId(null);
-        setRenameValue("");
-      }
-      return result;
-    });
-  }
-
   return (
     <div className="space-y-4">
-      {/* Ajouter une séance */}
-      <section className="rounded-2xl border border-line bg-surface p-4">
-        <h2 className="text-sm font-extrabold uppercase tracking-[0.12em] text-fg-muted">
-          Nouvelle séance
-        </h2>
-        <div className="mt-3 flex gap-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="ex. Dos, Push, Jambes…"
-            aria-label="Nom de la séance"
-            className="min-w-0 flex-1 rounded-xl bg-surface2 px-3 py-2.5 text-fg placeholder-fg-faint focus:outline-none focus:ring-2 focus:ring-energy"
-          />
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={isPending}
-            className="shrink-0 rounded-xl bg-energy px-4 py-2.5 text-sm font-extrabold text-ink disabled:opacity-50"
-          >
-            Ajouter
-          </button>
-        </div>
-        {errorKey === NEW_SEANCE_KEY && errorMessage && (
-          <p
-            role="alert"
-            className="mt-2 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
-          >
-            {errorMessage}
-          </p>
-        )}
-      </section>
-
-      {seances.length === 0 && (
-        <p className="rounded-2xl border border-dashed border-line bg-surface p-6 text-center text-sm text-fg-muted">
-          Aucune séance dans la bibliothèque. Crée ta première séance ci-dessus.
-        </p>
-      )}
-
       {seances.map((seance, index) => {
         const isEmpty = seance.exerciseCount === 0;
         const busy = busyId === seance.id && isPending;
-        const isRenaming = renamingId === seance.id;
-        const renameBusy = busyId === renameKey(seance.id) && isPending;
+        // « Jamais faite » reste en gris : l'orange signale une séance qui
+        // traîne, pas une séance qui n'a jamais été lancée.
+        const stale =
+          seance.lastDoneAt !== null &&
+          daysSince(seance.lastDoneAt, nowDate) >= STALE_DAYS;
         return (
           <section
             key={seance.id}
@@ -209,73 +112,28 @@ export default function SeanceLibrary({
                 : "border-line bg-surface"
             }`}
           >
-            {isRenaming ? (
-              <div>
-                <label
-                  htmlFor={`rename-${seance.id}`}
-                  className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-fg-muted"
-                >
-                  Nom de la séance
-                </label>
-                <input
-                  id={`rename-${seance.id}`}
-                  type="text"
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleRename(seance);
-                    } else if (e.key === "Escape") {
-                      e.preventDefault();
-                      cancelRename();
-                    }
-                  }}
-                  autoFocus
-                  className="mt-1.5 w-full rounded-xl bg-surface2 px-3 py-2.5 text-lg font-extrabold text-fg placeholder-fg-faint focus:outline-none focus:ring-2 focus:ring-energy"
-                />
-                {errorKey === renameKey(seance.id) && errorMessage && (
-                  <p
-                    role="alert"
-                    className="mt-2 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
-                  >
-                    {errorMessage}
-                  </p>
-                )}
-                <div className="mt-2.5 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={cancelRename}
-                    disabled={isPending}
-                    className="flex-1 rounded-lg bg-surface2 py-2 text-sm font-semibold text-fg disabled:opacity-50"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRename(seance)}
-                    disabled={isPending}
-                    className="flex-1 rounded-lg bg-energy py-2 text-sm font-extrabold text-ink disabled:opacity-50"
-                  >
-                    {renameBusy ? "Enregistrement…" : "Enregistrer"}
-                  </button>
-                </div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-extrabold text-fg">
+                  {seance.name}
+                </h2>
+                <p className="mt-0.5 text-xs font-semibold text-fg-muted">
+                  {isEmpty
+                    ? "Séance vide"
+                    : `${seance.exerciseCount} exercice${
+                        seance.exerciseCount > 1 ? "s" : ""
+                      } · ${seance.setCount} série${seance.setCount > 1 ? "s" : ""}`}
+                </p>
               </div>
-            ) : (
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="truncate text-lg font-extrabold text-fg">
-                    {seance.name}
-                  </h2>
-                  <p className="mt-0.5 text-xs font-semibold text-fg-muted">
-                    {isEmpty
-                      ? "Séance vide"
-                      : `${seance.exerciseCount} exercice${
-                          seance.exerciseCount > 1 ? "s" : ""
-                        } · ${seance.setCount} série${seance.setCount > 1 ? "s" : ""}`}
-                  </p>
-                </div>
-                <form action={startSession} className="shrink-0">
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <span
+                  className={`font-oswald text-xs font-semibold ${
+                    stale ? "text-flame" : "text-fg-muted"
+                  }`}
+                >
+                  {formatLastDone(seance.lastDoneAt, nowDate)}
+                </span>
+                <form action={startSession}>
                   <input type="hidden" name="day_id" value={seance.id} />
                   <button
                     type="submit"
@@ -289,7 +147,7 @@ export default function SeanceLibrary({
                   </button>
                 </form>
               </div>
-            )}
+            </div>
 
             {seance.tags.length > 0 && (
               <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -312,8 +170,7 @@ export default function SeanceLibrary({
             {isEmpty ? (
               <p className="mt-3 rounded-xl border border-flame/30 bg-flame/10 px-3 py-2 text-sm text-flame">
                 Cette séance n&apos;a aucun exercice : elle ne peut pas être
-                démarrée. Ajoute au moins un exercice via « Modifier les
-                exercices », en haut de la page.
+                démarrée. Ajoute au moins un exercice via « Modifier ».
               </p>
             ) : (
               <ul className="mt-3 space-y-2">
@@ -358,17 +215,14 @@ export default function SeanceLibrary({
                 ↓
               </button>
               <span className="flex-1" />
-              <button
-                type="button"
-                onClick={() =>
-                  isRenaming ? cancelRename() : startRename(seance)
-                }
-                disabled={isPending}
-                aria-expanded={isRenaming}
-                className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-fg disabled:opacity-50"
+              {/* Le nom se change dans l'écran de modification : plus de
+                  renommage en place depuis la bibliothèque (CM-81). */}
+              <Link
+                href={`/seances/${seance.id}/edit`}
+                className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-fg"
               >
-                Renommer
-              </button>
+                Modifier
+              </Link>
               <button
                 type="button"
                 onClick={() => run(seance.id, () => duplicateSeance(seance.id))}

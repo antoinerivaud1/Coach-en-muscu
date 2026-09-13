@@ -5,7 +5,6 @@ import { clearProfile, updateWeeklyGoal } from "@/app/actions";
 import BottomNav from "@/components/BottomNav";
 import OnboardingPhoto from "@/components/OnboardingPhoto";
 import { getBadges } from "@/lib/badges";
-import { getSharedProgramId } from "@/lib/queries/programs";
 
 function Row({ href, title, sub }: { href: string; title: string; sub: string }) {
   return (
@@ -42,12 +41,6 @@ export default async function ProfilePage() {
     const partnerId = ids.find((id) => id !== profileId);
     if (partnerId) partnerName = (await getProfile(supabase, partnerId))?.display_name ?? null;
   }
-
-  // Même point d'entrée que l'accueil vers la bibliothèque partagée (CM-80) :
-  // sans programme partagé, on renvoie vers la création existante.
-  const sharedProgramId = coupleId
-    ? await getSharedProgramId(supabase, coupleId)
-    : null;
 
   return (
     <main className="min-h-[100dvh] px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -128,19 +121,11 @@ export default async function ProfilePage() {
 
       <div className="mt-6 flex flex-col gap-2.5">
         <Row href="/guide" title="Guide des exercices" sub="Mouvements, erreurs à éviter, étirements" />
-        {sharedProgramId ? (
-          <Row
-            href={`/programs/${sharedProgramId}`}
-            title="Mes séances"
-            sub="Voir et modifier mes séances types"
-          />
-        ) : (
-          <Row
-            href="/programs/new"
-            title="Créer ma première séance"
-            sub="Aucune séance type pour l'instant"
-          />
-        )}
+        <Row
+          href="/seances"
+          title="Mes séances"
+          sub="Voir et modifier mes séances types"
+        />
       </div>
 
       <form action={clearProfile} className="mt-6">

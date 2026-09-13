@@ -57,7 +57,7 @@ export default async function NewSeancePage() {
       otherNames={otherNames}
       catalog={catalog}
       canCreateExercise
-      backHref={sharedProgramId ? `/programs/${sharedProgramId}` : "/dashboard"}
+      backHref="/seances"
     />
   );
 }

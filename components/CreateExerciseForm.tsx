@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createCustomExercise } from "@/app/programs/new/actions";
+import { createCustomExercise } from "@/lib/actions/exercises";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
 
