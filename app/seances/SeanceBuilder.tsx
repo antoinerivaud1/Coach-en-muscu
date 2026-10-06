@@ -15,6 +15,7 @@ import {
   type SeanceDraftExercise,
 } from "@/lib/utils/seances";
 import { EXTRA_EXERCISE_DEFAULTS } from "@/lib/utils/sessionExercises";
+import { moveItemByKey, type MoveDirection } from "@/lib/utils/reorder";
 import AddExerciseSheet from "@/components/AddExerciseSheet";
 import { saveSeance } from "./actions";
 
@@ -175,15 +176,16 @@ export default function SeanceBuilder({
     touch();
   }
 
-  function moveExercise(index: number, direction: -1 | 1) {
-    const to = index + direction;
-    setExercises((prev) => {
-      if (to < 0 || to >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(index, 1);
-      next.splice(to, 0, moved!);
-      return next;
-    });
+  /**
+   * CM-71 : l'ordre ne vit que dans l'état local et part avec le reste du
+   * brouillon au tap sur « Enregistrer » (`saveSeance` réécrit les
+   * `order_index`). Déplacement par id et non par index figé au rendu : deux
+   * taps rapides déplacent bien le même exercice de deux crans.
+   */
+  function moveExercise(exerciseId: string, direction: MoveDirection) {
+    setExercises((prev) =>
+      moveItemByKey(prev, (e) => e.exerciseId, exerciseId, direction),
+    );
     touch();
   }
 
@@ -433,8 +435,8 @@ export default function SeanceBuilder({
                     }}
                     onToggleField={(field) => toggleExpanded(ex.exerciseId, field)}
                     onDirectTarget={setDirectTarget}
-                    onMoveUp={() => moveExercise(index, -1)}
-                    onMoveDown={() => moveExercise(index, 1)}
+                    onMoveUp={() => moveExercise(ex.exerciseId, "up")}
+                    onMoveDown={() => moveExercise(ex.exerciseId, "down")}
                     onRemove={() => removeExercise(ex.exerciseId)}
                     onSets={(v) => setSets(ex, v)}
                     onRepsMin={(v) => setRepsMin(ex, v)}
