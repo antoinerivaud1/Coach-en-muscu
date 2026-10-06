@@ -1,0 +1,44 @@
+# Configuration minimale de la stack Supabase locale (CM-85 PR 0).
+# Sert uniquement à `supabase start` / `supabase db reset` en local et en CI.
+# Aucun lien avec le projet prod : ne jamais lancer `supabase link` + `db push`
+# sans avoir lu supabase/README.md.
+
+project_id = "coach-en-muscu"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Même version majeure que la prod (PostgreSQL 17).
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+# Services inutilisés par l'app : coupés pour accélérer le démarrage en CI.
+[realtime]
+enabled = false
+
+[storage]
+enabled = false
+
+[analytics]
+enabled = false
+
+[edge_runtime]
+enabled = false
