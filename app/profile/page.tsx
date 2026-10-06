@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getProfile, getCoupleId, getCoupleProfileIds } from "@/lib/profile";
+import {
+  requireProfileId,
+  getAuthState,
+  getProfile,
+  getCoupleId,
+  getCoupleProfileIds,
+} from "@/lib/profile";
 import { clearProfile, updateWeeklyGoal } from "@/app/actions";
+import { signOut } from "@/lib/actions/auth";
+import { isUuid, parsePrefillEmails } from "@/lib/auth/core";
+import CreatePasswordForm from "@/components/CreatePasswordForm";
 import BottomNav from "@/components/BottomNav";
 import OnboardingPhoto from "@/components/OnboardingPhoto";
 import { getBadges } from "@/lib/badges";
@@ -41,6 +50,20 @@ export default async function ProfilePage() {
     const partnerId = ids.find((id) => id !== profileId);
     if (partnerId) partnerName = (await getProfile(supabase, partnerId))?.display_name ?? null;
   }
+
+  // CM-58 : en `hybrid`, profil choisi par cookie et sans compte Auth → bloc
+  // « Créer mon mot de passe ». En `cookie`, aucun appel à l'API Auth.
+  const { mode, source } = await getAuthState();
+  let showCreatePassword = false;
+  let showLoginLink = false;
+  if (mode === "hybrid" && source === "cookie" && isUuid(profileId)) {
+    const { data, error } = await supabase.auth.admin.getUserById(profileId);
+    showCreatePassword = !data.user && error?.status === 404;
+    showLoginLink = !!data.user;
+  }
+  const prefillEmail = showCreatePassword
+    ? (parsePrefillEmails(process.env.AUTH_PREFILL_EMAILS)[profileId.toLowerCase()] ?? "")
+    : "";
 
   return (
     <main className="min-h-[100dvh] px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -128,14 +151,38 @@ export default async function ProfilePage() {
         />
       </div>
 
-      <form action={clearProfile} className="mt-6">
-        <button
-          type="submit"
-          className="w-full rounded-2xl border border-line bg-surface2 py-3.5 text-sm font-bold text-fg active:bg-white/10"
+      {showCreatePassword && <CreatePasswordForm defaultEmail={prefillEmail} />}
+      {showLoginLink && (
+        <Link
+          href="/login"
+          className="mt-6 block rounded-2xl border border-energy/30 bg-energy/5 py-3.5 text-center text-sm font-bold text-energy"
         >
-          Changer de profil
-        </button>
-      </form>
+          Me connecter avec mon mot de passe
+        </Link>
+      )}
+
+      {source === "cookie" && (
+        <form action={clearProfile} className="mt-6">
+          <button
+            type="submit"
+            className="w-full rounded-2xl border border-line bg-surface2 py-3.5 text-sm font-bold text-fg active:bg-white/10"
+          >
+            Changer de profil
+          </button>
+        </form>
+      )}
+
+      {/* CM-58 : déconnexion, modes `hybrid` et `required` avec session. */}
+      {source === "session" && (
+        <form action={signOut} className="mt-6">
+          <button
+            type="submit"
+            className="w-full rounded-2xl border border-line bg-surface2 py-3.5 text-sm font-bold text-fg active:bg-white/10"
+          >
+            Se déconnecter
+          </button>
+        </form>
+      )}
 
       <BottomNav />
     </main>

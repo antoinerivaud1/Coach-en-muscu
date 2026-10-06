@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { getAllProfiles } from "@/lib/profile";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getAllProfiles, getAuthState } from "@/lib/profile";
 import { getCompletedSessionsSince } from "@/lib/queries/sessions";
 import { selectProfile } from "./actions";
 
@@ -56,6 +58,11 @@ function computeStreak(dates: string[]): number {
 }
 
 export default async function Home() {
+  // CM-58 : le sélecteur n'existe qu'en `cookie` et en `hybrid` sans session.
+  const { mode, source } = await getAuthState();
+  if (source === "session") redirect("/dashboard");
+  if (mode === "required") redirect("/login");
+
   const supabase = await createClient();
   const profiles = await getAllProfiles(supabase);
   const ordered = [...profiles].sort((a, b) =>
@@ -217,6 +224,16 @@ export default async function Home() {
             );
           })}
         </div>
+
+        {/* CM-58 : en `hybrid`, accès à la connexion par compte. */}
+        {mode === "hybrid" && (
+          <Link
+            href="/login"
+            className="mt-4 block rounded-2xl border border-line bg-surface2 py-3.5 text-center text-sm font-bold text-fg active:bg-white/10"
+          >
+            J&apos;ai un mot de passe : me connecter
+          </Link>
+        )}
       </div>
     </main>
   );

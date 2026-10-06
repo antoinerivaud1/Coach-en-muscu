@@ -4,10 +4,14 @@ Parcours critiques joués dans un vrai navigateur contre l'app démarrée.
 
 | Fichier | Parcours | Écrit en base |
 | --- | --- | --- |
-| `smoke.spec.ts` | l'accueil affiche le sélecteur de profil | non |
+| `smoke.spec.ts` | l'accueil affiche le sélecteur de profil ; `/login` renvoie au sélecteur en mode cookie (CM-58) | non |
 | `profil.spec.ts` | choisir un profil, changer de profil | oui (purge CM-83 du tableau de bord) |
 | `seance.spec.ts` | démarrer, valider une série, abandonner, quitter puis reprendre, supprimer, terminer via la croix (CM-94) | oui |
 | `progression.spec.ts` | une séance terminée apparaît dans « Stats » | oui |
+
+Tous les parcours supposent l'app en `AUTH_MODE=cookie` (variable absente,
+défaut). Les modes `hybrid` et `required` (CM-58) se testent à la main : voir
+`supabase/ops/2026-10-cm58-bascule.md`.
 
 Chaque séance créée est supprimée à la fin du test **par l'UI** (feuille de
 sortie ou bouton « Supprimer » du récap), même si le test échoue.
