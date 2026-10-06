@@ -17,6 +17,7 @@ import {
   validateSeanceName,
   type SeanceDraftExercise,
 } from "@/lib/utils/seances";
+import { withOrderIndex } from "@/lib/utils/reorder";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Écran unique de création / édition d'une séance type (CM-81).
@@ -320,15 +321,18 @@ export async function saveSeance(
     savedDayId = created.id;
   }
 
+  // CM-71 : l'ordre reçu est celui de l'éditeur (flèches monter / descendre),
+  // renuméroté 0..n-1. Les séances démarrées ensuite le suivent, via le tri
+  // `order_index` de `buildSessionExercises`.
   const { error: insertError } = await supabase.from("program_exercises").insert(
-    input.exercises.map((ex, i) => ({
+    withOrderIndex(input.exercises).map((ex) => ({
       program_day_id: savedDayId,
       exercise_id: ex.exerciseId,
       target_sets: ex.targetSets,
       target_reps_min: ex.targetRepsMin,
       target_reps_max: ex.targetRepsMax,
       rest_seconds: ex.restSeconds,
-      order_index: i,
+      order_index: ex.order_index,
     })),
   );
 
