@@ -3,10 +3,16 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { PROFILE_COOKIE, getCurrentProfileId } from "@/lib/profile";
+import { PROFILE_COOKIE, getAuthState, getCurrentProfileId } from "@/lib/profile";
+import { getAuthMode } from "@/lib/auth/mode";
 import { createClient } from "@/lib/supabase/server";
 
 export async function selectProfile(formData: FormData) {
+  // CM-58 : en `required`, le sélecteur n'existe plus ; en `hybrid` avec une
+  // session, la session prime et le cookie ne changerait rien.
+  const { mode, source } = await getAuthState();
+  if (mode === "required") redirect("/login");
+  if (source === "session") redirect("/dashboard");
   const id = String(formData.get("profile_id") ?? "").trim();
   if (!id) redirect("/");
   const store = await cookies();
@@ -23,7 +29,8 @@ export async function clearProfile() {
   const store = await cookies();
   store.delete(PROFILE_COOKIE);
   revalidatePath("/", "layout");
-  redirect("/");
+  // CM-58 : en `required`, plus de sélecteur (la déconnexion passe par signOut).
+  redirect(getAuthMode() === "required" ? "/login" : "/");
 }
 
 export async function updateWeeklyGoal(formData: FormData) {

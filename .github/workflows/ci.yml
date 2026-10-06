@@ -2,9 +2,10 @@
 #
 # - `checks` : typecheck, lint, tests unitaires, build. Aucun secret : le build
 #   tourne avec des variables Supabase factices (aucun appel réseau au build).
-# - `e2e` : parcours réels qui ÉCRIVENT en base. Ne tourne que si le secret
-#   `E2E_SUPABASE_URL` est défini (base de TEST, jamais la prod) ; sinon le job
-#   est marqué « skipped », sans échec. Voir tests/e2e/README.md.
+# - `e2e` (CM-98) : parcours réels qui ÉCRIVENT en base, contre une stack
+#   Supabase LOCALE (Docker) recréée à chaque run : migrations de
+#   supabase/migrations/ + supabase/seed.sql. Aucun secret, aucune URL de prod.
+#   Voir tests/e2e/README.md.
 
 name: CI
 
@@ -54,43 +55,16 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: x
           SUPABASE_SERVICE_ROLE_KEY: x
 
-  # Les secrets ne sont pas lisibles dans un `if:` de job : ce job lit le
-  # secret et expose seulement un booléen.
-  e2e-gate:
-    name: Base de test disponible ?
-    runs-on: ubuntu-latest
-    outputs:
-      enabled: ${{ steps.gate.outputs.enabled }}
-    steps:
-      - id: gate
-        env:
-          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-        run: |
-          if [ -n "$E2E_SUPABASE_URL" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Secret E2E_SUPABASE_URL absent : tests e2e ignorés (pas de base de test)."
-          fi
-
   e2e:
-    name: Tests e2e (base de test)
-    needs: [checks, e2e-gate]
-    if: needs.e2e-gate.outputs.enabled == 'true'
+    name: Tests e2e (Supabase local)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # Base de TEST uniquement. Les tests refusent de tourner si cette URL
-      # contient la référence du projet de prod.
-      E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
       E2E_BASE_URL: http://localhost:3000
       E2E_ALLOW_WRITES: "1"
-      # Facultatifs : cibler un profil / une séance type précis du jeu de test.
-      E2E_PROFILE_NAME: ${{ vars.E2E_PROFILE_NAME }}
-      E2E_SEANCE_NAME: ${{ vars.E2E_SEANCE_NAME }}
+      # Données de supabase/seed.sql (fictives).
+      E2E_PROFILE_NAME: Toi
+      E2E_SEANCE_NAME: Haut du corps
     steps:
       - uses: actions/checkout@v4
 
@@ -101,10 +75,47 @@ jobs:
 
       - run: npm ci
 
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.119.0
+
+      # Services inutiles à l'app exclus (elle ne parle qu'à PostgREST via
+      # Kong). `gotrue` reste démarré : sans lui, `supabase status` ne donne
+      # pas les clés anon / service_role.
+      - name: Démarrer Supabase local
+        run: supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Recréer la base (migrations + seed)
+        run: supabase db reset
+
+      - name: Variables Supabase locales
+        run: |
+          supabase status -o env \
+            --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
+            --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY \
+            --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
+            | grep -E '^(NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=' \
+            | tr -d '"' > supabase.env
+          if [ "$(wc -l < supabase.env)" -ne 3 ]; then
+            echo "::error::supabase status n'a pas fourni URL + clés" && exit 1
+          fi
+          # Garde-fou : uniquement une base locale.
+          grep -qE '^NEXT_PUBLIC_SUPABASE_URL=http://127\.0\.0\.1:' supabase.env \
+            || { echo "::error::URL Supabase non locale, refus" && exit 1; }
+          cat supabase.env >> "$GITHUB_ENV"
+          grep '^NEXT_PUBLIC_SUPABASE_URL=' supabase.env | sed 's/^NEXT_PUBLIC_SUPABASE_URL=/E2E_SUPABASE_URL=/' >> "$GITHUB_ENV"
+          rm supabase.env
+
+      - name: Cache navigateurs Playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Navigateur Playwright
         run: npx playwright install --with-deps chromium
 
-      - name: Build
+      - name: Build (Supabase local)
         run: npm run build
 
       - name: Démarrer l'app
@@ -114,10 +125,14 @@ jobs:
             curl -sf -o /dev/null http://localhost:3000/ && exit 0
             sleep 1
           done
-          echo "L'app n'a pas démarré en 60 s" && cat next.log && exit 1
+          echo "L'app n'a pas répondu en 60 s" && cat next.log && exit 1
 
       - name: Tests e2e
         run: npm run test:e2e
+
+      - name: Logs Supabase
+        if: failure()
+        run: docker logs supabase_rest_coach-en-muscu > supabase-rest.log 2>&1 || true
 
       - name: Rapport Playwright
         if: failure()
@@ -128,4 +143,5 @@ jobs:
             playwright-report/
             test-results/
             next.log
+            supabase-rest.log
           retention-days: 7
