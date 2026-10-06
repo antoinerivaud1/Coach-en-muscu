@@ -1,0 +1,131 @@
+# CI Coach en Muscu (CM-56).
+#
+# - `checks` : typecheck, lint, tests unitaires, build. Aucun secret : le build
+#   tourne avec des variables Supabase factices (aucun appel réseau au build).
+# - `e2e` : parcours réels qui ÉCRIVENT en base. Ne tourne que si le secret
+#   `E2E_SUPABASE_URL` est défini (base de TEST, jamais la prod) ; sinon le job
+#   est marqué « skipped », sans échec. Voir tests/e2e/README.md.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  checks:
+    name: Typecheck, lint, unit, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests unitaires
+        run: npm run test:unit
+
+      - name: Build (env factices)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://x.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: x
+          SUPABASE_SERVICE_ROLE_KEY: x
+
+  # Les secrets ne sont pas lisibles dans un `if:` de job : ce job lit le
+  # secret et expose seulement un booléen.
+  e2e-gate:
+    name: Base de test disponible ?
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.gate.outputs.enabled }}
+    steps:
+      - id: gate
+        env:
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+        run: |
+          if [ -n "$E2E_SUPABASE_URL" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Secret E2E_SUPABASE_URL absent : tests e2e ignorés (pas de base de test)."
+          fi
+
+  e2e:
+    name: Tests e2e (base de test)
+    needs: [checks, e2e-gate]
+    if: needs.e2e-gate.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Base de TEST uniquement. Les tests refusent de tourner si cette URL
+      # contient la référence du projet de prod.
+      E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+      E2E_BASE_URL: http://localhost:3000
+      E2E_ALLOW_WRITES: "1"
+      # Facultatifs : cibler un profil / une séance type précis du jeu de test.
+      E2E_PROFILE_NAME: ${{ vars.E2E_PROFILE_NAME }}
+      E2E_SEANCE_NAME: ${{ vars.E2E_SEANCE_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Navigateur Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Démarrer l'app
+        run: |
+          npm run start -- -p 3000 > next.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:3000/ && exit 0
+            sleep 1
+          done
+          echo "L'app n'a pas démarré en 60 s" && cat next.log && exit 1
+
+      - name: Tests e2e
+        run: npm run test:e2e
+
+      - name: Rapport Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+            next.log
+          retention-days: 7
