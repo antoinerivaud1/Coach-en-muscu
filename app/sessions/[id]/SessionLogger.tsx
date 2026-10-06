@@ -17,6 +17,13 @@ import {
 } from "@/lib/utils/training";
 import { resolvePrefill, suggestFirstSet } from "@/lib/utils/prefill";
 import {
+  applySetCorrection,
+  parseDirectValue,
+  parseSetValues,
+  stepFieldValue,
+  type SetDraft,
+} from "@/lib/utils/setEdit";
+import {
   EXTRA_EXERCISE_DEFAULTS,
   resumeExerciseIndex,
   type SessionExercise,
@@ -203,6 +210,19 @@ export default function SessionLogger({
   const [editingField, setEditingField] = useState<"weight" | "reps" | null>(
     null,
   );
+  /**
+   * CM-72 : série déjà validée en cours de correction (une seule à la fois),
+   * repérée par son id, avec le brouillon en cours. Rien n'est écrit avant
+   * « Enregistrer ».
+   */
+  const [correction, setCorrection] = useState<{
+    id: string;
+    draft: SetDraft;
+  } | null>(null);
+  /** Champ de la correction en cours de saisie au clavier (CM-63). */
+  const [correctionField, setCorrectionField] = useState<
+    "weight" | "reps" | null
+  >(null);
 
   useWakeLock(!offlineSaved);
 
@@ -393,12 +413,7 @@ export default function SessionLogger({
         isWarmup: false,
         touched: false,
       };
-      // La saisie directe peut contenir une virgule (22,5) : on normalise.
-      const raw = Number(String(current[field]).replace(",", "."));
-      const base = Number.isFinite(raw) ? raw : 0;
-      const next = Math.max(0, base + delta);
-      const value =
-        field === "weight" ? formatWeight(next) : String(Math.round(next));
+      const value = stepFieldValue(current[field], field, delta);
       rows[rowIndex] = { ...current, [field]: value, touched: true };
       return { ...prev, [exId]: rows };
     });
@@ -412,26 +427,13 @@ export default function SessionLogger({
     raw: string,
   ) {
     setEditingField(null);
-    const trimmed = raw.trim();
+    // Reps vides ou valeur illisible : la saisie est ignorée.
+    const value = parseDirectValue(field, raw);
+    if (value === null) return;
     setSets((prev) => {
       const rows = prev[exId] ? [...prev[exId]!] : [];
       const current = rows[rowIndex];
       if (!current) return prev;
-      let value: string;
-      if (field === "weight") {
-        if (trimmed === "") {
-          value = "";
-        } else {
-          const n = Number(trimmed.replace(",", "."));
-          if (!Number.isFinite(n) || n < 0) return prev;
-          value = formatWeight(n);
-        }
-      } else {
-        if (trimmed === "") return prev; // reps obligatoires : on ne vide pas
-        const n = parseInt(trimmed, 10);
-        if (!Number.isFinite(n) || n < 0) return prev;
-        value = String(n);
-      }
       rows[rowIndex] = { ...current, [field]: value, touched: true };
       return { ...prev, [exId]: rows };
     });
@@ -483,18 +485,16 @@ export default function SessionLogger({
     const rows = sets[exId] ?? [];
     const row = rows[activeIndex];
     if (!row) return;
-    const reps = parseInt(row.reps, 10);
-    if (!(reps > 0)) {
-      setError("Renseigne les répétitions avant de valider la série.");
+    const parsed = parseSetValues(row.weight, row.reps);
+    if (!parsed.ok) {
+      setError(parsed.error);
       return;
     }
-    const weight = row.weight === "" ? 0 : Number(row.weight.replace(",", "."));
-    if (!Number.isFinite(weight) || weight < 0) {
-      setError("Poids invalide.");
-      return;
-    }
+    const { weightKg: weight, reps } = parsed;
     setError(null);
     setEditingField(null);
+    // CM-72 : valider la série active abandonne une correction restée ouverte.
+    setCorrection(null);
 
     // CM-78 : id généré ici, jamais par la base, pour qu'un réessai rejoue la
     // même ligne. `set_index` est celui de la validation et ne bouge plus : une
@@ -576,6 +576,81 @@ export default function SessionLogger({
     });
     setValidated((v) => ({ ...v, [exId]: Math.max(0, (v[exId] ?? 0) - 1) }));
     if (row.id) enqueueDelete(row.id);
+  }
+
+  // ----- Correction d'une série validée pendant la séance (CM-72) -----
+
+  /** Ouvre la correction d'une série validée ; ferme la suppression en attente. */
+  function openCorrection(row: SetField) {
+    if (row.id === null) return;
+    setConfirmDeleteSet(null);
+    setCorrectionField(null);
+    setError(null);
+    setCorrection({
+      id: row.id,
+      draft: { weight: row.weight, reps: row.reps, isWarmup: row.isWarmup },
+    });
+  }
+
+  function cancelCorrection() {
+    setCorrection(null);
+    setCorrectionField(null);
+  }
+
+  function updateDraft(patch: Partial<SetDraft>) {
+    setCorrection((c) => (c ? { ...c, draft: { ...c.draft, ...patch } } : c));
+  }
+
+  /**
+   * Enregistre la correction : mise à jour locale, puis upsert sur le MÊME id
+   * et le même `set_index` — la ligne est modifiée en place en base, jamais
+   * supprimée puis recréée. Le compteur de séries validées, la progression et
+   * le repos ne bougent pas.
+   */
+  function saveCorrection(exId: string) {
+    if (!correction) return;
+    const row = (sets[exId] ?? []).find((r) => r.id === correction.id);
+    if (!row || row.id === null || row.setIndex === null) {
+      cancelCorrection();
+      return;
+    }
+    const { draft } = correction;
+    const parsed = parseSetValues(draft.weight, draft.reps);
+    if (!parsed.ok) {
+      setError(parsed.error);
+      return;
+    }
+    setError(null);
+    cancelCorrection();
+
+    // Rien de changé : pas d'écriture inutile.
+    const before = parseSetValues(row.weight, row.reps);
+    if (
+      before.ok &&
+      before.weightKg === parsed.weightKg &&
+      before.reps === parsed.reps &&
+      row.isWarmup === draft.isWarmup
+    ) {
+      return;
+    }
+
+    const id = row.id;
+    setSets((prev) => ({
+      ...prev,
+      [exId]: applySetCorrection(prev[exId] ?? [], id, draft),
+    }));
+    // Si l'écriture d'origine attend encore dans la file, la correction la
+    // remplace à sa place (cf. `enqueueOp`) : une seule écriture part.
+    enqueueUpsert({
+      id,
+      sessionId,
+      exerciseId: exId,
+      setIndex: row.setIndex,
+      weightKg: parsed.weightKg,
+      reps: parsed.reps,
+      isWarmup: draft.isWarmup,
+      rpe: null,
+    });
   }
 
   /** Séries validées, toutes exercices confondus. */
@@ -827,6 +902,8 @@ export default function SessionLogger({
   useEffect(() => {
     setConfirmRemoveId(null);
     setConfirmDeleteSet(null);
+    setCorrection(null);
+    setCorrectionField(null);
   }, [currentIdx]);
 
   // CM-62 : scroll doux jusqu'à la carte du nouvel exercice, une seule fois,
@@ -999,7 +1076,10 @@ export default function SessionLogger({
           sont faites, mais jamais verrouillée : on peut encore en ajouter. */}
       <div
         ref={cardRef}
-        className={`mt-4 flex-1 ${exProgress?.isComplete ? "opacity-60" : ""}`}
+        className={`mt-4 flex-1 ${
+          // CM-72 : une correction en cours ne doit pas paraître désactivée.
+          exProgress?.isComplete && correction === null ? "opacity-60" : ""
+        }`}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -1101,15 +1181,100 @@ export default function SessionLogger({
             // rien n'est perdu, rien n'est à faire, la file s'en occupe.
             const waiting = row.id !== null && persistence.pendingIds.has(row.id);
             const deleteKey = `${ex.exerciseId}:${i}`;
+            const waitingDot = waiting && (
+              <span
+                className="h-1.5 w-1.5 flex-none rounded-full bg-fg-faint"
+                aria-label="Enregistrement en cours"
+                title="Enregistrement en cours"
+              />
+            );
+
+            // CM-72 : série validée en cours de correction, édition en ligne
+            // avec les mêmes contrôles que la série active.
+            if (done && correction !== null && row.id === correction.id) {
+              const draft = correction.draft;
+              return (
+                <div
+                  key={row.id}
+                  className="rounded-xl border-[1.5px] border-energy bg-surface px-3.5 py-2.5"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-energy font-oswald text-xs font-bold text-ink">
+                      ✓
+                    </span>
+                    <span className="flex flex-1 items-center gap-1.5 text-[13px] font-bold text-energy">
+                      Corriger la série {i + 1}
+                      {waitingDot}
+                    </span>
+                  </div>
+                  <SetInputs
+                    className="mt-3"
+                    weight={draft.weight}
+                    reps={draft.reps}
+                    isWarmup={draft.isWarmup}
+                    deltaKg={null}
+                    editingField={correctionField}
+                    onEditField={setCorrectionField}
+                    onStep={(field, delta) =>
+                      updateDraft({
+                        [field]: stepFieldValue(draft[field], field, delta),
+                      })
+                    }
+                    onCommitDirect={(field, raw) => {
+                      setCorrectionField(null);
+                      const value = parseDirectValue(field, raw);
+                      if (value !== null) updateDraft({ [field]: value });
+                    }}
+                    onToggleWarmup={() =>
+                      updateDraft({ isWarmup: !draft.isWarmup })
+                    }
+                  />
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelCorrection}
+                      className="min-h-11 flex-1 rounded-xl bg-surface2 text-sm font-semibold text-fg active:bg-white/10"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => saveCorrection(ex.exerciseId)}
+                      className="min-h-11 flex-1 rounded-xl bg-energy text-sm font-extrabold text-ink"
+                    >
+                      Enregistrer
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            const label = row.isWarmup
+              ? "Échauffement"
+              : done
+                ? `Série ${i + 1}`
+                : active
+                  ? "En cours"
+                  : "À venir";
+            const values = (
+              <span className="font-oswald text-base text-fg">
+                {done || (active && row.weight !== "")
+                  ? `${row.weight || 0} kg `
+                  : "— kg "}
+                <span className="text-fg-muted">×</span>{" "}
+                {done || (active && row.reps !== "") ? row.reps || 0 : "—"}
+              </span>
+            );
             return (
               <div
                 key={row.id ?? `row-${i}`}
-                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 ${
+                className={`flex items-center gap-3 rounded-xl px-3.5 ${
                   active
-                    ? "border-[1.5px] border-energy bg-energy/[0.08]"
+                    ? "border-[1.5px] border-energy bg-energy/[0.08] py-2.5"
                     : done
-                      ? "bg-surface"
-                      : "opacity-50"
+                      ? // CM-72 : la zone tactile de correction fait 44 px.
+                        "bg-surface py-0.5"
+                      : "py-2.5 opacity-50"
                 }`}
               >
                 <span
@@ -1123,59 +1288,84 @@ export default function SessionLogger({
                 >
                   {done ? "✓" : i + 1}
                 </span>
-                <span
-                  className={`flex flex-1 items-center gap-1.5 text-[13px] font-bold ${
-                    active ? "text-energy" : "text-fg-muted"
-                  }`}
-                >
-                  {row.isWarmup ? "Échauffement" : done ? `Série ${i + 1}` : active ? "En cours" : "À venir"}
-                  {waiting && (
-                    <span
-                      className="h-1.5 w-1.5 flex-none rounded-full bg-fg-faint"
-                      aria-label="Enregistrement en cours"
-                      title="Enregistrement en cours"
-                    />
-                  )}
-                </span>
-                {confirmDeleteSet === deleteKey ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-semibold text-flame">
-                      Supprimer ?
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeValidatedSet(ex.exerciseId, i)}
-                      className="rounded-lg bg-flame px-2 py-1 text-[11px] font-extrabold text-ink"
-                    >
-                      Oui
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteSet(null)}
-                      className="rounded-lg bg-surface2 px-2 py-1 text-[11px] font-semibold text-fg"
-                    >
-                      Non
-                    </button>
-                  </span>
-                ) : (
+                {done && confirmDeleteSet === deleteKey ? (
                   <>
-                    <span className="font-oswald text-base text-fg">
-                      {done || (active && row.weight !== "")
-                        ? `${row.weight || 0} kg `
-                        : "— kg "}
-                      <span className="text-fg-muted">×</span>{" "}
-                      {done || (active && row.reps !== "") ? row.reps || 0 : "—"}
+                    <span className="flex flex-1 items-center gap-1.5 text-[13px] font-bold text-fg-muted">
+                      {label}
+                      {waitingDot}
                     </span>
-                    {done && (
+                    <span className="flex min-h-11 items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-flame">
+                        Supprimer ?
+                      </span>
                       <button
                         type="button"
-                        onClick={() => setConfirmDeleteSet(deleteKey)}
-                        className="-mr-1 flex-none px-1 text-fg-faint hover:text-flame"
-                        aria-label={`Supprimer la série ${i + 1}`}
+                        onClick={() => removeValidatedSet(ex.exerciseId, i)}
+                        className="rounded-lg bg-flame px-2 py-1 text-[11px] font-extrabold text-ink"
                       >
-                        ✕
+                        Oui
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteSet(null)}
+                        className="rounded-lg bg-surface2 px-2 py-1 text-[11px] font-semibold text-fg"
+                      >
+                        Non
+                      </button>
+                    </span>
+                  </>
+                ) : done ? (
+                  <>
+                    {/* CM-72 : un tap sur la série validée ouvre sa correction. */}
+                    <button
+                      type="button"
+                      onClick={() => openCorrection(row)}
+                      className="flex min-h-11 flex-1 items-center gap-3 text-left"
+                      aria-label={`Corriger la série ${i + 1} : ${row.weight || 0} kg × ${row.reps || 0}`}
+                    >
+                      <span className="flex flex-1 items-center gap-1.5 text-[13px] font-bold text-fg-muted">
+                        {label}
+                        {waitingDot}
+                      </span>
+                      {values}
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4 flex-none text-fg-faint"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Une seule action en ligne à la fois (CM-72).
+                        cancelCorrection();
+                        setConfirmDeleteSet(deleteKey);
+                      }}
+                      className="-mr-1 flex-none px-1 text-fg-faint hover:text-flame"
+                      aria-label={`Supprimer la série ${i + 1}`}
+                    >
+                      ✕
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className={`flex flex-1 items-center gap-1.5 text-[13px] font-bold ${
+                        active ? "text-energy" : "text-fg-muted"
+                      }`}
+                    >
+                      {label}
+                      {waitingDot}
+                    </span>
+                    {values}
                   </>
                 )}
               </div>
@@ -1183,144 +1373,25 @@ export default function SessionLogger({
           })}
         </div>
 
-        {/* Saisie de la série en cours (CM-63) */}
-        {!exerciseDone && activeRow && (
-          <div className="mt-4 flex flex-col gap-3">
-            {/* Poids : pas de base 1 kg + pas rapide 2,5 kg + saisie clavier */}
-            <div className="rounded-2xl border border-line bg-surface px-4 py-3.5">
-              <div className="flex items-center justify-between">
-                <div className="text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
-                  Poids
-                </div>
-                {deltaKg !== null && (
-                  <span
-                    className={`font-oswald text-xs font-bold ${
-                      deltaKg >= 0 ? "text-energy" : "text-flame"
-                    }`}
-                  >
-                    {deltaKg > 0 ? "+" : "−"}
-                    {formatWeight(Math.abs(deltaKg))} kg
-                    <span className="ml-1 font-normal text-fg-faint">
-                      vs dernière
-                    </span>
-                  </span>
-                )}
-              </div>
-              <div className="mt-0.5 flex items-baseline gap-1.5">
-                {editingField === "weight" ? (
-                  <DirectInput
-                    field="weight"
-                    initial={activeRow.weight}
-                    onCommit={(raw) =>
-                      commitDirect(ex.exerciseId, activeIndex, "weight", raw)
-                    }
-                    onCancel={() => setEditingField(null)}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setEditingField("weight")}
-                    className="min-h-11 font-oswald text-[34px] font-bold leading-none text-fg"
-                    aria-label="Modifier le poids au clavier"
-                  >
-                    {activeRow.weight || 0}
-                  </button>
-                )}
-                <span className="text-sm font-bold text-fg-muted">kg</span>
-              </div>
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                <button
-                  type="button"
-                  onClick={() => step(ex.exerciseId, activeIndex, "weight", -2.5)}
-                  className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 font-oswald text-base font-semibold text-fg active:bg-white/10"
-                  aria-label="Moins 2,5 kg"
-                >
-                  −2.5
-                </button>
-                <button
-                  type="button"
-                  onClick={() => step(ex.exerciseId, activeIndex, "weight", -1)}
-                  className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
-                  aria-label="Moins 1 kg"
-                >
-                  −
-                </button>
-                <button
-                  type="button"
-                  onClick={() => step(ex.exerciseId, activeIndex, "weight", 1)}
-                  className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
-                  aria-label="Plus 1 kg"
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  onClick={() => step(ex.exerciseId, activeIndex, "weight", 2.5)}
-                  className="flex h-11 items-center justify-center rounded-2xl bg-energy font-oswald text-base font-bold text-ink"
-                  aria-label="Plus 2,5 kg"
-                >
-                  +2.5
-                </button>
-              </div>
-            </div>
-
-            {/* Répétitions : pas de 1 + saisie clavier (entiers) */}
-            <div className="rounded-2xl border border-line bg-surface px-4 py-3.5">
-              <div className="text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
-                Répétitions
-              </div>
-              <div className="mt-0.5 flex items-baseline gap-1.5">
-                {editingField === "reps" ? (
-                  <DirectInput
-                    field="reps"
-                    initial={activeRow.reps}
-                    onCommit={(raw) =>
-                      commitDirect(ex.exerciseId, activeIndex, "reps", raw)
-                    }
-                    onCancel={() => setEditingField(null)}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setEditingField("reps")}
-                    className="min-h-11 font-oswald text-[34px] font-bold leading-none text-fg"
-                    aria-label="Modifier les répétitions au clavier"
-                  >
-                    {activeRow.reps || 0}
-                  </button>
-                )}
-                <span className="text-sm font-bold text-fg-muted">reps</span>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => step(ex.exerciseId, activeIndex, "reps", -1)}
-                  className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
-                  aria-label="Moins 1 répétition"
-                >
-                  −
-                </button>
-                <button
-                  type="button"
-                  onClick={() => step(ex.exerciseId, activeIndex, "reps", 1)}
-                  className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
-                  aria-label="Plus 1 répétition"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => toggleWarmup(ex.exerciseId, activeIndex)}
-              className={`min-h-11 text-left text-[11px] font-semibold ${
-                activeRow.isWarmup ? "text-toi" : "text-fg-faint"
-              }`}
-            >
-              {activeRow.isWarmup ? "● Échauffement" : "○ Marquer comme échauffement"}
-            </button>
-          </div>
+        {/* Saisie de la série en cours (CM-63). Masquée pendant une correction
+            (CM-72) : un seul jeu de contrôles à l'écran à la fois. */}
+        {!exerciseDone && activeRow && correction === null && (
+          <SetInputs
+            className="mt-4"
+            weight={activeRow.weight}
+            reps={activeRow.reps}
+            isWarmup={activeRow.isWarmup}
+            deltaKg={deltaKg}
+            editingField={editingField}
+            onEditField={setEditingField}
+            onStep={(field, delta) =>
+              step(ex.exerciseId, activeIndex, field, delta)
+            }
+            onCommitDirect={(field, raw) =>
+              commitDirect(ex.exerciseId, activeIndex, field, raw)
+            }
+            onToggleWarmup={() => toggleWarmup(ex.exerciseId, activeIndex)}
+          />
         )}
 
         {exerciseDone && (
@@ -1508,6 +1579,172 @@ export default function SessionLogger({
         }}
         onClose={() => setSheetOpen(false)}
       />
+    </div>
+  );
+}
+
+/**
+ * Contrôles de saisie d'une série (CM-63) : poids (steppers 1 kg / 2,5 kg +
+ * pavé numérique), répétitions (stepper 1 + pavé), échauffement. Partagés par
+ * la série active et la correction d'une série validée (CM-72) : les deux se
+ * saisissent exactement de la même façon.
+ */
+function SetInputs({
+  className,
+  weight,
+  reps,
+  isWarmup,
+  deltaKg,
+  editingField,
+  onEditField,
+  onStep,
+  onCommitDirect,
+  onToggleWarmup,
+}: {
+  className?: string;
+  weight: string;
+  reps: string;
+  isWarmup: boolean;
+  /** Écart avec la même série la dernière fois (CM-64), `null` = masqué. */
+  deltaKg: number | null;
+  editingField: "weight" | "reps" | null;
+  onEditField: (field: "weight" | "reps" | null) => void;
+  onStep: (field: "weight" | "reps", delta: number) => void;
+  onCommitDirect: (field: "weight" | "reps", raw: string) => void;
+  onToggleWarmup: () => void;
+}) {
+  return (
+    <div className={`flex flex-col gap-3 ${className ?? ""}`}>
+      {/* Poids : pas de base 1 kg + pas rapide 2,5 kg + saisie clavier */}
+      <div className="rounded-2xl border border-line bg-surface px-4 py-3.5">
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
+            Poids
+          </div>
+          {deltaKg !== null && (
+            <span
+              className={`font-oswald text-xs font-bold ${
+                deltaKg >= 0 ? "text-energy" : "text-flame"
+              }`}
+            >
+              {deltaKg > 0 ? "+" : "−"}
+              {formatWeight(Math.abs(deltaKg))} kg
+              <span className="ml-1 font-normal text-fg-faint">
+                vs dernière
+              </span>
+            </span>
+          )}
+        </div>
+        <div className="mt-0.5 flex items-baseline gap-1.5">
+          {editingField === "weight" ? (
+            <DirectInput
+              field="weight"
+              initial={weight}
+              onCommit={(raw) => onCommitDirect("weight", raw)}
+              onCancel={() => onEditField(null)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => onEditField("weight")}
+              className="min-h-11 font-oswald text-[34px] font-bold leading-none text-fg"
+              aria-label="Modifier le poids au clavier"
+            >
+              {weight || 0}
+            </button>
+          )}
+          <span className="text-sm font-bold text-fg-muted">kg</span>
+        </div>
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          <button
+            type="button"
+            onClick={() => onStep("weight", -2.5)}
+            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 font-oswald text-base font-semibold text-fg active:bg-white/10"
+            aria-label="Moins 2,5 kg"
+          >
+            −2.5
+          </button>
+          <button
+            type="button"
+            onClick={() => onStep("weight", -1)}
+            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
+            aria-label="Moins 1 kg"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => onStep("weight", 1)}
+            className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
+            aria-label="Plus 1 kg"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={() => onStep("weight", 2.5)}
+            className="flex h-11 items-center justify-center rounded-2xl bg-energy font-oswald text-base font-bold text-ink"
+            aria-label="Plus 2,5 kg"
+          >
+            +2.5
+          </button>
+        </div>
+      </div>
+
+      {/* Répétitions : pas de 1 + saisie clavier (entiers) */}
+      <div className="rounded-2xl border border-line bg-surface px-4 py-3.5">
+        <div className="text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
+          Répétitions
+        </div>
+        <div className="mt-0.5 flex items-baseline gap-1.5">
+          {editingField === "reps" ? (
+            <DirectInput
+              field="reps"
+              initial={reps}
+              onCommit={(raw) => onCommitDirect("reps", raw)}
+              onCancel={() => onEditField(null)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => onEditField("reps")}
+              className="min-h-11 font-oswald text-[34px] font-bold leading-none text-fg"
+              aria-label="Modifier les répétitions au clavier"
+            >
+              {reps || 0}
+            </button>
+          )}
+          <span className="text-sm font-bold text-fg-muted">reps</span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onStep("reps", -1)}
+            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
+            aria-label="Moins 1 répétition"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => onStep("reps", 1)}
+            className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
+            aria-label="Plus 1 répétition"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onToggleWarmup}
+        className={`min-h-11 text-left text-[11px] font-semibold ${
+          isWarmup ? "text-toi" : "text-fg-faint"
+        }`}
+      >
+        {isWarmup ? "● Échauffement" : "○ Marquer comme échauffement"}
+      </button>
     </div>
   );
 }
