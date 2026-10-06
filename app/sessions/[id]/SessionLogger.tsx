@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  discardSession,
   finishSession,
   fetchLastForExercise,
   type FinishSessionInput,
@@ -28,6 +29,7 @@ import {
 import { useSetPersistence } from "@/hooks/useSetPersistence";
 import ExerciseInfo from "@/components/ExerciseInfo";
 import AddExerciseSheet from "@/components/AddExerciseSheet";
+import ExitSessionSheet from "@/components/ExitSessionSheet";
 import { addPending } from "@/lib/pendingSessions";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useRestTimer } from "@/hooks/useRestTimer";
@@ -184,6 +186,14 @@ export default function SessionLogger({
   const [confirmDeleteSet, setConfirmDeleteSet] = useState<string | null>(null);
   /** Confirmation « terminer alors que des séries restent en attente ». */
   const [confirmFinish, setConfirmFinish] = useState(false);
+  /**
+   * CM-94 : « Terminer la séance » alors que des exercices n'ont aucune série.
+   * Nombre d'exercices concernés, `null` hors confirmation.
+   */
+  const [confirmIncomplete, setConfirmIncomplete] = useState<number | null>(null);
+  /** CM-94 : feuille de sortie ouverte par la croix. */
+  const [exitSheetOpen, setExitSheetOpen] = useState(false);
+  const [isDiscarding, startDiscard] = useTransition();
   const [isFlushing, setIsFlushing] = useState(false);
   const [offlineSaved, setOfflineSaved] = useState(false);
   // Valeur initiale sans `Date.now()` : le rendu serveur et l'hydratation
@@ -603,10 +613,31 @@ export default function SessionLogger({
     });
   }
 
-  function handleFinish() {
+  /** Exercices de la séance (programme ou ajoutés) sans aucune série validée. */
+  const exercisesDone = allExercises.filter(
+    (e) => (validated[e.exerciseId] ?? 0) > 0,
+  ).length;
+  const exercisesSkipped = allExercises.length - exercisesDone;
+
+  /**
+   * `skipIncompleteCheck` : la feuille de sortie affiche déjà « X/Y
+   * exercices », choisir « Terminer » depuis elle vaut confirmation.
+   */
+  function handleFinish(skipIncompleteCheck = false) {
     setError(null);
+    setConfirmIncomplete(null);
     if (validatedCount === 0) {
       setError("Valide au moins une série avant de terminer.");
+      return;
+    }
+    // CM-94 : un exercice sauté se voit avant de clôturer. Pas en
+    // « Modifier » d'une séance déjà terminée : rien n'y est en cours.
+    if (
+      !skipIncompleteCheck &&
+      finishedDurationSeconds === null &&
+      exercisesSkipped > 0
+    ) {
+      setConfirmIncomplete(exercisesSkipped);
       return;
     }
     if (!persistence.hasPending) {
@@ -620,6 +651,21 @@ export default function SessionLogger({
       setIsFlushing(false);
       if (drained) finish();
       else setConfirmFinish(true);
+    });
+  }
+
+  /**
+   * CM-94 : suppression depuis la feuille de sortie. La file est abandonnée
+   * d'abord, pour qu'aucune série n'arrive après la suppression ; l'action
+   * redirige vers l'accueil (ne pas l'entourer d'un try/catch, qui avalerait
+   * la redirection).
+   */
+  function discard() {
+    startDiscard(async () => {
+      await persistence.discard(3000);
+      const formData = new FormData();
+      formData.set("session_id", sessionId);
+      await discardSession(formData);
     });
   }
 
@@ -830,7 +876,13 @@ export default function SessionLogger({
       <div className="flex items-center justify-between gap-2 py-2">
         <button
           type="button"
-          onClick={() => router.push("/dashboard")}
+          onClick={() =>
+            // CM-94 : une séance en cours ne se quitte jamais sur un seul tap.
+            // En « Modifier » d'une séance terminée, rien n'est en cours.
+            finishedDurationSeconds !== null
+              ? router.push("/dashboard")
+              : setExitSheetOpen(true)
+          }
           className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface2 text-fg"
           aria-label="Quitter la séance"
         >
@@ -1343,7 +1395,7 @@ export default function SessionLogger({
         ) : isLast ? (
           <button
             type="button"
-            onClick={handleFinish}
+            onClick={() => handleFinish()}
             disabled={isPending || isFlushing}
             className="w-full rounded-2xl bg-energy py-4 text-[17px] font-extrabold text-ink disabled:opacity-50"
           >
@@ -1361,15 +1413,34 @@ export default function SessionLogger({
             </svg>
           </button>
         )}
-        {!(exerciseDone && isLast) && (
-          <button
-            type="button"
-            onClick={handleFinish}
-            disabled={isPending || isFlushing}
-            className="mt-2 w-full py-1 text-center text-xs font-semibold text-fg-muted hover:text-fg disabled:opacity-50"
-          >
-            {isFlushing ? "Enregistrement…" : "Terminer maintenant"}
-          </button>
+        {/* CM-94 : plus de « Terminer maintenant » ici. Collé sous
+            « Valider la série », il clôturait la séance au moindre tap raté ;
+            la sortie anticipée passe par la croix et sa feuille. */}
+
+        {confirmIncomplete !== null && (
+          <div className="mt-2 rounded-xl border border-flame/40 bg-flame/10 p-3">
+            <p className="text-xs font-semibold text-flame">
+              {confirmIncomplete} exercice{confirmIncomplete > 1 ? "s" : ""} non
+              fait{confirmIncomplete > 1 ? "s" : ""}. Terminer quand même ?
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleFinish(true)}
+                disabled={isPending || isFlushing}
+                className="flex-1 rounded-lg bg-flame py-2 text-xs font-extrabold text-ink disabled:opacity-50"
+              >
+                Terminer
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmIncomplete(null)}
+                className="flex-1 rounded-lg bg-surface2 py-2 text-xs font-semibold text-fg"
+              >
+                Continuer
+              </button>
+            </div>
+          </div>
         )}
 
         {/* CM-78 : la file n'a pas réussi à écrire trois fois de suite. On le
@@ -1409,6 +1480,21 @@ export default function SessionLogger({
           </div>
         )}
       </div>
+
+      <ExitSessionSheet
+        open={exitSheetOpen}
+        validatedCount={validatedCount}
+        exercisesDone={exercisesDone}
+        exercisesTotal={allExercises.length}
+        isBusy={isDiscarding}
+        onClose={() => setExitSheetOpen(false)}
+        onQuit={() => router.push("/dashboard")}
+        onFinish={() => {
+          setExitSheetOpen(false);
+          handleFinish(true);
+        }}
+        onDiscard={discard}
+      />
 
       <AddExerciseSheet
         open={sheetOpen}

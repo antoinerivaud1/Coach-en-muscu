@@ -36,6 +36,13 @@ export interface SetPersistence {
   enqueueDelete: (id: string) => void;
   /** Tente de vider la file, au plus `timeoutMs`. Rend `true` si elle est vide. */
   flush: (timeoutMs: number) => Promise<boolean>;
+  /**
+   * Abandonne la file (séance supprimée, CM-94) : plus rien ne sera écrit, la
+   * copie `localStorage` est effacée. Attend au plus `timeoutMs` que
+   * l'opération déjà partie sur le réseau revienne, pour qu'elle n'arrive pas
+   * après la suppression de la séance.
+   */
+  discard: (timeoutMs: number) => Promise<void>;
 }
 
 /**
@@ -225,6 +232,19 @@ export function useSetPersistence(sessionId: string): SetPersistence {
     [clearTimer, pump],
   );
 
+  const discard = useCallback(
+    async (timeoutMs: number): Promise<void> => {
+      clearTimer();
+      commit([]);
+      setFailures(0);
+      const deadline = Date.now() + timeoutMs;
+      while (runningRef.current && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    },
+    [clearTimer, commit],
+  );
+
   const pendingIds = useMemo(() => pendingIdsOf(queue), [queue]);
 
   return {
@@ -235,5 +255,6 @@ export function useSetPersistence(sessionId: string): SetPersistence {
     enqueueUpsert,
     enqueueDelete,
     flush,
+    discard,
   };
 }

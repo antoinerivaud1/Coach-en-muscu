@@ -207,8 +207,8 @@ function backToDashboard(message?: string): never {
 /**
  * Clôture une séance oubliée sans la rouvrir.
  *
- * Passe par `finishSession`, exactement comme le bouton « Terminer maintenant »
- * du logger : un seul chemin marque une séance terminée. La durée est calculée
+ * Passe par `finishSession`, exactement comme « Terminer la séance » du logger
+ * (fin de parcours ou feuille de sortie, CM-94) : un seul chemin marque une séance terminée. La durée est calculée
  * de `performed_at` jusqu'à la DERNIÈRE série écrite, pas jusqu'à maintenant —
  * une séance d'hier soir clôturée ce matin ne doit pas valoir quinze heures.
  */
