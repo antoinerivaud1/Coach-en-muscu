@@ -1,8 +1,9 @@
 # Supabase : schéma et base locale
 
 - **Ordre des migrations** (`migrations/`, appliquées par ordre de nom) : `20260506000000_baseline.sql` (schéma prod figé le 06/10/2026, état d'avant CM-69/CM-78), puis `20260812072300_drop_program_days_weekdays.sql` (CM-69), puis `20260912093000_session_sets_unique_set.sql` (CM-78). L'enchaînement complet = schéma prod actuel.
-- **Base locale** (Docker requis) : `supabase start` démarre la stack, `supabase db reset` recrée la base depuis zéro (migrations puis `seed.sql`). URL/clés locales : `supabase status`.
-- **Données de test** : `seed.sql`, fictives (profils `1111…`/`2222…`, couple `3333…`, 12 exercices système, programme « Nos séances », 1 séance terminée).
+- **Base locale** (Docker requis) : `supabase start` démarre la stack, `supabase db reset` recrée la base depuis zéro (migrations puis `seed.sql`). URL/clés locales : `supabase status` (les clés n'apparaissent que si `gotrue` tourne : ne pas l'exclure avec `-x`).
+- **CI (CM-98)** : le job `e2e` de `.github/workflows/ci.yml` fait exactement ça à chaque PR / push sur `main` (stack jetable, services inutiles exclus), build l'app contre la stack locale et lance les tests Playwright. Procédure locale identique : `tests/e2e/README.md`.
+- **Données de test** : `seed.sql`, fictives (profils « Toi » `1111…` / « Elle » `2222…`, couple `3333…`, 12 exercices système, programme « Nos séances » avec « Haut du corps » et « Bas du corps », 1 séance terminée). Les e2e en dépendent (`E2E_PROFILE_NAME=Toi`, `E2E_SEANCE_NAME=Haut du corps` en CI) : renommer ces données impose de mettre à jour le job.
 - **Vérifier sans Docker** : `scripts/check-baseline.mjs` (PGlite) rejoue tout et affiche des empreintes du schéma, comparables à la prod via `--print-hash-query`.
 - **Règle désormais** : toute modification de schéma passe par un fichier `migrations/<horodatage>_<nom>.sql` committé, testé en local (`supabase db reset`), puis appliqué en prod. Plus de DDL direct dans le dashboard.
 - **Attention prod** : ne jamais rejouer la baseline sur la prod (elle échoue volontairement si le schéma existe). L'historique `supabase_migrations` de la prod porte d'autres versions (14 entrées, dont `20260906140326` et `20260912211215` pour CM-69/CM-78) : avant tout `supabase db push`, aligner l'historique avec `supabase migration repair` (étape manuelle, hors de cette PR).
