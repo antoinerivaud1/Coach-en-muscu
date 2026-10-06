@@ -13,7 +13,7 @@
     "cap:android": "cap open android",
     "assets:gen": "capacitor-assets generate",
     "test:unit": "playwright test --project=unit",
-    "test:e2e": "playwright test --project=e2e"
+    "test:e2e": "playwright test --project=e2e --workers=1"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
