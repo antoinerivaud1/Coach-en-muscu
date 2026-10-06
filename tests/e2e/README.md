@@ -14,57 +14,78 @@ sortie ou bouton « Supprimer » du récap), même si le test échoue.
 
 ## Garde-fous : jamais contre la prod
 
-La seule base Supabase existante est la prod (`drmmgwchoowggpsppilo`). Les
-fichiers qui écrivent :
+La prod est le projet Supabase `drmmgwchoowggpsppilo`. Les fichiers qui
+écrivent :
 
 - sont **ignorés** tant que `E2E_ALLOW_WRITES` n'est pas à `1` ;
 - **échouent net** si `E2E_SUPABASE_URL` ou `NEXT_PUBLIC_SUPABASE_URL`
   contient la référence du projet de prod.
 
 Ces garde-fous ne voient que l'environnement du runner, pas celui de l'app :
-c'est à toi de démarrer l'app sur la base de test.
+c'est à toi de démarrer l'app sur une base de test. La base de test, c'est la
+stack Supabase **locale** (Docker), en CI comme sur ton poste.
 
-## Lancer en local contre une base de test
+## En CI (CM-98)
+
+Le job `e2e` de `.github/workflows/ci.yml` tourne sur chaque PR et chaque push
+sur `main`, sans aucun secret :
+
+1. `supabase start` (CLI installée par `supabase/setup-cli`, version figée)
+   avec les services inutiles exclus (`realtime`, `storage-api`, `imgproxy`,
+   `mailpit`, `postgres-meta`, `studio`, `edge-runtime`, `logflare`, `vector`,
+   `supavisor`). `gotrue` reste actif : sans lui `supabase status` ne donne pas
+   les clés.
+2. `supabase db reset` : base recréée depuis `supabase/migrations/` puis
+   `supabase/seed.sql`.
+3. `supabase status -o env` fournit `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` et `SUPABASE_SERVICE_ROLE_KEY` (clés de démo
+   locales) ; le job refuse toute URL qui n'est pas `http://127.0.0.1:…`.
+4. `npm run build` puis `next start` sur le port 3000, attente de la réponse.
+5. `npm run test:e2e` avec `E2E_ALLOW_WRITES=1`, `E2E_PROFILE_NAME=Toi`,
+   `E2E_SEANCE_NAME=Haut du corps` (données du seed).
+
+En cas d'échec, l'artefact `playwright-report` contient le rapport HTML, les
+traces (`test-results/`), `next.log` et les logs PostgREST. Le job e2e tourne
+en parallèle du job « Typecheck, lint, unit, build ».
+
+## Reproduire en local (Docker)
 
 ```bash
-# 1. App branchée sur la base de TEST (pas .env.local, qui vise la prod)
-NEXT_PUBLIC_SUPABASE_URL=<url de test> \
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon de test> \
-SUPABASE_SERVICE_ROLE_KEY=<service_role de test> \
-npm run build && npm run start
+# 1. Stack Supabase locale + base fraîche (migrations + seed)
+supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+supabase db reset
 
-# 2. Dans un autre terminal
+# 2. Variables de la stack locale (PAS .env.local, qui vise la prod)
+eval "$(supabase status -o env \
+  --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
+  --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY \
+  --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
+  | grep -E '^(NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=' \
+  | sed 's/^/export /')"
+
+# 3. App sur la base locale
+npm run build && npm run start          # laisser tourner
+
+# 4. Dans un autre terminal (mêmes variables exportées)
 npx playwright install chromium          # une fois
 E2E_ALLOW_WRITES=1 \
-E2E_SUPABASE_URL=<url de test> \
+E2E_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
 E2E_BASE_URL=http://localhost:3000 \
+E2E_PROFILE_NAME=Toi E2E_SEANCE_NAME="Haut du corps" \
 npm run test:e2e
+
+# 5. Fin
+supabase stop --no-backup
 ```
 
-Données attendues : au moins un profil, et pour ce profil une séance type
-contenant au moins un exercice. Pour cibler des données précises :
-`E2E_PROFILE_NAME` (nom affiché du profil) et `E2E_SEANCE_NAME` (nom de la
-séance type). Les tests tournent en série (`--workers=1`) : ils partagent un
-profil.
+Attention : `next build` grave `NEXT_PUBLIC_*` dans le bundle. Après un build
+local contre la stack Docker, rebuilder avant tout usage avec `.env.local`.
 
-## En CI
+## Données attendues
 
-Le job `e2e` de `.github/workflows/ci.yml` ne tourne que si le secret
-`E2E_SUPABASE_URL` est défini (sinon il est « skipped »). Secrets à créer,
-**tous pointant vers la base de test** : `E2E_SUPABASE_URL`,
-`E2E_SUPABASE_ANON_KEY`, `E2E_SUPABASE_SERVICE_ROLE_KEY`. Variables
-facultatives : `E2E_PROFILE_NAME`, `E2E_SEANCE_NAME`.
-
-## Avoir une base de test : 2 options
-
-1. **Supabase CLI local (Docker), dans la CI et en local.** Gratuit, base
-   jetable à chaque run (`supabase start`, puis seed). Prérequis : une
-   migration « baseline » qui recrée tout le schéma de prod
-   (`supabase db dump` du schéma, sans données), car `supabase/migrations/`
-   ne contient aujourd'hui que des deltas. Il faut aussi un `seed.sql`
-   (2 profils, un couple, une séance type avec exercices) et adapter le job
-   `e2e` pour démarrer la stack locale au lieu de lire des secrets.
-2. **Deuxième projet Supabase payant, ou branche Supabase.** Le plan gratuit
-   est plein (2 projets) : il faut passer en Pro pour un 3e projet ou pour les
-   branches. Base persistante : il faut la tenir à jour à chaque migration et
-   la remettre en état si un test laisse des données.
+Celles de `supabase/seed.sql` (fictives) : profils « Toi » et « Elle »,
+programme « Nos séances » avec les séances types « Haut du corps » et
+« Bas du corps » (4 exercices chacune). Sans `E2E_PROFILE_NAME` /
+`E2E_SEANCE_NAME`, les tests prennent le premier profil et la première séance
+non vide. Les tests tournent en série (`--workers=1`) : ils partagent un
+profil, et chacun supprime ses séances par l'UI.
