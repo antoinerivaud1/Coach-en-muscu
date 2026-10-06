@@ -1009,7 +1009,8 @@ export default function SessionLogger({
               </div>
               {ex.source === "extra" && (
                 <span className="text-xs font-semibold text-fg-muted">
-                  Hors programme
+                  {/* CM-84 : le mot « programme » a disparu du produit. */}
+                  Hors séance
                 </span>
               )}
               {canRemove && (

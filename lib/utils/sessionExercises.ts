@@ -13,7 +13,7 @@ export type SessionExerciseSource = "program" | "extra";
 /**
  * Forme unique d'un exercice de séance, que le programme l'ait prévu ou qu'il
  * ait été ajouté en cours de route. L'écran de saisie ne distingue les deux
- * que par `source` (badge « Hors programme », croix de retrait).
+ * que par `source` (badge « Hors séance », croix de retrait).
  */
 export interface SessionExercise {
   exerciseId: string;
