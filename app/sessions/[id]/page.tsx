@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getCoupleId } from "@/lib/profile";
+import { requireProfileId, getDuoId } from "@/lib/profile";
 import { getDayWithExercises } from "@/lib/queries/programs";
 import type { ProgramDayFull } from "@/lib/queries/programs";
 import { getCatalogExercises } from "@/lib/queries/exercises";
@@ -138,8 +138,8 @@ export default async function SessionPage({
 
     // Catalogue d'ajout en séance (système + persos du couple), chargé ici
     // pour que la bottom sheet n'ait aucune requête à faire côté client.
-    const coupleId = await getCoupleId(supabase, profileId);
-    const { data: catalogData } = await getCatalogExercises(supabase, coupleId);
+    const duoId = await getDuoId(supabase, profileId);
+    const { data: catalogData } = await getCatalogExercises(supabase, duoId);
     const catalog = (catalogData ?? []) as SystemExercise[];
 
     // Pré-remplissage des champs.
@@ -220,7 +220,7 @@ export default async function SessionPage({
           exercises={exercises}
           initialSets={initialSets}
           catalog={catalog}
-          canCreateExercise={coupleId !== null}
+          canCreateExercise={duoId !== null}
         />
       </main>
     );

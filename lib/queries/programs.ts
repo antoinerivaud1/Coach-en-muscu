@@ -5,19 +5,21 @@ import { completedSessionsQuery } from "@/lib/queries/sessions";
 /**
  * Id du programme partagé du couple (CM-80).
  *
- * Un programme partagé a `couple_id` renseigné et `owner_profile_id` à null —
- * la contrainte `program_owner_xor` garantit que les deux sont exclusifs. Il
+ * Un programme partagé a `duo_id` renseigné et `owner_profile_id` à null —
+ * la contrainte `program_owner_xor` garantit que les deux sont exclusifs
+ * (CM-85 partie A : elle porte encore sur `couple_id`, tenu égal à `duo_id`
+ * par le trigger `programs_sync_duo` ; partie B : elle passera sur `duo_id`). Il
  * n'y en a qu'un en pratique ; s'il y en avait plusieurs, on retient le plus
  * ancien pour que l'accueil et le Profil pointent toujours au même endroit.
  */
 export async function getSharedProgramId(
   supabase: SupabaseClient<Database>,
-  coupleId: string,
+  duoId: string,
 ): Promise<string | null> {
   const { data } = await supabase
     .from("programs")
     .select("id")
-    .eq("couple_id", coupleId)
+    .eq("duo_id", duoId)
     .is("owner_profile_id", null)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -54,10 +56,10 @@ export async function canAccessProgram(
 ): Promise<ProgramAccess> {
   const { data: program, error } = await supabase
     .from("programs")
-    .select("id, owner_profile_id, couple_id")
+    .select("id, owner_profile_id, duo_id")
     .eq("id", programId)
     .returns<
-      { id: string; owner_profile_id: string | null; couple_id: string | null }[]
+      { id: string; owner_profile_id: string | null; duo_id: string | null }[]
     >()
     .maybeSingle();
 
@@ -70,16 +72,16 @@ export async function canAccessProgram(
   if (program.owner_profile_id === profileId) {
     return { ok: true, allowed: true };
   }
-  if (!program.couple_id) {
+  if (!program.duo_id) {
     return { ok: true, allowed: false };
   }
 
   const { data: membership, error: membershipError } = await supabase
-    .from("couple_members")
-    .select("couple_id")
-    .eq("couple_id", program.couple_id)
+    .from("duo_members")
+    .select("duo_id")
+    .eq("duo_id", program.duo_id)
     .eq("profile_id", profileId)
-    .returns<{ couple_id: string }[]>()
+    .returns<{ duo_id: string }[]>()
     .maybeSingle();
 
   if (membershipError) {
@@ -118,7 +120,7 @@ export type ProgramDayFull = {
 export type ProgramFull = {
   id: string;
   name: string;
-  couple_id: string | null;
+  duo_id: string | null;
   owner_profile_id: string | null;
   program_days: ProgramDayFull[];
 };
@@ -130,7 +132,7 @@ export async function getProgramWithDays(
   return supabase
     .from("programs")
     .select(
-      `id, name, couple_id, owner_profile_id,
+      `id, name, duo_id, owner_profile_id,
        program_days (
          id, name, order_index,
          program_exercises (
@@ -243,16 +245,18 @@ export type EnsureSharedProgram =
  */
 export async function ensureSharedProgram(
   supabase: SupabaseClient<Database>,
-  coupleId: string,
+  duoId: string,
 ): Promise<EnsureSharedProgram> {
-  const existing = await getSharedProgramId(supabase, coupleId);
+  const existing = await getSharedProgramId(supabase, duoId);
   if (existing) return { ok: true, programId: existing };
 
   const { data, error } = await supabase
     .from("programs")
     .insert({
       name: SHARED_PROGRAM_NAME,
-      couple_id: coupleId,
+      // CM-85 : seul `duo_id` est écrit ; le trigger `programs_sync_duo`
+      // recopie la valeur dans `couple_id` (supprimé en partie B).
+      duo_id: duoId,
       owner_profile_id: null,
     })
     .select("id")

@@ -94,27 +94,32 @@ export async function getProfile(
   return data;
 }
 
-export async function getCoupleId(
+/**
+ * CM-85 : duo du profil (ex-couple, même uuid), null si le profil est solo.
+ * Un profil appartient à un seul duo (index unique `duo_members.profile_id`).
+ */
+export async function getDuoId(
   supabase: SupabaseClient<Database>,
   profileId: string,
 ): Promise<string | null> {
   const { data } = await supabase
-    .from("couple_members")
-    .select("couple_id")
+    .from("duo_members")
+    .select("duo_id")
     .eq("profile_id", profileId)
-    .returns<{ couple_id: string }[]>()
+    .returns<{ duo_id: string }[]>()
     .maybeSingle();
-  return data?.couple_id ?? null;
+  return data?.duo_id ?? null;
 }
 
-export async function getCoupleProfileIds(
+/** CM-85 : profils membres du duo (2 au plus). */
+export async function getDuoProfileIds(
   supabase: SupabaseClient<Database>,
-  coupleId: string,
+  duoId: string,
 ): Promise<string[]> {
   const { data } = await supabase
-    .from("couple_members")
+    .from("duo_members")
     .select("profile_id")
-    .eq("couple_id", coupleId)
+    .eq("duo_id", duoId)
     .returns<{ profile_id: string }[]>();
   return (data ?? []).map((r) => r.profile_id);
 }

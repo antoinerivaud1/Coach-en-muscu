@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getCoupleId } from "@/lib/profile";
+import { requireProfileId, getDuoId } from "@/lib/profile";
 import { getCatalogExercises } from "@/lib/queries/exercises";
 import {
   canAccessProgram,
@@ -175,8 +175,8 @@ export async function saveSeance(
   const profileId = await requireProfileId();
   const supabase = await createClient();
 
-  const coupleId = await getCoupleId(supabase, profileId);
-  if (!coupleId) {
+  const duoId = await getDuoId(supabase, profileId);
+  if (!duoId) {
     // Pas de programme personnel créé en silence : l'app est pensée pour le
     // couple, et une bibliothèque solo deviendrait invisible une fois le
     // couple rejoint.
@@ -196,7 +196,7 @@ export async function saveSeance(
   // couple à cette séance.
   const { data: catalogData, error: catalogError } = await getCatalogExercises(
     supabase,
-    coupleId,
+    duoId,
   );
   if (catalogError) {
     return {
@@ -249,7 +249,7 @@ export async function saveSeance(
     programId = day.program_id;
     excludeDayId = day.id;
   } else {
-    const shared = await ensureSharedProgram(supabase, coupleId);
+    const shared = await ensureSharedProgram(supabase, duoId);
     if (!shared.ok) {
       return { success: false, error: shared.error };
     }

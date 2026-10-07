@@ -88,6 +88,12 @@ jobs:
       - name: Recréer la base (migrations + seed)
         run: supabase db reset
 
+      # CM-85 : contraintes du modèle duo (2 membres max, un seul duo par
+      # membre, FK profils / comptes, synchro couple ↔ duo, rien pour anon).
+      # Transaction annulée : la base seedée reste intacte pour les e2e.
+      - name: Vérifications SQL (CM-85)
+        run: docker exec -i supabase_db_coach-en-muscu psql -U postgres -v ON_ERROR_STOP=1 < supabase/checks/cm85_duos.sql
+
       - name: Variables Supabase locales
         run: |
           supabase status -o env \

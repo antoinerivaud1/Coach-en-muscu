@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getCoupleId } from "@/lib/profile";
+import { requireProfileId, getDuoId } from "@/lib/profile";
 import { getCatalogExercises } from "@/lib/queries/exercises";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import {
@@ -20,8 +20,8 @@ export default async function NewSeancePage() {
   const profileId = await requireProfileId();
   const supabase = await createClient();
 
-  const coupleId = await getCoupleId(supabase, profileId);
-  if (!coupleId) {
+  const duoId = await getDuoId(supabase, profileId);
+  if (!duoId) {
     return (
       <main className="min-h-screen p-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="mx-auto flex max-w-lg flex-col items-center gap-4 pt-16 text-center">
@@ -39,10 +39,10 @@ export default async function NewSeancePage() {
     );
   }
 
-  const { data: catalogData } = await getCatalogExercises(supabase, coupleId);
+  const { data: catalogData } = await getCatalogExercises(supabase, duoId);
   const catalog: SystemExercise[] = catalogData ?? [];
 
-  const sharedProgramId = await getSharedProgramId(supabase, coupleId);
+  const sharedProgramId = await getSharedProgramId(supabase, duoId);
   const siblings = sharedProgramId
     ? await getProgramDayNames(supabase, sharedProgramId)
     : null;

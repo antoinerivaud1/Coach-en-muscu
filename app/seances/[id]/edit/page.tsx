@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getCoupleId } from "@/lib/profile";
+import { requireProfileId, getDuoId } from "@/lib/profile";
 import { getCatalogExercises } from "@/lib/queries/exercises";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import {
@@ -39,8 +39,8 @@ export default async function EditSeancePage({
     notFound();
   }
 
-  const coupleId = await getCoupleId(supabase, profileId);
-  const { data: catalogData } = await getCatalogExercises(supabase, coupleId);
+  const duoId = await getDuoId(supabase, profileId);
+  const { data: catalogData } = await getCatalogExercises(supabase, duoId);
   const catalog: SystemExercise[] = catalogData ?? [];
 
   const initialExercises: SeanceDraftExercise[] = [...day.program_exercises]
@@ -68,7 +68,7 @@ export default async function EditSeancePage({
       initialExercises={initialExercises}
       otherNames={otherNames}
       catalog={catalog}
-      canCreateExercise={Boolean(coupleId)}
+      canCreateExercise={Boolean(duoId)}
       backHref="/seances"
     />
   );

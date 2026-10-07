@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   requireProfileId,
-  getCoupleId,
-  getCoupleProfileIds,
+  getDuoId,
+  getDuoProfileIds,
 } from "@/lib/profile";
 import {
   getAllSetsForProgress,
@@ -31,9 +31,9 @@ export default async function ProgressPage({
   const supabase = await createClient();
 
   // Profils du couple (moi + partenaire).
-  const coupleId = await getCoupleId(supabase, profileId);
-  const ids = coupleId
-    ? await getCoupleProfileIds(supabase, coupleId)
+  const duoId = await getDuoId(supabase, profileId);
+  const ids = duoId
+    ? await getDuoProfileIds(supabase, duoId)
     : [profileId];
 
   const { data: profilesData } = await supabase

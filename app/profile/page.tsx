@@ -4,8 +4,8 @@ import {
   requireProfileId,
   getAuthState,
   getProfile,
-  getCoupleId,
-  getCoupleProfileIds,
+  getDuoId,
+  getDuoProfileIds,
 } from "@/lib/profile";
 import { clearProfile, updateWeeklyGoal } from "@/app/actions";
 import { signOut } from "@/lib/actions/auth";
@@ -43,10 +43,10 @@ export default async function ProfilePage() {
     profile?.weekly_goal ?? 4,
   );
 
-  const coupleId = await getCoupleId(supabase, profileId);
+  const duoId = await getDuoId(supabase, profileId);
   let partnerName: string | null = null;
-  if (coupleId) {
-    const ids = await getCoupleProfileIds(supabase, coupleId);
+  if (duoId) {
+    const ids = await getDuoProfileIds(supabase, duoId);
     const partnerId = ids.find((id) => id !== profileId);
     if (partnerId) partnerName = (await getProfile(supabase, partnerId))?.display_name ?? null;
   }
