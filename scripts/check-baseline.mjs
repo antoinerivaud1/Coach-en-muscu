@@ -111,7 +111,17 @@ do $$ begin
 end $$;
 create schema if not exists extensions;
 create schema if not exists auth;
-create table if not exists auth.users (id uuid primary key, email text, raw_user_meta_data jsonb);
+-- Colonnes utilisées par seed.sql (CM-85 : comptes Auth avant les profils).
+create table if not exists auth.users (
+  id uuid primary key, instance_id uuid, aud text, role text, email text,
+  encrypted_password text, email_confirmed_at timestamptz,
+  raw_app_meta_data jsonb, raw_user_meta_data jsonb,
+  created_at timestamptz, updated_at timestamptz, confirmation_token text,
+  recovery_token text, email_change_token_new text, email_change text);
+create table if not exists auth.identities (
+  id uuid primary key, user_id uuid references auth.users (id) on delete cascade,
+  provider_id text, provider text, identity_data jsonb,
+  last_sign_in_at timestamptz, created_at timestamptz, updated_at timestamptz);
 create or replace function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;

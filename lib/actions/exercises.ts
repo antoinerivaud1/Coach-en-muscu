@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getCoupleId } from "@/lib/profile";
+import { requireProfileId, getDuoId } from "@/lib/profile";
 import type { Database } from "@/lib/types/database";
 
 type MuscleGroup = Database["public"]["Enums"]["muscle_group"];
@@ -15,7 +15,7 @@ export type CreateExerciseResult =
         name: string;
         muscle_group: MuscleGroup;
         is_compound: boolean;
-        couple_id: string | null;
+        duo_id: string | null;
       };
     }
   | { success: false; error: string };
@@ -40,8 +40,8 @@ export async function createCustomExercise(input: {
     return { success: false, error: "Le nom de l'exercice est requis" };
   }
 
-  const coupleId = await getCoupleId(supabase, profileId);
-  if (!coupleId) {
+  const duoId = await getDuoId(supabase, profileId);
+  if (!duoId) {
     return {
       success: false,
       error: "Tu dois être en couple pour créer un exercice perso",
@@ -53,7 +53,7 @@ export async function createCustomExercise(input: {
     .from("exercises")
     .select("id")
     .eq("name", name)
-    .or(`couple_id.is.null,couple_id.eq.${coupleId}`);
+    .or(`duo_id.is.null,duo_id.eq.${duoId}`);
   if (dupes && dupes.length > 0) {
     return { success: false, error: "Un exercice porte déjà ce nom" };
   }
@@ -64,9 +64,10 @@ export async function createCustomExercise(input: {
       name,
       muscle_group: input.muscle_group,
       is_compound: false,
-      couple_id: coupleId,
+      // CM-85 : `couple_id` est rempli par le trigger `exercises_sync_duo`.
+      duo_id: duoId,
     })
-    .select("id, name, muscle_group, is_compound, couple_id")
+    .select("id, name, muscle_group, is_compound, duo_id")
     .single();
 
   if (error || !data) {

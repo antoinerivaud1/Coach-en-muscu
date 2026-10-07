@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getCoupleId } from "@/lib/profile";
+import { requireProfileId, getDuoId } from "@/lib/profile";
 import { ensureSharedProgram, getProgramWithDays } from "@/lib/queries/programs";
 import type { ProgramFull, ProgramDayFull } from "@/lib/queries/programs";
 import { getLastDoneByDay } from "@/lib/queries/sessions";
@@ -62,8 +62,8 @@ export default async function SeancesPage({
   const profileId = await requireProfileId();
   const supabase = await createClient();
 
-  const coupleId = await getCoupleId(supabase, profileId);
-  if (!coupleId) {
+  const duoId = await getDuoId(supabase, profileId);
+  if (!duoId) {
     return (
       <Message>
         <p className="text-sm text-fg-muted">
@@ -73,7 +73,7 @@ export default async function SeancesPage({
     );
   }
 
-  const shared = await ensureSharedProgram(supabase, coupleId);
+  const shared = await ensureSharedProgram(supabase, duoId);
   if (!shared.ok) {
     return (
       <Message>

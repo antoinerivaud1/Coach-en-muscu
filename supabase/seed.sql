@@ -3,25 +3,77 @@
 -- Chargé automatiquement par `supabase db reset` (config.toml, [db.seed]).
 --
 -- Tout est fictif, SAUF :
---   - les uuid des 2 profils et du couple, identiques à la prod car l'app les
---     utilise comme profils fixes (cookie cm_profile) ;
+--   - les uuid des 2 profils et du couple / duo, identiques à la prod car l'app
+--     les utilise comme profils fixes (cookie cm_profile) ;
 --   - les exercices système (catalogue commun, couple_id NULL), copiés de la
 --     prod avec leurs uuid : ce sont des données de catalogue, non personnelles.
 -- Aucune séance, série ni email réels.
 -- ============================================================================
 
--- Profils et couple ----------------------------------------------------------
+-- Comptes Auth (CM-85) ---------------------------------------------------------
+-- `profiles.id` référence `auth.users(id)` : les comptes passent AVANT les
+-- profils. Emails en `.test` (domaine réservé, jamais routé) et mot de passe
+-- de test fictif, base locale uniquement. Colonnes texte à '' : GoTrue local
+-- refuse les NULL sur les jetons à la connexion par mot de passe.
+-- Le trigger `on_auth_user_created` crée déjà les profils ; l'insert de
+-- profils plus bas fixe leurs valeurs exactes (`on conflict do update`).
 
-insert into public.couples (id, name) values
-  ('33333333-3333-3333-3333-333333333333', 'Nous');
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+) values
+  ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111',
+   'authenticated', 'authenticated', 'toi@coach-en-muscu.test',
+   extensions.crypt('motdepasse-de-test', extensions.gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}', '{"display_name":"Toi","color_role":"toi"}',
+   now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', '22222222-2222-2222-2222-222222222222',
+   'authenticated', 'authenticated', 'elle@coach-en-muscu.test',
+   extensions.crypt('motdepasse-de-test', extensions.gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}', '{"display_name":"Elle","color_role":"elle"}',
+   now(), now(), '', '', '', '');
+
+insert into auth.identities (
+  id, user_id, provider_id, provider, identity_data, last_sign_in_at, created_at, updated_at
+) values
+  ('11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111',
+   '11111111-1111-1111-1111-111111111111', 'email',
+   '{"sub":"11111111-1111-1111-1111-111111111111","email":"toi@coach-en-muscu.test","email_verified":true}',
+   now(), now(), now()),
+  ('22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222',
+   '22222222-2222-2222-2222-222222222222', 'email',
+   '{"sub":"22222222-2222-2222-2222-222222222222","email":"elle@coach-en-muscu.test","email_verified":true}',
+   now(), now(), now());
+
+-- Profils, couple et duo -------------------------------------------------------
 
 insert into public.profiles (id, display_name, color_role, weekly_goal) values
   ('11111111-1111-1111-1111-111111111111', 'Toi',  'toi',  4),
-  ('22222222-2222-2222-2222-222222222222', 'Elle', 'elle', 3);
+  ('22222222-2222-2222-2222-222222222222', 'Elle', 'elle', 3)
+on conflict (id) do update set
+  display_name = excluded.display_name,
+  color_role   = excluded.color_role,
+  weekly_goal  = excluded.weekly_goal;
+
+-- CM-85 partie A : le couple est recopié en duo (même uuid) par les triggers
+-- de synchro ; les inserts duo explicites sont là pour la lisibilité (sans
+-- effet si la synchro les a déjà faits). Partie B : ne garder que le duo.
+insert into public.couples (id, name) values
+  ('33333333-3333-3333-3333-333333333333', 'Nous');
 
 insert into public.couple_members (couple_id, profile_id) values
   ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111'),
   ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222');
+
+insert into public.duos (id, name) values
+  ('33333333-3333-3333-3333-333333333333', 'Nous')
+on conflict (id) do nothing;
+
+insert into public.duo_members (duo_id, profile_id) values
+  ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111'),
+  ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222')
+on conflict do nothing;
 
 -- Exercices système (extrait du catalogue prod, 12 sur 81) ---------------------
 
@@ -41,8 +93,9 @@ insert into public.exercises (id, name, muscle_group, is_compound, couple_id) va
 
 -- Programme partagé « Nos séances » (SHARED_PROGRAM_NAME, CM-81) -------------
 
-insert into public.programs (id, name, owner_profile_id, couple_id) values
-  ('44444444-4444-4444-4444-444444444444', 'Nos séances', null, '33333333-3333-3333-3333-333333333333');
+insert into public.programs (id, name, owner_profile_id, couple_id, duo_id) values
+  ('44444444-4444-4444-4444-444444444444', 'Nos séances', null,
+   '33333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333333');
 
 insert into public.program_days (id, program_id, name, order_index) values
   ('55555555-5555-5555-5555-000000000001', '44444444-4444-4444-4444-444444444444', 'Haut du corps', 0),

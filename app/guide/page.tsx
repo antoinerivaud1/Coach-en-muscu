@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getCoupleId } from "@/lib/profile";
+import { requireProfileId, getDuoId } from "@/lib/profile";
 import { getCatalogExercises } from "@/lib/queries/exercises";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
@@ -23,9 +23,9 @@ const GROUP_ORDER = [
 export default async function GuidePage() {
   const profileId = await requireProfileId();
   const supabase = await createClient();
-  const coupleId = await getCoupleId(supabase, profileId);
+  const duoId = await getDuoId(supabase, profileId);
 
-  const { data } = await getCatalogExercises(supabase, coupleId);
+  const { data } = await getCatalogExercises(supabase, duoId);
   const exercises: SystemExercise[] = data ?? [];
 
   const byGroup: Record<string, SystemExercise[]> = {};

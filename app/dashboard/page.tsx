@@ -4,8 +4,8 @@ import {
   requireProfileId,
   getAuthState,
   getProfile,
-  getCoupleId,
-  getCoupleProfileIds,
+  getDuoId,
+  getDuoProfileIds,
 } from "@/lib/profile";
 import { startSession } from "@/app/seances/actions";
 import {
@@ -61,15 +61,15 @@ export default async function DashboardPage({
   const supabase = await createClient();
 
   const profile = await getProfile(supabase, profileId);
-  const coupleId = await getCoupleId(supabase, profileId);
+  const duoId = await getDuoId(supabase, profileId);
   const isElle = profile?.color_role === "elle";
   const accent = isElle ? "text-elle" : "text-toi";
 
   let partnerName: string | null = null;
   let partnerIsElle = false;
   let partnerLive: { dayName: string } | null = null;
-  if (coupleId) {
-    const pids = await getCoupleProfileIds(supabase, coupleId);
+  if (duoId) {
+    const pids = await getDuoProfileIds(supabase, duoId);
     const partnerId = pids.find((id) => id !== profileId);
     if (partnerId) {
       const partner = await getProfile(supabase, partnerId);
@@ -153,21 +153,21 @@ export default async function DashboardPage({
   // --- Bibliothèque de séances types ---
   //
   // Les programmes partagés ont `owner_profile_id` à null et ne remontent que
-  // par la branche `couple_id` du `or(...)`.
+  // par la branche `duo_id` du `or(...)`.
   let q = supabase
     .from("programs")
     .select(
-      "id, name, couple_id, owner_profile_id, created_at, program_days(id, name, order_index, program_exercises(target_sets, exercises(muscle_group)))",
+      "id, name, duo_id, owner_profile_id, created_at, program_days(id, name, order_index, program_exercises(target_sets, exercises(muscle_group)))",
     )
     .order("created_at", { ascending: true });
-  q = coupleId
-    ? q.or(`owner_profile_id.eq.${profileId},couple_id.eq.${coupleId}`)
+  q = duoId
+    ? q.or(`owner_profile_id.eq.${profileId},duo_id.eq.${duoId}`)
     : q.eq("owner_profile_id", profileId);
   const { data: progData } = await q.returns<
     {
       id: string;
       name: string;
-      couple_id: string | null;
+      duo_id: string | null;
       program_days: {
         id: string;
         name: string;

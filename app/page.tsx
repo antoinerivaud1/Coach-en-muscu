@@ -96,18 +96,18 @@ export default async function Home() {
 
     const { data: progRows } = await supabase
       .from("programs")
-      .select("owner_profile_id, couple_id, program_days(name)")
+      .select("owner_profile_id, duo_id, program_days(name)")
       .returns<
         {
           owner_profile_id: string | null;
-          couple_id: string | null;
+          duo_id: string | null;
           program_days: { name: string }[];
         }[]
       >();
     for (const p of ordered) {
       const names: string[] = [];
       for (const prog of progRows ?? []) {
-        const mine = prog.owner_profile_id === p.id || prog.couple_id !== null;
+        const mine = prog.owner_profile_id === p.id || prog.duo_id !== null;
         if (!mine) continue;
         for (const d of prog.program_days ?? []) {
           if (d.name && !names.includes(d.name)) names.push(d.name);

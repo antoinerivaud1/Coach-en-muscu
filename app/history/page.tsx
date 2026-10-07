@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getCoupleId, getCoupleProfileIds } from "@/lib/profile";
+import { requireProfileId, getDuoId, getDuoProfileIds } from "@/lib/profile";
 import { getHistory } from "@/lib/queries/sessions";
 import type { HistorySessionRow } from "@/lib/queries/sessions";
 import { formatDateLong } from "@/lib/utils/training";
@@ -23,9 +23,9 @@ export default async function HistoryPage() {
   const profileId = await requireProfileId();
   const supabase = await createClient();
 
-  const coupleId = await getCoupleId(supabase, profileId);
-  const ids = coupleId
-    ? await getCoupleProfileIds(supabase, coupleId)
+  const duoId = await getDuoId(supabase, profileId);
+  const ids = duoId
+    ? await getDuoProfileIds(supabase, duoId)
     : [profileId];
 
   const { data: profilesData } = await supabase

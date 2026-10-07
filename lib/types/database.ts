@@ -9,7 +9,7 @@ export type Json =
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCHS MANUELS À RÉAPPLIQUER APRÈS CHAQUE REGÉNÉRATION DU TYPEGEN (CM-7)
 //
-// Ce fichier est généré par le typegen Supabase. Deux points à connaître :
+// Ce fichier est généré par le typegen Supabase. Trois points à connaître :
 //
 // 1. `create_couple.Args.couple_name` est forcé en `string` (obligatoire). Le
 //    typegen le sort parfois en optionnel (`couple_name?: string`) ; on le
@@ -22,6 +22,12 @@ export type Json =
 //    (cf. https://www.answeroverflow.com/m/1409468021931511849). Avant de
 //    lever le pin, vérifier que le bug est officiellement corrigé :
 //    https://github.com/supabase/supabase-js/issues
+//
+// 3. CM-85 partie A : bloc `public` régénéré depuis la base locale
+//    (`supabase gen types typescript --local` après `supabase db reset`),
+//    formaté pour coller au reste du fichier ; `__InternalSupabase` et le
+//    patch 1 conservés. Le typegen local écrit `Args: Record<PropertyKey, never>`
+//    là où celui de la prod écrit `Args: never` : on garde `never`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type Database = {
@@ -62,7 +68,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       couples: {
@@ -83,10 +89,134 @@ export type Database = {
         }
         Relationships: []
       }
+      duo_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          code: string
+          created_at: string
+          created_by: string
+          duo_id: string
+          expires_at: string
+          id: string
+          revoked_at: string | null
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          code: string
+          created_at?: string
+          created_by: string
+          duo_id: string
+          expires_at?: string
+          id?: string
+          revoked_at?: string | null
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          code?: string
+          created_at?: string
+          created_by?: string
+          duo_id?: string
+          expires_at?: string
+          id?: string
+          revoked_at?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duo_invitations_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_invitations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_invitations_duo_id_fkey"
+            columns: ["duo_id"]
+            isOneToOne: false
+            referencedRelation: "duos"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      duo_members: {
+        Row: {
+          duo_id: string
+          joined_at: string
+          profile_id: string
+        }
+        Insert: {
+          duo_id: string
+          joined_at?: string
+          profile_id: string
+        }
+        Update: {
+          duo_id?: string
+          joined_at?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duo_members_duo_id_fkey"
+            columns: ["duo_id"]
+            isOneToOne: false
+            referencedRelation: "duos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_members_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      duos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       exercises: {
         Row: {
           couple_id: string | null
           created_at: string
+          duo_id: string | null
           id: string
           is_compound: boolean
           muscle_group: Database["public"]["Enums"]["muscle_group"]
@@ -95,6 +225,7 @@ export type Database = {
         Insert: {
           couple_id?: string | null
           created_at?: string
+          duo_id?: string | null
           id?: string
           is_compound?: boolean
           muscle_group: Database["public"]["Enums"]["muscle_group"]
@@ -103,6 +234,7 @@ export type Database = {
         Update: {
           couple_id?: string | null
           created_at?: string
+          duo_id?: string | null
           id?: string
           is_compound?: boolean
           muscle_group?: Database["public"]["Enums"]["muscle_group"]
@@ -116,6 +248,13 @@ export type Database = {
             referencedRelation: "couples"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "exercises_duo_id_fkey"
+            columns: ["duo_id"]
+            isOneToOne: false
+            referencedRelation: "duos"
+            referencedColumns: ["id"]
+          }
         ]
       }
       profiles: {
@@ -171,7 +310,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "programs"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       program_exercises: {
@@ -225,13 +364,14 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "program_days"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       programs: {
         Row: {
           couple_id: string | null
           created_at: string
+          duo_id: string | null
           id: string
           name: string
           owner_profile_id: string | null
@@ -239,6 +379,7 @@ export type Database = {
         Insert: {
           couple_id?: string | null
           created_at?: string
+          duo_id?: string | null
           id?: string
           name: string
           owner_profile_id?: string | null
@@ -246,6 +387,7 @@ export type Database = {
         Update: {
           couple_id?: string | null
           created_at?: string
+          duo_id?: string | null
           id?: string
           name?: string
           owner_profile_id?: string | null
@@ -259,12 +401,19 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "programs_duo_id_fkey"
+            columns: ["duo_id"]
+            isOneToOne: false
+            referencedRelation: "duos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "programs_owner_profile_id_fkey"
             columns: ["owner_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       session_sets: {
@@ -315,7 +464,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sessions"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       sessions: {
@@ -363,7 +512,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "program_days"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
     }
@@ -372,10 +521,14 @@ export type Database = {
     }
     Functions: {
       accessible_profile_ids: { Args: never; Returns: string[] }
+      can_access_program: { Args: { p_program_id: string }; Returns: boolean }
       // couple_name : requis (patch manuel CM-7, voir note en tête de fichier)
       create_couple: { Args: { couple_name: string }; Returns: string }
+      is_duo_member: { Args: { p_duo_id: string }; Returns: boolean }
       join_couple: { Args: { target_couple_id: string }; Returns: string }
+      my_duo_id: { Args: never; Returns: string }
       user_couple_id: { Args: never; Returns: string }
+      visible_profile_ids: { Args: never; Returns: string[] }
     }
     Enums: {
       color_role: "toi" | "elle"
