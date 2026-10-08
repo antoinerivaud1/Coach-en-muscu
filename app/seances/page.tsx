@@ -43,7 +43,7 @@ function NewSeanceCta() {
     <div className="sticky bottom-0 mt-6 bg-ink/90 pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
       <Link
         href="/seances/new"
-        className="block rounded-2xl bg-energy py-4 text-center text-[17px] font-extrabold text-ink"
+        className="block rounded-2xl bg-energy py-4 text-center text-[18px] font-extrabold text-ink"
       >
         + Nouvelle séance
       </Link>

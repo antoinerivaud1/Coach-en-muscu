@@ -87,7 +87,7 @@ export default function ExitSessionSheet({
             type="button"
             onClick={onClose}
             disabled={isBusy}
-            className="w-full rounded-2xl bg-energy py-4 text-[17px] font-extrabold text-ink disabled:opacity-50"
+            className="w-full rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-ink disabled:opacity-50"
           >
             Continuer la séance
           </button>
@@ -110,7 +110,7 @@ export default function ExitSessionSheet({
                 className="w-full rounded-xl bg-surface2 py-3 text-sm font-bold text-fg disabled:opacity-50"
               >
                 Quitter sans terminer
-                <span className="mt-0.5 block text-[11px] font-semibold text-fg-muted">
+                <span className="mt-0.5 block text-[13px] font-semibold text-fg-muted">
                   Tu pourras la reprendre depuis l&apos;accueil
                 </span>
               </button>

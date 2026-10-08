@@ -296,7 +296,7 @@ export default function SeanceBuilder({
           >
             ✕
           </button>
-          <span className="pointer-events-none absolute inset-x-12 text-center text-[11px] font-extrabold uppercase tracking-[0.12em] text-fg-muted">
+          <span className="pointer-events-none absolute inset-x-12 text-center text-[13px] font-extrabold uppercase tracking-[0.12em] text-fg-muted">
             {mode === "edit" ? "Modifier la séance" : "Nouvelle séance"}
           </span>
         </div>
@@ -385,11 +385,11 @@ export default function SeanceBuilder({
 
         {/* ----- En-tête de liste ----- */}
         <div className="mt-6 flex items-baseline justify-between gap-3">
-          <h2 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-fg-muted">
+          <h2 className="text-[13px] font-extrabold uppercase tracking-[0.12em] text-fg-muted">
             Exercices
           </h2>
           {exercises.length > 0 && (
-            <span className="font-oswald text-[13px] font-bold text-energy">
+            <span className="font-oswald text-[15px] font-bold text-energy">
               {exercises.length} exercice{exercises.length > 1 ? "s" : ""} ·{" "}
               {setCount} série{setCount > 1 ? "s" : ""}
             </span>
@@ -406,7 +406,7 @@ export default function SeanceBuilder({
             <button
               type="button"
               onClick={() => setSheetOpen(true)}
-              className="mt-5 w-full rounded-2xl bg-energy py-4 text-[17px] font-extrabold text-ink"
+              className="mt-5 w-full rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-ink"
             >
               + Ajouter un exercice
             </button>
@@ -473,7 +473,7 @@ export default function SeanceBuilder({
             type="button"
             onClick={save}
             disabled={!canSave}
-            className={`w-full rounded-2xl bg-energy py-4 text-[17px] font-extrabold text-ink ${
+            className={`w-full rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-ink ${
               canSave ? "" : "opacity-35"
             }`}
           >
@@ -690,7 +690,7 @@ function Pill({
     >
       <span className="font-oswald text-base font-semibold">{value}</span>
       <span
-        className={`text-[11px] ${active ? "text-energy" : "text-fg-muted"}`}
+        className={`text-[13px] ${active ? "text-energy" : "text-fg-muted"}`}
       >
         {unit}
       </span>

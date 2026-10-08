@@ -975,7 +975,7 @@ export default function SessionLogger({
               {formatClock(elapsed)}
             </span>
           </div>
-          <div className="text-[11px] font-semibold text-fg-muted">{dayName}</div>
+          <div className="text-[13px] font-semibold text-fg-muted">{dayName}</div>
         </div>
         <div className="flex items-center gap-1.5">
           <button
@@ -987,7 +987,7 @@ export default function SessionLogger({
           >
             ‹
           </button>
-          <span className="font-oswald text-[13px] font-bold text-energy">
+          <span className="font-oswald text-[15px] font-bold text-energy">
             {currentIdx + 1}/{allExercises.length}
           </span>
           <button
@@ -1038,7 +1038,7 @@ export default function SessionLogger({
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-fg-muted">
+              <span className="text-[12px] font-extrabold uppercase tracking-[0.18em] text-fg-muted">
                 Repos
               </span>
               <span className="font-oswald text-4xl font-bold tabular-nums text-fg">
@@ -1084,7 +1084,7 @@ export default function SessionLogger({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-toi">
+              <div className="text-[13px] font-bold uppercase tracking-wide text-toi">
                 Exercice {currentIdx + 1}
               </div>
               {ex.source === "extra" && (
@@ -1156,7 +1156,7 @@ export default function SessionLogger({
         {/* Rappel « dernière fois » (CM-64) — lecture seule, distinct d'un champ. */}
         {last && last.sets.length > 0 ? (
           <div className="mt-3 rounded-xl bg-surface/50 px-3.5 py-2.5">
-            <div className="font-oswald text-[11px] font-bold uppercase tracking-[0.14em] text-fg-muted">
+            <div className="font-oswald text-[13px] font-bold uppercase tracking-[0.14em] text-fg-muted">
               Dernière fois, {formatDateShort(last.performed_at)}
             </div>
             <div className="mt-0.5 font-oswald text-sm text-fg">
@@ -1203,7 +1203,7 @@ export default function SessionLogger({
                     <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-energy font-oswald text-xs font-bold text-ink">
                       ✓
                     </span>
-                    <span className="flex flex-1 items-center gap-1.5 text-[13px] font-bold text-energy">
+                    <span className="flex flex-1 items-center gap-1.5 text-[15px] font-bold text-energy">
                       Corriger la série {i + 1}
                       {waitingDot}
                     </span>
@@ -1291,25 +1291,25 @@ export default function SessionLogger({
                 </span>
                 {done && confirmDeleteSet === deleteKey ? (
                   <>
-                    <span className="flex flex-1 items-center gap-1.5 text-[13px] font-bold text-fg-muted">
+                    <span className="flex flex-1 items-center gap-1.5 text-[15px] font-bold text-fg-muted">
                       {label}
                       {waitingDot}
                     </span>
                     <span className="flex min-h-11 items-center gap-1.5">
-                      <span className="text-[11px] font-semibold text-flame">
+                      <span className="text-[13px] font-semibold text-flame">
                         Supprimer ?
                       </span>
                       <button
                         type="button"
                         onClick={() => removeValidatedSet(ex.exerciseId, i)}
-                        className="rounded-lg bg-flame px-2 py-1 text-[11px] font-extrabold text-ink"
+                        className="rounded-lg bg-flame px-2 py-1 text-[13px] font-extrabold text-ink"
                       >
                         Oui
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmDeleteSet(null)}
-                        className="rounded-lg bg-surface2 px-2 py-1 text-[11px] font-semibold text-fg"
+                        className="rounded-lg bg-surface2 px-2 py-1 text-[13px] font-semibold text-fg"
                       >
                         Non
                       </button>
@@ -1324,7 +1324,7 @@ export default function SessionLogger({
                       className="flex min-h-11 flex-1 items-center gap-3 text-left"
                       aria-label={`Corriger la série ${i + 1} : ${row.weight || 0} kg × ${row.reps || 0}`}
                     >
-                      <span className="flex flex-1 items-center gap-1.5 text-[13px] font-bold text-fg-muted">
+                      <span className="flex flex-1 items-center gap-1.5 text-[15px] font-bold text-fg-muted">
                         {label}
                         {waitingDot}
                       </span>
@@ -1359,7 +1359,7 @@ export default function SessionLogger({
                 ) : (
                   <>
                     <span
-                      className={`flex flex-1 items-center gap-1.5 text-[13px] font-bold ${
+                      className={`flex flex-1 items-center gap-1.5 text-[15px] font-bold ${
                         active ? "text-energy" : "text-fg-muted"
                       }`}
                     >
@@ -1408,7 +1408,7 @@ export default function SessionLogger({
         {/* Ressenti (dernier exercice terminé) */}
         {exerciseDone && isLast && (
           <div className="mt-5">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
+            <p className="text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
               Ressenti de la séance
             </p>
             <div className="mt-2 grid grid-cols-4 gap-2">
@@ -1457,7 +1457,7 @@ export default function SessionLogger({
                 ? validateSet(ex.exerciseId, activeIndex, ex.restSeconds)
                 : addRow(ex.exerciseId)
             }
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[17px] font-extrabold text-ink"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-ink"
           >
             {activeRow ? "Valider la série" : "Ajouter une série"}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -1469,7 +1469,7 @@ export default function SessionLogger({
             type="button"
             onClick={() => handleFinish()}
             disabled={isPending || isFlushing}
-            className="w-full rounded-2xl bg-energy py-4 text-[17px] font-extrabold text-ink disabled:opacity-50"
+            className="w-full rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-ink disabled:opacity-50"
           >
             {isPending || isFlushing ? "Enregistrement…" : "Terminer la séance"}
           </button>
@@ -1477,7 +1477,7 @@ export default function SessionLogger({
           <button
             type="button"
             onClick={() => setCurrentIdx((i) => Math.min(allExercises.length - 1, i + 1))}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[17px] font-extrabold text-ink"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-ink"
           >
             Exercice suivant
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -1518,7 +1518,7 @@ export default function SessionLogger({
         {/* CM-78 : la file n'a pas réussi à écrire trois fois de suite. On le
             dit, sans alarmer ni bloquer — le réessai est automatique. */}
         {persistence.isStalled && !confirmFinish && (
-          <p className="mt-2 text-center text-[11px] font-medium text-fg-muted">
+          <p className="mt-2 text-center text-[13px] font-medium text-fg-muted">
             Enregistrement en attente, réessai automatique
           </p>
         )}
@@ -1619,7 +1619,7 @@ function SetInputs({
       {/* Poids : pas de base 1 kg + pas rapide 2,5 kg + saisie clavier */}
       <div className="rounded-2xl border border-line bg-surface px-4 py-3.5">
         <div className="flex items-center justify-between">
-          <div className="text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
+          <div className="text-[13px] font-extrabold uppercase tracking-wide text-fg-muted">
             Poids
           </div>
           {deltaKg !== null && (
@@ -1694,7 +1694,7 @@ function SetInputs({
 
       {/* Répétitions : pas de 1 + saisie clavier (entiers) */}
       <div className="rounded-2xl border border-line bg-surface px-4 py-3.5">
-        <div className="text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
+        <div className="text-[13px] font-extrabold uppercase tracking-wide text-fg-muted">
           Répétitions
         </div>
         <div className="mt-0.5 flex items-baseline gap-1.5">
@@ -1740,7 +1740,7 @@ function SetInputs({
       <button
         type="button"
         onClick={onToggleWarmup}
-        className={`min-h-11 text-left text-[11px] font-semibold ${
+        className={`min-h-11 text-left text-[13px] font-semibold ${
           isWarmup ? "text-toi" : "text-fg-faint"
         }`}
       >

@@ -29,6 +29,14 @@ const config: Config = {
         toi: { DEFAULT: "#2FE6FF", fg: "#0B0B0F" }, // Lui — cyan
         elle: { DEFAULT: "#FF4F7E", fg: "#0B0B0F" } // Elle — rose
       },
+      // CM-101 : échelle de texte agrandie pour la lecture à bout de bras, à la
+      // salle (design system « Coach en Muscu », 08/10/2026). Rien sous 12px.
+      fontSize: {
+        xs: ["14px", { lineHeight: "20px" }],
+        sm: ["16px", { lineHeight: "22px" }],
+        base: ["17px", { lineHeight: "24px" }],
+        lg: ["19px", { lineHeight: "26px" }]
+      },
       fontFamily: {
         sans: ["var(--font-archivo)", "system-ui", "sans-serif"],
         oswald: ["var(--font-oswald)", "system-ui", "sans-serif"]

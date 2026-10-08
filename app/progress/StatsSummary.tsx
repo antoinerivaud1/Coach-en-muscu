@@ -59,7 +59,7 @@ export default function StatsSummary({
       <div className="rounded-[22px] border border-line bg-surface p-5">
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-fg-muted">
+            <div className="text-[13px] font-extrabold uppercase tracking-[0.1em] text-fg-muted">
               Volume soulevé
             </div>
             <div className="mt-1 flex items-baseline gap-1.5">
@@ -94,7 +94,7 @@ export default function StatsSummary({
                     opacity: wk.volume === 0 ? 1 : isLast ? 1 : 0.55,
                   }}
                 />
-                <span className={`text-[9px] font-bold ${isLast ? "text-energy" : "text-fg-muted"}`}>
+                <span className={`text-[12px] font-bold ${isLast ? "text-energy" : "text-fg-muted"}`}>
                   {wk.label}
                 </span>
               </div>
@@ -125,7 +125,7 @@ export default function StatsSummary({
               {stats.weekSessions}/{stats.weekGoal}
             </div>
           </div>
-          <span className="mt-2.5 text-center text-[11px] font-bold text-fg-muted">
+          <span className="mt-2.5 text-center text-[13px] font-bold text-fg-muted">
             Objectif
             <br />
             hebdo
@@ -134,7 +134,7 @@ export default function StatsSummary({
 
         {stats.couple.length > 1 ? (
           <div className="flex-1 rounded-[20px] border border-line bg-surface p-4">
-            <div className="mb-3.5 text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
+            <div className="mb-3.5 text-[13px] font-extrabold uppercase tracking-wide text-fg-muted">
               Couple · séries (semaine)
             </div>
             <div className="space-y-3">
@@ -146,7 +146,7 @@ export default function StatsSummary({
                     >
                       {c.name}
                     </span>
-                    <span className="font-oswald text-[13px] text-fg">{c.sets}</span>
+                    <span className="font-oswald text-[15px] text-fg">{c.sets}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-ink">
                     <span
@@ -163,7 +163,7 @@ export default function StatsSummary({
           </div>
         ) : (
           <div className="flex flex-1 flex-col justify-center gap-2 rounded-[20px] border border-line bg-surface p-4">
-            <div className="text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">
+            <div className="text-[13px] font-extrabold uppercase tracking-wide text-fg-muted">
               Ce mois
             </div>
             <div className="font-oswald text-3xl font-bold text-fg">
@@ -181,7 +181,7 @@ export default function StatsSummary({
       {/* Records récents */}
       {stats.recordE1rm > 0 && (
         <>
-          <p className="ml-0.5 mt-1 text-[11px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
+          <p className="ml-0.5 mt-1 text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
             Record récent
           </p>
           <div className="flex items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5">

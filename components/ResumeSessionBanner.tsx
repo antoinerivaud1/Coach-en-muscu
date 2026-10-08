@@ -32,18 +32,21 @@ export default function ResumeSessionBanner({
 
   return (
     <section className="mt-5 rounded-[18px] border border-energy/30 bg-energy/10 px-3.5 py-2.5">
-      <div className="flex items-center gap-2">
-        <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-[0.12em] text-energy">
-          Séance en cours
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-extrabold text-fg">
-          <span className="text-fg-muted">· </span>
-          {dayName}
-          <span className="text-fg-muted"> · {setsLabel}</span>
-        </span>
+      <div className="flex items-center gap-3">
+        {/* CM-101 : libellé au-dessus du nom, sinon le nom de séance est tronqué
+            avec la nouvelle taille de texte. */}
+        <div className="min-w-0 flex-1">
+          <span className="block text-[12px] font-extrabold uppercase tracking-[0.12em] text-energy">
+            Séance en cours
+          </span>
+          <span className="block truncate text-sm font-extrabold text-fg">
+            {dayName}
+            <span className="text-fg-muted"> · {setsLabel}</span>
+          </span>
+        </div>
         <Link
           href={`/sessions/${sessionId}`}
-          className="shrink-0 rounded-xl bg-energy px-3 py-1.5 text-[13px] font-extrabold text-ink"
+          className="shrink-0 rounded-xl bg-energy px-3 py-1.5 text-[15px] font-extrabold text-ink"
         >
           Reprendre
         </Link>
@@ -51,7 +54,7 @@ export default function ResumeSessionBanner({
 
       {stale && (
         <div className="mt-2.5 border-t border-energy/20 pt-2.5">
-          <p className="text-[11px] font-semibold text-fg-muted">
+          <p className="text-[13px] font-semibold text-fg-muted">
             Séance ouverte depuis plus de 12 h. Tu peux la reprendre, l&apos;enregistrer
             telle quelle ou la supprimer.
           </p>

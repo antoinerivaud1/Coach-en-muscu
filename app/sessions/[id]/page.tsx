@@ -400,7 +400,7 @@ export default async function SessionPage({
                         <span className="text-fg-muted"> kg × </span>
                         <span className="font-medium">{r.reps}</span>
                         {r.is_warmup && (
-                          <span className="ml-1 text-[10px] uppercase">éch.</span>
+                          <span className="ml-1 text-[12px] uppercase">éch.</span>
                         )}
                       </li>
                     ),
