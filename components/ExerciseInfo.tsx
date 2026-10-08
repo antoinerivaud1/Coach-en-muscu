@@ -65,7 +65,7 @@ export default function ExerciseInfo({
                   ).map((t) => (
                     <span
                       key={t}
-                      className="rounded-full border border-line bg-surface2 px-2.5 py-0.5 text-[11px] font-bold text-fg"
+                      className="rounded-full border border-line bg-surface2 px-2.5 py-0.5 text-[13px] font-bold text-fg"
                     >
                       {t}
                     </span>

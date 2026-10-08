@@ -216,7 +216,7 @@ export default async function DashboardPage({
     <main className="min-h-[100dvh] px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
       <header className="flex items-start justify-between">
         <div>
-          <div className="text-[13px] font-semibold tracking-wide text-fg-muted">
+          <div className="text-[15px] font-semibold tracking-wide text-fg-muted">
             {todayLabel()}
           </div>
           <h1 className="mt-1 text-[30px] font-black tracking-tight text-fg">
@@ -273,7 +273,7 @@ export default async function DashboardPage({
           return (
             <div key={i} className="flex flex-col items-center gap-1.5">
               <span
-                className={`text-[10px] font-bold ${isToday ? "text-energy" : "text-fg-muted"}`}
+                className={`text-[12px] font-bold ${isToday ? "text-energy" : "text-fg-muted"}`}
               >
                 {d}
               </span>
@@ -317,7 +317,7 @@ export default async function DashboardPage({
         </div>
       ) : (
         <>
-          <p className="mb-2.5 ml-0.5 mt-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
+          <p className="mb-2.5 ml-0.5 mt-6 text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
             Choisis ta séance
           </p>
 
@@ -332,13 +332,13 @@ export default async function DashboardPage({
                 type="submit"
                 className="flex w-full items-center gap-2 rounded-[14px] border border-energy/30 bg-energy/10 px-3.5 py-2.5 text-left"
               >
-                <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-[0.12em] text-energy">
+                <span className="shrink-0 text-[12px] font-extrabold uppercase tracking-[0.12em] text-energy">
                   Suggestion
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-extrabold text-fg">
                   {recommended.name}
                 </span>
-                <span className="shrink-0 text-[11px] font-semibold text-fg-muted">
+                <span className="shrink-0 text-[13px] font-semibold text-fg-muted">
                   {formatLastDone(recommended.lastDoneAt, now)}
                 </span>
               </button>
@@ -368,10 +368,10 @@ export default async function DashboardPage({
                         : "border-line bg-surface"
                     }`}
                   >
-                    <span className="line-clamp-2 w-full text-[17px] font-extrabold leading-tight text-fg">
+                    <span className="line-clamp-2 w-full text-[18px] font-extrabold leading-tight text-fg">
                       {seance.name}
                     </span>
-                    <span className="mt-1 text-[11px] font-semibold text-fg-muted">
+                    <span className="mt-1 text-[13px] font-semibold text-fg-muted">
                       {isEmpty
                         ? "Séance vide"
                         : `${seance.exerciseCount} exercice${
@@ -384,20 +384,20 @@ export default async function DashboardPage({
                         {visible.map((tag) => (
                           <span
                             key={tag.group}
-                            className="rounded-full border border-line bg-surface2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fg-muted"
+                            className="rounded-full border border-line bg-surface2 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wide text-fg-muted"
                           >
                             {tag.label}
                           </span>
                         ))}
                         {overflow > 0 && (
-                          <span className="rounded-full border border-line bg-surface2 px-2 py-0.5 text-[10px] font-bold text-fg-muted">
+                          <span className="rounded-full border border-line bg-surface2 px-2 py-0.5 text-[12px] font-bold text-fg-muted">
                             +{overflow}
                           </span>
                         )}
                       </span>
                     )}
 
-                    <span className="mt-auto pt-2.5 text-[11px] font-semibold text-fg-faint">
+                    <span className="mt-auto pt-2.5 text-[13px] font-semibold text-fg-faint">
                       {formatLastDone(seance.lastDoneAt, now)}
                     </span>
                   </button>

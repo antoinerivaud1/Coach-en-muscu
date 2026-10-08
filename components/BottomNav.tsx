@@ -70,7 +70,7 @@ export default function BottomNav() {
         }`}
       >
         {item.icon}
-        <span className="text-[10px] font-semibold">{item.label}</span>
+        <span className="text-[12px] font-semibold">{item.label}</span>
       </Link>
     );
   };

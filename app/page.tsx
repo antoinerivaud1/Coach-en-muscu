@@ -168,7 +168,7 @@ export default async function Home() {
 
                   {/* Badge rôle */}
                   <span
-                    className={`absolute left-[18px] top-4 rounded-full border px-[11px] py-[5px] text-[10px] font-extrabold uppercase tracking-[0.12em] ${
+                    className={`absolute left-[18px] top-4 rounded-full border px-[11px] py-[5px] text-[12px] font-extrabold uppercase tracking-[0.12em] ${
                       isElle
                         ? "border-elle/30 bg-elle/15 text-elle"
                         : "border-toi/30 bg-toi/15 text-toi"
@@ -186,7 +186,7 @@ export default async function Home() {
                       {streak > 0 && (
                         <>
                           <FlameIcon className="h-3.5 w-3.5 text-flame" />
-                          <span className="font-oswald text-[13px] font-semibold text-flame">
+                          <span className="font-oswald text-[15px] font-semibold text-flame">
                             {streak} {streak > 1 ? "jours" : "jour"}
                           </span>
                         </>

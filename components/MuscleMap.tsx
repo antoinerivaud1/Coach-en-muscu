@@ -38,7 +38,7 @@ export default function MuscleMap({
           <div className="h-40 w-24" style={{ filter: "blur(0.5px)" }}>
             <Model type="anterior" {...common} />
           </div>
-          <figcaption className="mt-1 text-[10px] font-medium text-zinc-500">
+          <figcaption className="mt-1 text-[12px] font-medium text-zinc-500">
             Face
           </figcaption>
         </figure>
@@ -46,12 +46,12 @@ export default function MuscleMap({
           <div className="h-40 w-24" style={{ filter: "blur(0.5px)" }}>
             <Model type="posterior" {...common} />
           </div>
-          <figcaption className="mt-1 text-[10px] font-medium text-zinc-500">
+          <figcaption className="mt-1 text-[12px] font-medium text-zinc-500">
             Dos
           </figcaption>
         </figure>
       </div>
-      <div className="mt-1 flex items-center justify-center gap-4 text-[10px] text-zinc-400">
+      <div className="mt-1 flex items-center justify-center gap-4 text-[12px] text-zinc-400">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: PRIMARY }} />
           Principal

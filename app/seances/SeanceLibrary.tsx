@@ -154,13 +154,13 @@ export default function SeanceLibrary({
                 {seance.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-line bg-surface2 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-fg-muted"
+                    className="rounded-full border border-line bg-surface2 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wide text-fg-muted"
                   >
                     {tag}
                   </span>
                 ))}
                 {seance.extraTags > 0 && (
-                  <span className="rounded-full border border-line bg-surface2 px-2.5 py-1 text-[11px] font-bold text-fg-muted">
+                  <span className="rounded-full border border-line bg-surface2 px-2.5 py-1 text-[13px] font-bold text-fg-muted">
                     +{seance.extraTags}
                   </span>
                 )}

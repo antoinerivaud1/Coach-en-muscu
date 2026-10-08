@@ -89,7 +89,7 @@ export default async function ProfilePage() {
       <OnboardingPhoto />
 
       <div className="mt-6 rounded-2xl border border-line bg-surface p-4">
-        <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-fg-muted">
+        <div className="text-[13px] font-extrabold uppercase tracking-[0.14em] text-fg-muted">
           Objectif hebdomadaire
         </div>
         <p className="mt-1 text-sm text-fg-muted">
@@ -117,7 +117,7 @@ export default async function ProfilePage() {
 
       <div className="mt-6">
         <div className="mb-2.5 flex items-center justify-between">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
+          <p className="text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
             Badges
           </p>
           <span className="text-xs font-semibold text-fg-muted">
@@ -133,10 +133,10 @@ export default async function ProfilePage() {
               }`}
             >
               <span className="text-2xl">{b.icon}</span>
-              <span className={`text-[11px] font-bold leading-tight ${b.earned ? "text-fg" : "text-fg-muted"}`}>
+              <span className={`text-[13px] font-bold leading-tight ${b.earned ? "text-fg" : "text-fg-muted"}`}>
                 {b.label}
               </span>
-              <span className="text-[10px] text-fg-faint">{b.detail}</span>
+              <span className="text-[12px] text-fg-faint">{b.detail}</span>
             </div>
           ))}
         </div>

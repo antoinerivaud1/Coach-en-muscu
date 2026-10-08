@@ -17,7 +17,7 @@ export default function CreatePasswordForm({ defaultEmail }: { defaultEmail: str
 
   return (
     <section className="mt-6 rounded-2xl border border-energy/30 bg-energy/5 p-4">
-      <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-energy">
+      <div className="text-[13px] font-extrabold uppercase tracking-[0.14em] text-energy">
         Créer mon mot de passe
       </div>
       <p className="mt-1 text-sm text-fg-muted">
