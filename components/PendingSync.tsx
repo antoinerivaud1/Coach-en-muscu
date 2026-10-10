@@ -24,7 +24,9 @@ export default function PendingSync() {
       for (const it of items) {
         try {
           const r = await finishSession(it);
-          if (!r.ok) remaining.push(it);
+          // CM-59 B : refus définitif (RLS, séance pas à toi) : entrée
+          // abandonnée, la rejouer à chaque visite ne servirait à rien.
+          if (!r.ok && !r.refused) remaining.push(it);
         } catch {
           remaining.push(it);
         }

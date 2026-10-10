@@ -121,19 +121,23 @@ export function useSetPersistence(sessionId: string): SetPersistence {
         while (aliveRef.current && queueRef.current.length > 0) {
           const op = queueRef.current[0]!;
           let ok = false;
+          let refused = false;
           try {
             const result =
               op.kind === "upsert"
                 ? await upsertSet(op.set)
                 : await deleteSet({ id: op.id, sessionId: op.sessionId });
             ok = result.ok;
+            refused = !result.ok && result.refused === true;
           } catch {
             // Hors-ligne, ou server action injoignable : on réessaiera.
             ok = false;
           }
           if (!aliveRef.current) return;
 
-          if (ok) {
+          // CM-59 B : un refus définitif (RLS 42501, séance pas à toi) est
+          // abandonné au lieu d'être rejoué en boucle toutes les 30 s.
+          if (ok || refused) {
             commit(shiftQueue(queueRef.current));
             setFailures(0);
             continue;

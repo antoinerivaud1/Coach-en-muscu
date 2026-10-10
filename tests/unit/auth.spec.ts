@@ -1,9 +1,8 @@
 import { test, expect } from "@playwright/test";
 import {
   authErrorMessage,
+  LEGACY_PROFILE_COOKIE,
   isUuid,
-  parseAuthMode,
-  parsePrefillEmails,
   resolveProfileId,
   safeNextPath,
   validateLoginInput,
@@ -16,71 +15,19 @@ import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-config";
 const A = "11111111-1111-1111-1111-111111111111";
 const B = "22222222-2222-2222-2222-222222222222";
 
-test.describe("parseAuthMode (CM-58)", () => {
-  test("absent ou vide : cookie (défaut, comportement historique)", () => {
-    expect(parseAuthMode(undefined)).toBe("cookie");
-    expect(parseAuthMode(null)).toBe("cookie");
-    expect(parseAuthMode("")).toBe("cookie");
+test.describe("resolveProfileId (CM-59 B : session seule)", () => {
+  test("avec session : l'id de session est l'id de profil", () => {
+    expect(resolveProfileId(A)).toBe(A);
+    expect(resolveProfileId(B)).toBe(B);
   });
 
-  test("valeurs connues, insensible à la casse et aux espaces", () => {
-    expect(parseAuthMode("cookie")).toBe("cookie");
-    expect(parseAuthMode("hybrid")).toBe("hybrid");
-    expect(parseAuthMode(" REQUIRED ")).toBe("required");
+  test("sans session : personne", () => {
+    expect(resolveProfileId(null)).toBeNull();
+    expect(resolveProfileId(undefined)).toBeNull();
   });
 
-  test("valeur inconnue : cookie", () => {
-    expect(parseAuthMode("requried")).toBe("cookie");
-    expect(parseAuthMode("true")).toBe("cookie");
-  });
-});
-
-test.describe("resolveProfileId (CM-58)", () => {
-  test("cookie : seul le cookie compte, la session est ignorée", () => {
-    expect(resolveProfileId({ mode: "cookie", sessionUserId: B, cookieProfileId: A })).toEqual({
-      profileId: A,
-      source: "cookie",
-    });
-    expect(resolveProfileId({ mode: "cookie", sessionUserId: B, cookieProfileId: null })).toEqual({
-      profileId: null,
-      source: null,
-    });
-  });
-
-  test("hybrid : la session prime sur le cookie", () => {
-    expect(resolveProfileId({ mode: "hybrid", sessionUserId: B, cookieProfileId: A })).toEqual({
-      profileId: B,
-      source: "session",
-    });
-  });
-
-  test("hybrid : sans session, repli sur le cookie", () => {
-    expect(resolveProfileId({ mode: "hybrid", sessionUserId: null, cookieProfileId: A })).toEqual({
-      profileId: A,
-      source: "cookie",
-    });
-    expect(resolveProfileId({ mode: "hybrid", sessionUserId: null, cookieProfileId: null })).toEqual({
-      profileId: null,
-      source: null,
-    });
-  });
-
-  test("required : le cookie ne suffit jamais", () => {
-    expect(resolveProfileId({ mode: "required", sessionUserId: null, cookieProfileId: A })).toEqual({
-      profileId: null,
-      source: null,
-    });
-    expect(resolveProfileId({ mode: "required", sessionUserId: B, cookieProfileId: A })).toEqual({
-      profileId: B,
-      source: "session",
-    });
-  });
-
-  test("chaînes vides traitées comme absentes", () => {
-    expect(resolveProfileId({ mode: "hybrid", sessionUserId: "", cookieProfileId: "" })).toEqual({
-      profileId: null,
-      source: null,
-    });
+  test("chaîne vide traitée comme absente", () => {
+    expect(resolveProfileId("")).toBeNull();
   });
 });
 
@@ -206,12 +153,8 @@ test.describe("divers (CM-58)", () => {
     expect(isUuid(null)).toBe(false);
   });
 
-  test("parsePrefillEmails", () => {
-    expect(parsePrefillEmails(`${A}=Moi@Ex.fr, ${B}=elle@ex.fr,bad=x@y.z,${A.slice(1)}=a@b.c`)).toEqual({
-      [A]: "moi@ex.fr",
-      [B]: "elle@ex.fr",
-    });
-    expect(parsePrefillEmails(undefined)).toEqual({});
+  test("ancien cookie du sélecteur", () => {
+    expect(LEGACY_PROFILE_COOKIE).toBe("cm_profile");
   });
 
   test("hasSupabaseAuthCookie", () => {

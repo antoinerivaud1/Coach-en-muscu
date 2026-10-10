@@ -1,13 +1,9 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { isUuid, resolveProfileId, type AuthMode, type ProfileSource } from "@/lib/auth/core";
-import { getAuthMode } from "@/lib/auth/mode";
-import { createAuthClient } from "@/lib/supabase/auth-server";
+import { isUuid, resolveProfileId } from "@/lib/auth/core";
+import { createAuthClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
-
-export const PROFILE_COOKIE = "cm_profile";
 
 export type Profile = {
   id: string;
@@ -17,13 +13,8 @@ export type Profile = {
 };
 
 export type AuthState = {
-  mode: AuthMode;
-  /** Id du profil courant (= id Auth si session), null si personne. */
+  /** Id du profil courant (= id Auth de la session), null si personne. */
   profileId: string | null;
-  /** D'où vient `profileId` : session Supabase, cookie `cm_profile`, ou rien. */
-  source: ProfileSource;
-  /** Utilisateur de la session Supabase validée (`claims.sub`), si présente. */
-  sessionUserId: string | null;
 };
 
 /**
@@ -43,42 +34,23 @@ async function readSessionUserId(): Promise<string | null> {
 }
 
 /**
- * CM-58 : état d'auth de la requête, mis en cache par requête (`cache`), donc
- * un seul `getClaims()` même si plusieurs appels. En mode `cookie`, aucun
- * appel Supabase : comportement historique strict.
+ * État d'auth de la requête, mis en cache par requête (`cache`), donc un seul
+ * `getClaims()` même si plusieurs appels. CM-59 B : seule la session compte.
  */
 export const getAuthState = cache(async (): Promise<AuthState> => {
-  const mode = getAuthMode();
-  const store = await cookies();
-  const cookieProfileId = store.get(PROFILE_COOKIE)?.value ?? null;
-  const sessionUserId = mode === "cookie" ? null : await readSessionUserId();
-  const { profileId, source } = resolveProfileId({ mode, sessionUserId, cookieProfileId });
-  return { mode, profileId, source, sessionUserId };
+  const profileId = resolveProfileId(await readSessionUserId());
+  return { profileId };
 });
 
 export async function getCurrentProfileId(): Promise<string | null> {
   return (await getAuthState()).profileId;
 }
 
-/**
- * Renvoie l'id du profil courant, sinon redirige : vers le sélecteur (modes
- * `cookie` et `hybrid`) ou vers `/login` (mode `required`, CM-58).
- */
+/** Renvoie l'id du profil courant, sinon redirige vers `/login`. */
 export async function requireProfileId(): Promise<string> {
-  const { profileId, mode } = await getAuthState();
-  if (!profileId) redirect(mode === "required" ? "/login" : "/");
+  const { profileId } = await getAuthState();
+  if (!profileId) redirect("/login");
   return profileId;
-}
-
-export async function getAllProfiles(
-  supabase: SupabaseClient<Database>,
-): Promise<Profile[]> {
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, display_name, color_role, weekly_goal")
-    .order("color_role")
-    .returns<Profile[]>();
-  return data ?? [];
 }
 
 export async function getProfile(

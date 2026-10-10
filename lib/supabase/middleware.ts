@@ -1,6 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getAuthMode } from "@/lib/auth/mode";
 import { isPublicPath } from "@/lib/auth/publicPaths";
 import { AUTH_COOKIE_OPTIONS, authEnv, hasSupabaseAuthCookie } from "./auth-config";
 
@@ -11,13 +10,11 @@ import { AUTH_COOKIE_OPTIONS, authEnv, hasSupabaseAuthCookie } from "./auth-conf
  * jetons expirés sont renouvelés, puis réinjectés dans la requête pour que les
  * pages voient la session à jour.
  *
- * - Mode `cookie` : ne fait RIEN (aucun appel réseau, aucune lecture).
  * - Pas de cookie de session : rien à rafraîchir, on passe.
  * - Aucune redirection ici : l'accès est contrôlé côté serveur par
  *   `requireProfileId()` (lib/profile.ts), ce qui couvre aussi les server actions.
  */
 export async function updateSession(request: NextRequest) {
-  if (getAuthMode() === "cookie") return NextResponse.next();
   // CM-93 : pages légales et support publiques. Aucun appel Supabase : elles
   // restent servies même sans session, sans config Auth ou si Supabase est
   // indisponible (URLs déclarées dans App Store Connect).

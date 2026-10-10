@@ -2,10 +2,11 @@ import { test, expect } from "@playwright/test";
 import {
   currentExerciseName,
   deleteSessionViaUi,
+  E2E_ACCOUNT,
   guardWrites,
+  login,
   logSet,
   openExitSheet,
-  selectProfile,
   startSession,
 } from "./helpers";
 
@@ -17,7 +18,7 @@ test.describe("Progression", () => {
 
   test.beforeEach(async ({ page }) => {
     created = [];
-    await selectProfile(page);
+    await login(page, E2E_ACCOUNT.email, E2E_ACCOUNT.password);
   });
 
   test.afterEach(async ({ page }) => {

@@ -15,8 +15,8 @@ import SeanceBuilder from "../../SeanceBuilder";
  * Édition d'une séance type (CM-81) : le MÊME écran que la création,
  * pré-rempli.
  *
- * `id` vient de l'URL et le client serveur contourne la RLS (`service_role`,
- * CM-17) : l'appartenance est vérifiée ici en code. Une séance inaccessible
+ * `id` vient de l'URL : l'appartenance est vérifiée ici en code, en plus de la
+ * RLS (CM-59 B). Une séance inaccessible
  * rend un 404, comme une séance inexistante — rien ne doit révéler qu'elle
  * existe chez un autre couple.
  */

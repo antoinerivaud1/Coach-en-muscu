@@ -18,6 +18,11 @@ import {
   type SeanceDraftExercise,
 } from "@/lib/utils/seances";
 import { withOrderIndex } from "@/lib/utils/reorder";
+import {
+  REFUSED_MESSAGE,
+  touchedRows,
+  writeErrorMessage,
+} from "@/lib/supabase/rlsErrors";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Écran unique de création / édition d'une séance type (CM-81).
@@ -68,9 +73,9 @@ function redirectWithError(path: string, message: string): never {
 /**
  * Le profil courant peut-il agir sur la séance de ce programme ?
  *
- * Les ids de séance arrivent du client et le client serveur contourne la RLS
- * (`service_role`, CM-17) : sans cette vérification, un id arbitraire agirait
- * sur la séance d'un autre couple. Une séance inaccessible renvoie le même
+ * Les ids de séance arrivent du client. La RLS (CM-59 B) refuse déjà d'agir
+ * sur la séance d'un autre duo ; cette vérification reste en place (ceinture
+ * et bretelles, et filet `DATA_CLIENT=service`). Une séance inaccessible renvoie le même
  * message qu'une séance inexistante, on ne révèle pas qu'elle existe (CM-80).
  *
  * `cancelled` complète le message quand la vérification elle-même échoue :
@@ -233,8 +238,8 @@ export async function saveSeance(
       return { success: false, error: NOT_FOUND };
     }
 
-    // `dayId` vient du client et le client serveur contourne la RLS
-    // (`service_role`, CM-17) : l'appartenance se vérifie ici, en code.
+    // `dayId` vient du client : l'appartenance se vérifie aussi ici, en code
+    // (en plus de la RLS, CM-59 B).
     const access = await canAccessProgram(supabase, day.program_id, profileId);
     if (!access.ok) {
       return {
@@ -279,21 +284,28 @@ export async function saveSeance(
   let savedDayId: string;
 
   if (dayId) {
-    const { error } = await supabase
+    // CM-59 B : sous RLS, un update refusé touche 0 ligne sans erreur.
+    const { data: renamed, error } = await supabase
       .from("program_days")
       .update({ name: checkedName.name })
-      .eq("id", dayId);
+      .eq("id", dayId)
+      .select("id");
     if (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: writeErrorMessage(error) };
+    }
+    if (!touchedRows(renamed)) {
+      return { success: false, error: REFUSED_MESSAGE };
     }
     savedDayId = dayId;
 
+    // 0 ligne ici n'est PAS un refus : la séance peut être vide. L'accès à la
+    // séance vient d'être prouvé par l'update ci-dessus.
     const { error: clearError } = await supabase
       .from("program_exercises")
       .delete()
       .eq("program_day_id", dayId);
     if (clearError) {
-      return { success: false, error: clearError.message };
+      return { success: false, error: writeErrorMessage(clearError) };
     }
   } else {
     const order = await nextOrderIndex(supabase, programId);
@@ -315,7 +327,7 @@ export async function saveSeance(
     if (error || !created) {
       return {
         success: false,
-        error: error?.message ?? "Impossible de créer la séance",
+        error: error ? writeErrorMessage(error) : "Impossible de créer la séance",
       };
     }
     savedDayId = created.id;
@@ -337,24 +349,29 @@ export async function saveSeance(
   );
 
   if (insertError) {
+    const insertMessage = writeErrorMessage(insertError);
     if (!dayId) {
       // La séance créée serait vide et donc inutilisable : on annule tout,
       // comme `duplicateSeance` (CM-65). En édition la séance existait déjà,
       // on la laisse en place plutôt que de la supprimer sous les pieds.
-      const { error: rollbackError } = await supabase
+      const { data: rolledBack, error: rollbackError } = await supabase
         .from("program_days")
         .delete()
-        .eq("id", savedDayId);
-      if (rollbackError) {
+        .eq("id", savedDayId)
+        .select("id");
+      if (rollbackError || !touchedRows(rolledBack)) {
+        const rollbackMessage = rollbackError
+          ? writeErrorMessage(rollbackError)
+          : REFUSED_MESSAGE;
         return {
           success: false,
           error:
-            `${insertError.message}. La séance vide « ${checkedName.name} » n'a pas pu ` +
-            `être nettoyée (${rollbackError.message}) : supprime-la à la main.`,
+            `${insertMessage}. La séance vide « ${checkedName.name} » n'a pas pu ` +
+            `être nettoyée (${rollbackMessage}) : supprime-la à la main.`,
         };
       }
     }
-    return { success: false, error: insertError.message };
+    return { success: false, error: insertMessage };
   }
 
   revalidateLibrary();
@@ -427,7 +444,7 @@ export async function startSession(formData: FormData) {
   if (error || !session) {
     redirectWithError(
       "/dashboard",
-      `Impossible de démarrer la séance : ${error?.message ?? "erreur inconnue"}`,
+      `Impossible de démarrer la séance : ${error ? writeErrorMessage(error) : "erreur inconnue"}`,
     );
   }
 
@@ -506,7 +523,7 @@ export async function duplicateSeance(
   if (copyError || !copy) {
     return {
       success: false,
-      error: copyError?.message ?? "Erreur lors de la duplication",
+      error: copyError ? writeErrorMessage(copyError) : "Erreur lors de la duplication",
     };
   }
 
@@ -525,20 +542,25 @@ export async function duplicateSeance(
     );
 
     if (exError) {
+      const exMessage = writeErrorMessage(exError);
       // La copie serait vide et donc inutilisable : on annule tout.
-      const { error: rollbackError } = await supabase
+      const { data: rolledBack, error: rollbackError } = await supabase
         .from("program_days")
         .delete()
-        .eq("id", copy.id);
-      if (rollbackError) {
+        .eq("id", copy.id)
+        .select("id");
+      if (rollbackError || !touchedRows(rolledBack)) {
+        const rollbackMessage = rollbackError
+          ? writeErrorMessage(rollbackError)
+          : REFUSED_MESSAGE;
         return {
           success: false,
           error:
-            `${exError.message}. La copie vide « ${source.name} (copie) » n'a pas pu ` +
-            `être nettoyée (${rollbackError.message}) : supprime-la à la main.`,
+            `${exMessage}. La copie vide « ${source.name} (copie) » n'a pas pu ` +
+            `être nettoyée (${rollbackMessage}) : supprime-la à la main.`,
         };
       }
-      return { success: false, error: exError.message };
+      return { success: false, error: exMessage };
     }
   }
 
@@ -605,13 +627,18 @@ export async function deleteSeance(dayId: string): Promise<SeanceActionResult> {
     };
   }
 
-  const { error } = await supabase
+  // CM-59 B : sous RLS, un delete refusé touche 0 ligne sans erreur.
+  const { data: deleted, error } = await supabase
     .from("program_days")
     .delete()
-    .eq("id", dayId);
+    .eq("id", dayId)
+    .select("id");
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: writeErrorMessage(error) };
+  }
+  if (!touchedRows(deleted)) {
+    return { success: false, error: REFUSED_MESSAGE };
   }
 
   revalidateLibrary();
@@ -691,12 +718,17 @@ export async function moveSeance(
   for (let i = 0; i < reordered.length; i++) {
     const current = reordered[i]!;
     if (current.order_index === i) continue;
-    const { error } = await supabase
+    // CM-59 B : sous RLS, un update refusé touche 0 ligne sans erreur.
+    const { data: moved, error } = await supabase
       .from("program_days")
       .update({ order_index: i })
-      .eq("id", current.id);
+      .eq("id", current.id)
+      .select("id");
     if (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: writeErrorMessage(error) };
+    }
+    if (!touchedRows(moved)) {
+      return { success: false, error: REFUSED_MESSAGE };
     }
   }
 

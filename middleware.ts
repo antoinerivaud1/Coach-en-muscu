@@ -1,8 +1,7 @@
 import type { NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-// CM-58 : rafraîchissement de la session Supabase. Sans effet en
-// AUTH_MODE=cookie (défaut). Next 15 : le fichier s'appelle bien
+// CM-58 : rafraîchissement de la session Supabase. Next 15 : le fichier s'appelle bien
 // `middleware.ts` (`proxy.ts` est le nom Next 16).
 export async function middleware(request: NextRequest) {
   return updateSession(request);

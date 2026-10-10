@@ -62,8 +62,8 @@ jobs:
     env:
       E2E_BASE_URL: http://localhost:3000
       E2E_ALLOW_WRITES: "1"
-      # Données de supabase/seed.sql (fictives).
-      E2E_PROFILE_NAME: Toi
+      # Données de supabase/seed.sql (fictives). Les parcours se connectent
+      # avec le compte « Toi » du seed (tests/e2e/helpers.ts, CM-59 B).
       E2E_SEANCE_NAME: Haut du corps
     steps:
       - uses: actions/checkout@v4

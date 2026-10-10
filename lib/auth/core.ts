@@ -2,49 +2,19 @@
 // testée dans tests/unit/auth.spec.ts.
 
 /**
- * Palier de bascule de l'auth, lu côté serveur uniquement (variable d'env
- * `AUTH_MODE`, jamais un cookie : un cookie est falsifiable).
- * - `cookie`   : comportement historique, profil choisi via le cookie `cm_profile`.
- * - `hybrid`   : la session Supabase prime ; sinon repli sur le cookie.
- * - `required` : seule la session compte ; sans session, direction `/login`.
- */
-export type AuthMode = "cookie" | "hybrid" | "required";
-
-export const AUTH_MODES: readonly AuthMode[] = ["cookie", "hybrid", "required"];
-
-/** Valeur brute de `AUTH_MODE` → mode. Absente ou inconnue : `cookie`. */
-export function parseAuthMode(raw: string | null | undefined): AuthMode {
-  const v = (raw ?? "").trim().toLowerCase();
-  return (AUTH_MODES as readonly string[]).includes(v) ? (v as AuthMode) : "cookie";
-}
-
-export type ProfileSource = "session" | "cookie" | null;
-
-/**
- * CM-58 : qui est l'utilisateur courant, selon le mode.
+ * CM-58 / CM-59 B : qui est l'utilisateur courant. Seule la session Supabase
+ * compte (`claims.sub`, JWT validé par `getClaims()`) ; sans session, personne.
  * `profiles.id = auth.users.id` : l'id de session EST l'id de profil.
  */
-export function resolveProfileId({
-  mode,
-  sessionUserId,
-  cookieProfileId,
-}: {
-  mode: AuthMode;
-  sessionUserId: string | null;
-  cookieProfileId: string | null;
-}): { profileId: string | null; source: ProfileSource } {
-  const session = sessionUserId || null;
-  const cookie = cookieProfileId || null;
-  switch (mode) {
-    case "cookie":
-      return cookie ? { profileId: cookie, source: "cookie" } : { profileId: null, source: null };
-    case "hybrid":
-      if (session) return { profileId: session, source: "session" };
-      return cookie ? { profileId: cookie, source: "cookie" } : { profileId: null, source: null };
-    case "required":
-      return session ? { profileId: session, source: "session" } : { profileId: null, source: null };
-  }
+export function resolveProfileId(sessionUserId: string | null | undefined): string | null {
+  return sessionUserId || null;
 }
+
+/**
+ * Ancien cookie du sélecteur de profil (avant CM-59 B). Plus lu nulle part :
+ * seulement effacé s'il traîne encore dans un navigateur.
+ */
+export const LEGACY_PROFILE_COOKIE = "cm_profile";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -99,7 +69,11 @@ export function validateLoginInput(input: {
   return { ok: true, email, password: input.password };
 }
 
-/** Bloc « Créer mon mot de passe » de l'écran Profil. */
+/**
+ * Choix d'un mot de passe (email, mot de passe, confirmation). Son seul écran
+ * (bloc « Créer mon mot de passe » du Profil) a disparu avec CM-59 B ; gardé
+ * pour l'inscription et la réinitialisation à venir.
+ */
 export function validatePasswordCreation(input: {
   email: string;
   password: string;
@@ -146,19 +120,4 @@ export function authErrorMessage(err: { code?: string | null; status?: number | 
   }
   if (err?.status === 429) return "Trop de tentatives. Réessaie dans quelques minutes.";
   return "Une erreur est survenue. Réessaie dans un instant.";
-}
-
-/**
- * Emails pré-remplis du bloc « Créer mon mot de passe » (le repo est public :
- * aucun email en dur). Format de `AUTH_PREFILL_EMAILS` :
- * `<uuid>=<email>,<uuid>=<email>`. Entrées invalides ignorées.
- */
-export function parsePrefillEmails(raw: string | null | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const part of (raw ?? "").split(",")) {
-    const [id, email] = part.split("=").map((s) => s?.trim() ?? "");
-    const e = normalizeEmail(email);
-    if (isUuid(id) && isValidEmail(e)) out[id.toLowerCase()] = e;
-  }
-  return out;
 }

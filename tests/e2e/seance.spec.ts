@@ -1,10 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   deleteSessionViaUi,
+  E2E_ACCOUNT,
   guardWrites,
+  login,
   logSet,
   openExitSheet,
-  selectProfile,
   startSession,
 } from "./helpers";
 
@@ -28,7 +29,7 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
 
   test.beforeEach(async ({ page }) => {
     created = [];
-    await selectProfile(page);
+    await login(page, E2E_ACCOUNT.email, E2E_ACCOUNT.password);
   });
 
   test.afterEach(async ({ page }) => {

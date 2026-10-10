@@ -8,19 +8,17 @@ import LoginForm from "@/components/LoginForm";
 export const metadata: Metadata = { title: "Connexion · Coach en Muscu" };
 
 // CM-58 : connexion par compte (email + mot de passe). Pas d'inscription
-// publique (CM-86) : un compte se crée depuis Profil en mode `hybrid`.
+// publique (CM-86) : les comptes existants ont été créés pendant la bascule.
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string | string[] }>;
 }) {
-  const { mode, source } = await getAuthState();
-  // Mode `cookie` (défaut) : la page n'existe pas encore pour l'utilisateur.
-  if (mode === "cookie") redirect("/");
+  const { profileId } = await getAuthState();
 
   const { next: rawNext } = await searchParams;
   const next = safeNextPath(Array.isArray(rawNext) ? rawNext[0] : rawNext);
-  if (source === "session") redirect(next);
+  if (profileId) redirect(next);
 
   return (
     <main className="flex min-h-[100dvh] flex-col px-6 pb-7 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -44,15 +42,6 @@ export default async function LoginPage({
         <div className="mt-7">
           <LoginForm next={next} />
         </div>
-
-        {mode === "hybrid" && (
-          <Link
-            href="/"
-            className="mt-6 text-center text-sm font-medium text-fg-muted underline-offset-4 hover:text-fg hover:underline"
-          >
-            Pas encore de mot de passe ? Choisir mon profil
-          </Link>
-        )}
 
         {/* CM-93 : liens légaux, accessibles sans compte. */}
         <nav

@@ -259,8 +259,8 @@ export type DashboardSessionRow = {
 /**
  * Séances terminées du profil, du plus récent au plus ancien.
  *
- * Le `.eq("profile_id", …)` est OBLIGATOIRE : le client serveur est en clé
- * service, la RLS n'isole donc pas les deux profils du couple (CM-17).
+ * Le `.eq("profile_id", …)` est OBLIGATOIRE : la RLS laisse lire les séances
+ * du partenaire de duo (CM-59).
  */
 export async function getCompletedSessionsForDashboard(
   supabase: SupabaseClient<Database>,
@@ -379,6 +379,8 @@ export async function purgeAbandonedEmptySessions(
 
   // Le `.eq("profile_id", …)` est redondant avec le `select` ci-dessus, et
   // gardé : une suppression ne doit jamais pouvoir sortir du profil courant.
+  // CM-59 B : pas de contrôle « 0 ligne = refus » ici, nettoyage opportuniste
+  // dont le résultat est ignoré (déjà le cas des erreurs).
   await supabase
     .from("sessions")
     .delete()
@@ -429,8 +431,8 @@ export function buildLastDoneByDay(
  *
  * Une séance terminée SANS aucune série ne compte pas : elle daterait la
  * « dernière fois » d'un simple tap sur une carte (même règle que l'accueil
- * depuis CM-66). Le `.eq("profile_id", …)` est obligatoire, la RLS n'isole pas
- * les deux profils du couple côté serveur (CM-17).
+ * depuis CM-66). Le `.eq("profile_id", …)` est obligatoire, la RLS laisse lire
+ * les séances du partenaire de duo (CM-59).
  */
 export async function getLastDoneByDay(
   supabase: SupabaseClient<Database>,

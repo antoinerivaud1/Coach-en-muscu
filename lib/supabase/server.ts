@@ -1,33 +1,78 @@
 import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import type { Database } from "@/lib/types/database";
+import { AUTH_COOKIE_OPTIONS, authEnv } from "./auth-config";
 
 /**
- * Client Supabase côté serveur, utilisé par toutes les pages et server actions.
+ * CM-59 B : client Supabase de l'UTILISATEUR, utilisé par toutes les pages et
+ * server actions. Clé anon + cookies de session (lecture et écriture) : les
+ * requêtes partent avec le JWT de l'utilisateur connecté et passent sous RLS
+ * (rôle `authenticated`, policies par duo de CM-59 A). La base garantit le
+ * périmètre des données ; les contrôles d'appartenance du code restent en place
+ * (ceinture et bretelles).
  *
- * Sécurité (CM-17) : l'app identifie le profil par cookie (lib/profile.ts), pas
- * via Supabase Auth, donc `auth.uid()` est toujours null et les policies RLS
- * scoppées au couple ne peuvent pas s'appliquer. On utilise ici la clé
- * `service_role` (server-only, jamais exposée au client) qui contourne la RLS.
- * Le périmètre des données (profil / couple) est garanti par le code des
- * server actions et des requêtes, pas par la base.
+ * Filet de déploiement : si `DATA_CLIENT=service` (variable serveur Vercel),
+ * on revient à l'ancien client service-role, qui contourne la RLS. À utiliser
+ * uniquement en cas d'incident (puis Redeploy) ; il sera retiré avec la clé
+ * service-role après 7 jours sans incident.
+ *
+ * Ne jamais utiliser `getSession()` pour décider d'un accès côté serveur :
+ * seul `getClaims()` valide le JWT.
+ */
+export async function createClient() {
+  if (process.env.DATA_CLIENT === "service") return createServiceRoleClient();
+  return createUserClient();
+}
+
+/**
+ * Client réservé à l'auth (`getClaims`, `signInWithPassword`, `signOut`).
+ * Toujours le client utilisateur, MÊME avec `DATA_CLIENT=service` : le filet ne
+ * concerne que les données, la session doit continuer d'être lue et écrite
+ * dans les cookies (sinon plus personne ne pourrait se connecter).
+ */
+export async function createAuthClient() {
+  return createUserClient();
+}
+
+async function createUserClient() {
+  const cookieStore = await cookies();
+  const { url, anonKey } = authEnv();
+
+  return createServerClient<Database>(url, anonKey, {
+    cookieOptions: AUTH_COOKIE_OPTIONS,
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // Appelé depuis un Server Component (cookies en lecture seule) :
+          // sans effet, le middleware rafraîchit la session à chaque requête.
+        }
+      },
+    },
+  });
+}
+
+/**
+ * Ancien client (CM-17), conservé uniquement pour le filet `DATA_CLIENT=service`.
+ * Clé `service_role` : contourne la RLS. Ne lit AUCUN cookie, sinon supabase-js
+ * enverrait le JWT de l'utilisateur à la place de la clé.
  *
  * IMPORTANT : `SUPABASE_SERVICE_ROLE_KEY` ne doit JAMAIS être préfixée
  * `NEXT_PUBLIC_` ni utilisée dans un composant client.
- *
- * CM-58 : ce client ne lit AUCUN cookie. Sinon, dès qu'un cookie de session
- * Supabase existe (modes `hybrid` / `required`), supabase-js enverrait le JWT
- * de l'utilisateur à la place de la clé service-role : les requêtes passeraient
- * sous RLS (rôle `authenticated`) avec des policies encore écrites pour
- * l'ancien modèle. La session est gérée à part par `lib/supabase/auth-server.ts`.
- * Sert aussi pour l'API admin Auth (`auth.admin.*`, CM-58).
  */
-export async function createClient() {
+function createServiceRoleClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceRoleKey) {
     throw new Error(
-      "Supabase mal configuré : NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont requis côté serveur.",
+      "Supabase mal configuré : NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont requis avec DATA_CLIENT=service.",
     );
   }
 
@@ -37,7 +82,7 @@ export async function createClient() {
         return [];
       },
       setAll() {
-        // CM-58 : jamais de cookie de session pour le client service-role.
+        // Jamais de cookie de session pour le client service-role.
       },
     },
   });
