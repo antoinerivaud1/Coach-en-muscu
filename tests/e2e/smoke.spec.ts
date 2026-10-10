@@ -9,8 +9,9 @@ test("l'accueil sans session renvoie à la connexion", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Qui s'entraîne/i })).toHaveCount(0);
 });
 
-test("une page privée sans session renvoie à la connexion", async ({ page }) => {
+test("une page privée sans session renvoie à la connexion, avec retour prévu", async ({ page }) => {
   await page.goto("/dashboard");
-  await expect(page).toHaveURL(/\/login$/);
+  // CM-59 B : requireProfileId(next) ramène à la page demandée après connexion.
+  await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
   await expect(page.getByLabel("Email")).toBeVisible();
 });

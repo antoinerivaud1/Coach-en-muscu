@@ -20,6 +20,6 @@ test.describe("Connexion et profil (CM-59 B)", () => {
     await expect(page.getByRole("heading", { name: /Connexion/ })).toBeVisible();
     // Session bien fermée : le tableau de bord renvoie à la connexion.
     await page.goto("/dashboard");
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
   });
 });
