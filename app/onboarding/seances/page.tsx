@@ -2,6 +2,7 @@ import { requireOnboardingIdentity } from "@/lib/onboardingSession";
 import { SEANCE_TEMPLATES, templateMeta } from "@/lib/onboardingTemplates";
 import StepHeader from "@/components/onboarding/StepHeader";
 import TemplatePicker from "@/components/onboarding/TemplatePicker";
+import LoadError from "@/components/onboarding/LoadError";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,9 @@ export default async function OnboardingSeancesPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
-  const { identity } = await requireOnboardingIdentity("/onboarding/seances");
+  const ctx = await requireOnboardingIdentity("/onboarding/seances");
+  if (!ctx.ok) return <LoadError retryHref="/onboarding/seances" />;
+  const { identity } = ctx;
 
   const templates = SEANCE_TEMPLATES.map((t) => ({
     id: t.id,

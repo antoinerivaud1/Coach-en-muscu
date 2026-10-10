@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getDuoId } from "@/lib/profile";
+import { requireProfileId, readDuoId, libraryTarget } from "@/lib/profile";
 import { writeErrorMessage } from "@/lib/supabase/rlsErrors";
 import { catalogFilter } from "@/lib/queries/exercises";
 import type { Database } from "@/lib/types/database";
@@ -45,7 +45,13 @@ export async function createCustomExercise(input: {
     return { success: false, error: "Le nom de l'exercice est requis" };
   }
 
-  const duoId = await getDuoId(supabase, profileId);
+  // C3 : duo illisible => refus (sinon l'exercice d'un membre du duo
+  // deviendrait un exercice perso invisible pour l'autre).
+  const target = libraryTarget(await readDuoId(supabase, profileId));
+  if (target.kind === "error") {
+    return { success: false, error: target.error };
+  }
+  const duoId = target.kind === "shared" ? target.duoId : null;
 
   // Évite les doublons (catalogue système, mes exercices perso, ceux du duo).
   const { data: dupes } = await supabase

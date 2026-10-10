@@ -1,6 +1,7 @@
 import { requireOnboardingIdentity, prefilledFirstName } from "@/lib/onboardingSession";
 import StepHeader from "@/components/onboarding/StepHeader";
 import ProfileStepForm from "@/components/onboarding/ProfileStepForm";
+import LoadError from "@/components/onboarding/LoadError";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,9 @@ export const dynamic = "force-dynamic";
 // L'étape 1 est l'inscription : pas de retour possible vers elle, le compte
 // existe déjà.
 export default async function OnboardingProfilePage() {
-  const { identity, email } = await requireOnboardingIdentity("/onboarding");
+  const ctx = await requireOnboardingIdentity("/onboarding");
+  if (!ctx.ok) return <LoadError retryHref="/onboarding" />;
+  const { identity, email } = ctx;
 
   return (
     <>

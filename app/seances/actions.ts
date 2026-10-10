@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getDuoId } from "@/lib/profile";
+import { requireProfileId, readDuoId, libraryTarget } from "@/lib/profile";
 import { getCatalogExercises } from "@/lib/queries/exercises";
 import {
   canAccessProgram,
@@ -182,8 +182,13 @@ export async function saveSeance(
   const supabase = await createClient();
 
   // CM-86 : sans duo, la séance va dans la bibliothèque perso (branche
-  // `ensurePersonalProgram` plus bas) ; en duo, rien ne change.
-  const duoId = await getDuoId(supabase, profileId);
+  // `ensurePersonalProgram` plus bas) ; en duo, rien ne change. Duo illisible
+  // (C3) : refus, jamais de séance rangée en perso par erreur.
+  const target = libraryTarget(await readDuoId(supabase, profileId));
+  if (target.kind === "error") {
+    return { success: false, error: target.error };
+  }
+  const duoId = target.kind === "shared" ? target.duoId : null;
 
   const checkedExercises = validateExercises(input.exercises);
   if (!checkedExercises.ok) {
@@ -250,13 +255,13 @@ export async function saveSeance(
     excludeDayId = day.id;
   } else {
     // CM-86 : utilisateur sans duo => bibliothèque perso.
-    const target = duoId
+    const library = duoId
       ? await ensureSharedProgram(supabase, duoId)
       : await ensurePersonalProgram(supabase, profileId);
-    if (!target.ok) {
-      return { success: false, error: target.error };
+    if (!library.ok) {
+      return { success: false, error: library.error };
     }
-    programId = target.programId;
+    programId = library.programId;
   }
 
   // ----- Nom -----

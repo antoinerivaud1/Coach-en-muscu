@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getDuoId } from "@/lib/profile";
+import { requireProfileId, readDuoId, DUO_READ_ERROR_MESSAGE } from "@/lib/profile";
 import {
-  ensurePersonalProgram,
   ensureSharedProgram,
   getProgramWithDays,
+  readPersonalProgramId,
 } from "@/lib/queries/programs";
 import type { ProgramFull, ProgramDayFull } from "@/lib/queries/programs";
 import { getLastDoneByDay } from "@/lib/queries/sessions";
@@ -25,11 +25,26 @@ import type { SeanceView } from "./SeanceLibrary";
  */
 
 /** Cadre commun aux écrans qui n'ont rien à afficher (erreur). */
-function Message({ children }: { children: React.ReactNode }) {
+function Message({
+  children,
+  retryHref,
+}: {
+  children: React.ReactNode;
+  retryHref?: string;
+}) {
   return (
     <main className="min-h-screen p-4 pt-[max(1rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex max-w-lg flex-col items-center gap-4 pt-16 text-center">
         {children}
+        {retryHref && (
+          // Lien plein (pas <Link>) : rechargement complet de la page.
+          <a
+            href={retryHref}
+            className="rounded-xl bg-energy px-4 py-2.5 text-sm font-extrabold text-ink"
+          >
+            Réessayer
+          </a>
+        )}
         <Link
           href="/dashboard"
           className="rounded-xl bg-surface2 px-4 py-2.5 text-sm font-semibold text-fg"
@@ -66,43 +81,67 @@ export default async function SeancesPage({
   const profileId = await requireProfileId("/seances");
   const supabase = await createClient();
 
-  // CM-86 : sans duo, la bibliothèque perso.
-  const duoId = await getDuoId(supabase, profileId);
-
-  const shared = duoId
-    ? await ensureSharedProgram(supabase, duoId)
-    : await ensurePersonalProgram(supabase, profileId);
-  if (!shared.ok) {
+  // CM-86 : sans duo, la bibliothèque perso. C3 : duo illisible => erreur,
+  // et la bibliothèque perso n'est JAMAIS créée au simple affichage (elle
+  // l'est à la première séance enregistrée, cf. `saveSeance`).
+  const membership = await readDuoId(supabase, profileId);
+  if (!membership.ok) {
     return (
-      <Message>
+      <Message retryHref="/seances">
         <p
           role="alert"
           className="rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
         >
-          Impossible de charger tes séances ({shared.error}).
+          {DUO_READ_ERROR_MESSAGE}
+        </p>
+      </Message>
+    );
+  }
+  const duoId = membership.duoId;
+
+  let programId: string | null;
+  let loadError: string | null = null;
+  if (duoId) {
+    const shared = await ensureSharedProgram(supabase, duoId);
+    programId = shared.ok ? shared.programId : null;
+    if (!shared.ok) loadError = shared.error;
+  } else {
+    const personal = await readPersonalProgramId(supabase, profileId);
+    programId = personal.ok ? personal.programId : null;
+    if (!personal.ok) loadError = personal.error;
+  }
+  if (loadError) {
+    return (
+      <Message retryHref="/seances">
+        <p
+          role="alert"
+          className="rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+        >
+          Impossible de charger tes séances ({loadError}).
         </p>
       </Message>
     );
   }
 
-  const { data } = await getProgramWithDays(supabase, shared.programId);
-  const program = data as ProgramFull | null;
-  if (!program) {
-    return (
-      <Message>
-        <p
-          role="alert"
-          className="rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
-        >
-          Impossible de charger tes séances. Réessaie dans un instant.
-        </p>
-      </Message>
-    );
+  // Solo sans bibliothèque encore créée : liste vide, rien n'est écrit.
+  let days: ProgramDayFull[] = [];
+  if (programId) {
+    const { data } = await getProgramWithDays(supabase, programId);
+    const program = data as ProgramFull | null;
+    if (!program) {
+      return (
+        <Message retryHref="/seances">
+          <p
+            role="alert"
+            className="rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+          >
+            Impossible de charger tes séances. Réessaie dans un instant.
+          </p>
+        </Message>
+      );
+    }
+    days = [...program.program_days].sort((a, b) => a.order_index - b.order_index);
   }
-
-  const days: ProgramDayFull[] = [...program.program_days].sort(
-    (a, b) => a.order_index - b.order_index,
-  );
 
   // « Dernière fois » du profil courant : le même calcul que l'accueil, partagé
   // dans `lib/queries/sessions.ts` plutôt que recopié ici.

@@ -275,38 +275,64 @@ export async function ensureSharedProgram(
 /** Nom du programme perso, jamais montré à l'utilisateur (CM-86). */
 export const PERSONAL_PROGRAM_NAME = "Mes séances";
 
+export type PersonalProgramRead =
+  | { ok: true; programId: string | null }
+  | { ok: false; error: string };
+
 /**
- * Id du programme PERSO du profil (`owner_profile_id` = lui, `duo_id` null),
- * le plus ancien s'il y en a plusieurs (CM-86).
+ * Programme PERSO du profil (`owner_profile_id` = lui, `duo_id` null), le plus
+ * ancien s'il y en a plusieurs (CM-86). Distingue « aucun » d'une erreur.
+ */
+export async function readPersonalProgramId(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+): Promise<PersonalProgramRead> {
+  try {
+    const { data, error } = await supabase
+      .from("programs")
+      .select("id")
+      .eq("owner_profile_id", profileId)
+      .is("duo_id", null)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .returns<{ id: string }[]>();
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, programId: data?.[0]?.id ?? null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Lecture impossible" };
+  }
+}
+
+/**
+ * Id du programme perso, null s'il n'existe pas ENCORE ou si la lecture
+ * échoue (affichage uniquement ; pour écrire : `ensurePersonalProgram`).
  */
 export async function getPersonalProgramId(
   supabase: SupabaseClient<Database>,
   profileId: string,
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from("programs")
-    .select("id")
-    .eq("owner_profile_id", profileId)
-    .is("duo_id", null)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .returns<{ id: string }[]>();
-
-  return data?.[0]?.id ?? null;
+  const read = await readPersonalProgramId(supabase, profileId);
+  return read.ok ? read.programId : null;
 }
 
 /**
  * Équivalent perso d'`ensureSharedProgram` (CM-86) : la bibliothèque d'un
- * utilisateur qui s'entraîne seul vit dans un programme à son nom, créé en
- * silence à la première séance puis toujours réutilisé. Il reste à lui s'il
- * rejoint un duo plus tard (ses séances perso ne deviennent pas celles du duo).
+ * utilisateur qui s'entraîne seul vit dans un programme à son nom, créé
+ * paresseusement à la PREMIÈRE ÉCRITURE (jamais au simple affichage d'une
+ * page) puis toujours réutilisé. Il reste à lui s'il rejoint un duo plus tard.
+ *
+ * Lecture en échec : refus, jamais de création « à l'aveugle » (sinon un
+ * doublon de programme à chaque coupure réseau).
  */
 export async function ensurePersonalProgram(
   supabase: SupabaseClient<Database>,
   profileId: string,
 ): Promise<EnsureSharedProgram> {
-  const existing = await getPersonalProgramId(supabase, profileId);
-  if (existing) return { ok: true, programId: existing };
+  const existing = await readPersonalProgramId(supabase, profileId);
+  if (!existing.ok) {
+    return { ok: false, error: `Impossible de lire ta bibliothèque (${existing.error})` };
+  }
+  if (existing.programId) return { ok: true, programId: existing.programId };
 
   const { data, error } = await supabase
     .from("programs")

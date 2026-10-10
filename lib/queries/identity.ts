@@ -16,15 +16,34 @@ export type Identity = {
   onboarded_at: string | null;
 };
 
+export type IdentityRead =
+  | { ok: true; identity: Identity | null }
+  | { ok: false; error: string };
+
+/** Lecture qui distingue « pas de profil » d'une erreur (CM-86, C7). */
+export async function readIdentity(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+): Promise<IdentityRead> {
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, display_name, accent_color, color_role, weekly_goal, avatar_url, onboarded_at")
+      .eq("id", profileId)
+      .returns<Identity[]>()
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, identity: data };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Lecture impossible" };
+  }
+}
+
+/** Identité du profil, null si absente OU illisible (affichage seulement). */
 export async function getIdentity(
   supabase: SupabaseClient<Database>,
   profileId: string,
 ): Promise<Identity | null> {
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, display_name, accent_color, color_role, weekly_goal, avatar_url, onboarded_at")
-    .eq("id", profileId)
-    .returns<Identity[]>()
-    .maybeSingle();
-  return data;
+  const read = await readIdentity(supabase, profileId);
+  return read.ok ? read.identity : null;
 }

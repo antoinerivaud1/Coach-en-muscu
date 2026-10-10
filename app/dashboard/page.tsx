@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   requireProfileId,
   getProfile,
-  getDuoId,
+  readDuoId,
   getDuoProfileIds,
 } from "@/lib/profile";
 import { startSession } from "@/app/seances/actions";
@@ -60,7 +60,9 @@ export default async function DashboardPage({
   const supabase = await createClient();
 
   const profile = await getProfile(supabase, profileId);
-  const duoId = await getDuoId(supabase, profileId);
+  // CM-86 (C3) : l'accueil du premier jour n'est montré qu'à un solo AVÉRÉ.
+  const membership = await readDuoId(supabase, profileId);
+  const duoId = membership.ok ? membership.duoId : null;
   const isElle = profile?.color_role === "elle";
   const accent = isElle ? "text-elle" : "text-toi";
 
@@ -214,7 +216,13 @@ export default async function DashboardPage({
   // CM-86 : premier jour d'un utilisateur sans duo (aucune séance terminée,
   // aucune en cours) : accueil dédié, sans aucune section duo.
   const firstDay = seances[0];
-  if (!duoId && loggedSessionCount === 0 && banner.kind !== "banner" && firstDay) {
+  if (
+    membership.ok &&
+    !duoId &&
+    loggedSessionCount === 0 &&
+    banner.kind !== "banner" &&
+    firstDay
+  ) {
     const identity = await getIdentity(supabase, profileId);
     const { data: todayExercises } = await supabase
       .from("program_exercises")

@@ -1,20 +1,27 @@
 import { redirect } from "next/navigation";
 import { requireProfileId } from "@/lib/profile";
 import { createClient, createAuthClient } from "@/lib/supabase/server";
-import { getIdentity, type Identity } from "@/lib/queries/identity";
+import { readIdentity, type Identity } from "@/lib/queries/identity";
+
+export type OnboardingContext =
+  | { ok: true; identity: Identity; email: string | null }
+  | { ok: false };
 
 /**
  * CM-86 : contexte serveur des écrans d'onboarding. Sans session : connexion.
  * Onboarding déjà terminé : accueil (Antoine et Léa ne le revoient jamais).
+ *
+ * C7 : profil illisible (erreur réseau) ou introuvable : `{ ok: false }`, la
+ * page affiche un écran d'erreur avec « Réessayer ». Surtout pas de
+ * redirection : le middleware renverrait vers /onboarding (boucle possible
+ * /onboarding → /login → /dashboard → /onboarding).
  */
-export async function requireOnboardingIdentity(path: string): Promise<{
-  identity: Identity;
-  email: string | null;
-}> {
+export async function requireOnboardingIdentity(path: string): Promise<OnboardingContext> {
   const profileId = await requireProfileId(path);
   const supabase = await createClient();
-  const identity = await getIdentity(supabase, profileId);
-  if (!identity) redirect("/login");
+  const read = await readIdentity(supabase, profileId);
+  if (!read.ok || !read.identity) return { ok: false };
+  const identity = read.identity;
   if (identity.onboarded_at) redirect("/dashboard");
 
   let email: string | null = null;
@@ -26,7 +33,7 @@ export async function requireOnboardingIdentity(path: string): Promise<{
   } catch {
     email = null;
   }
-  return { identity, email };
+  return { ok: true, identity, email };
 }
 
 /**
