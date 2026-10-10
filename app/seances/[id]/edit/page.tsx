@@ -40,7 +40,7 @@ export default async function EditSeancePage({
   }
 
   const duoId = await getDuoId(supabase, profileId);
-  const { data: catalogData } = await getCatalogExercises(supabase, duoId);
+  const { data: catalogData } = await getCatalogExercises(supabase, duoId, profileId);
   const catalog: SystemExercise[] = catalogData ?? [];
 
   const initialExercises: SeanceDraftExercise[] = [...day.program_exercises]

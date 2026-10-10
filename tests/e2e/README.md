@@ -9,6 +9,7 @@ Parcours critiques joués dans un vrai navigateur contre l'app démarrée.
 | `profil.spec.ts` | se connecter, se déconnecter | oui (purge CM-83 du tableau de bord) |
 | `seance.spec.ts` | démarrer, valider une série, abandonner, quitter puis reprendre, supprimer, terminer via la croix (CM-94) | oui |
 | `progression.spec.ts` | une séance terminée apparaît dans « Stats » | oui |
+| `onboarding.spec.ts` | CM-86 : inscription d'un nouveau compte, onboarding complet (prénom, couleur, objectif), modèle de séances ajouté, accueil du premier jour ; un solo crée un exercice perso et le retrouve dans le catalogue ; un compte déjà onboardé n'est jamais redirigé vers `/onboarding` | oui (crée des comptes `cm86-…@coach-en-muscu.test`) |
 
 Depuis CM-59 B, l'app n'a plus de sélecteur de profil ni de mode d'auth : les
 parcours se connectent par `/login` avec les comptes du seed (helper `login`),
@@ -46,7 +47,8 @@ sur `main`, sans aucun secret :
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` et `SUPABASE_SERVICE_ROLE_KEY` (clés de démo
    locales) ; le job refuse toute URL qui n'est pas `http://127.0.0.1:…`.
 4. `npm run build` puis `next start` sur le port 3000, attente de la réponse.
-5. `npm run test:e2e` avec `E2E_ALLOW_WRITES=1` et
+5. `npm run test:e2e` avec `E2E_ALLOW_WRITES=1`, `SIGNUP_ENABLED=1` (CM-86 :
+   inscription ouverte côté app, lue par `next start`) et
    `E2E_SEANCE_NAME=Haut du corps` (données du seed) ; les parcours se
    connectent avec le compte « Toi » du seed.
 
@@ -84,6 +86,7 @@ E2E_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
 E2E_BASE_URL=http://localhost:3000 \
 E2E_SEANCE_NAME="Haut du corps" \
 npm run test:e2e
+# (l'app doit avoir été démarrée avec SIGNUP_ENABLED=1 pour onboarding.spec.ts)
 
 # 5. Fin
 supabase stop --no-backup

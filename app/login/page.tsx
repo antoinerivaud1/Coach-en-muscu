@@ -7,8 +7,8 @@ import LoginForm from "@/components/LoginForm";
 
 export const metadata: Metadata = { title: "Connexion · Coach en Muscu" };
 
-// CM-58 : connexion par compte (email + mot de passe). Pas d'inscription
-// publique (CM-86) : les comptes existants ont été créés pendant la bascule.
+// CM-58 : connexion par compte (email + mot de passe). CM-86 : lien vers
+// l'écran de bienvenue (inscription, fermée tant que SIGNUP_ENABLED est off).
 export default async function LoginPage({
   searchParams,
 }: {
@@ -42,6 +42,13 @@ export default async function LoginPage({
         <div className="mt-7">
           <LoginForm next={next} />
         </div>
+
+        <p className="mt-5 text-center text-base text-fg-muted">
+          Pas encore de compte&nbsp;?{" "}
+          <Link href="/welcome" className="inline-flex min-h-11 items-center font-bold text-energy">
+            Créer un compte
+          </Link>
+        </p>
 
         {/* CM-93 : liens légaux, accessibles sans compte. */}
         <nav

@@ -4,6 +4,16 @@ import { isUuid, loginPath, resolveProfileId } from "@/lib/auth/core";
 import { createAuthClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import { readDuoId } from "@/lib/duoMembership";
+
+// CM-86 (C3) : lecture du duo qui distingue « solo » d'une erreur.
+export {
+  readDuoId,
+  libraryTarget,
+  DUO_READ_ERROR_MESSAGE,
+  type DuoIdResult,
+  type LibraryTarget,
+} from "@/lib/duoMembership";
 
 export type Profile = {
   id: string;
@@ -77,18 +87,17 @@ export async function getProfile(
 /**
  * CM-85 : duo du profil (ex-couple, même uuid), null si le profil est solo.
  * Un profil appartient à un seul duo (index unique `duo_members.profile_id`).
+ *
+ * ATTENTION (CM-86, C3) : renvoie aussi null si la lecture échoue. À réserver
+ * à l'AFFICHAGE. Pour décider où écrire (bibliothèque du duo ou perso), utiliser
+ * `readDuoId`, qui distingue « solo » d'une erreur.
  */
 export async function getDuoId(
   supabase: SupabaseClient<Database>,
   profileId: string,
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from("duo_members")
-    .select("duo_id")
-    .eq("profile_id", profileId)
-    .returns<{ duo_id: string }[]>()
-    .maybeSingle();
-  return data?.duo_id ?? null;
+  const membership = await readDuoId(supabase, profileId);
+  return membership.ok ? membership.duoId : null;
 }
 
 /** CM-85 : profils membres du duo (2 au plus). */

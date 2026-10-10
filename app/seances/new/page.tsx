@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getDuoId } from "@/lib/profile";
+import Link from "next/link";
+import { requireProfileId, readDuoId, DUO_READ_ERROR_MESSAGE } from "@/lib/profile";
 import { getCatalogExercises } from "@/lib/queries/exercises";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import {
+  getPersonalProgramId,
   getProgramDayNames,
   getSharedProgramId,
 } from "@/lib/queries/programs";
@@ -20,31 +21,45 @@ export default async function NewSeancePage() {
   const profileId = await requireProfileId("/seances/new");
   const supabase = await createClient();
 
-  const duoId = await getDuoId(supabase, profileId);
-  if (!duoId) {
+  // CM-86 : sans duo, la séance ira dans la bibliothèque perso (créée à
+  // l'enregistrement, jamais ici). C3 : duo illisible => écran d'erreur.
+  const membership = await readDuoId(supabase, profileId);
+  if (!membership.ok) {
     return (
       <main className="min-h-screen p-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="mx-auto flex max-w-lg flex-col items-center gap-4 pt-16 text-center">
-          <p className="text-sm text-fg-muted">
-            Cette fonctionnalité nécessite un couple.
+          <p
+            role="alert"
+            className="rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+          >
+            {DUO_READ_ERROR_MESSAGE}
           </p>
+          <a
+            href="/seances/new"
+            className="rounded-xl bg-energy px-4 py-2.5 text-sm font-extrabold text-ink"
+          >
+            Réessayer
+          </a>
           <Link
-            href="/dashboard"
+            href="/seances"
             className="rounded-xl bg-surface2 px-4 py-2.5 text-sm font-semibold text-fg"
           >
-            ← Retour à l&apos;accueil
+            Retour à mes séances
           </Link>
         </div>
       </main>
     );
   }
+  const duoId = membership.duoId;
 
-  const { data: catalogData } = await getCatalogExercises(supabase, duoId);
+  const { data: catalogData } = await getCatalogExercises(supabase, duoId, profileId);
   const catalog: SystemExercise[] = catalogData ?? [];
 
-  const sharedProgramId = await getSharedProgramId(supabase, duoId);
-  const siblings = sharedProgramId
-    ? await getProgramDayNames(supabase, sharedProgramId)
+  const libraryProgramId = duoId
+    ? await getSharedProgramId(supabase, duoId)
+    : await getPersonalProgramId(supabase, profileId);
+  const siblings = libraryProgramId
+    ? await getProgramDayNames(supabase, libraryProgramId)
     : null;
   const otherNames =
     siblings && siblings.ok ? siblings.days.map((d) => d.name) : [];

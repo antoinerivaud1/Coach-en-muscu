@@ -272,6 +272,89 @@ export async function ensureSharedProgram(
   return { ok: true, programId: data.id };
 }
 
+/** Nom du programme perso, jamais montré à l'utilisateur (CM-86). */
+export const PERSONAL_PROGRAM_NAME = "Mes séances";
+
+export type PersonalProgramRead =
+  | { ok: true; programId: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Programme PERSO du profil (`owner_profile_id` = lui, `duo_id` null), le plus
+ * ancien s'il y en a plusieurs (CM-86). Distingue « aucun » d'une erreur.
+ */
+export async function readPersonalProgramId(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+): Promise<PersonalProgramRead> {
+  try {
+    const { data, error } = await supabase
+      .from("programs")
+      .select("id")
+      .eq("owner_profile_id", profileId)
+      .is("duo_id", null)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .returns<{ id: string }[]>();
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, programId: data?.[0]?.id ?? null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Lecture impossible" };
+  }
+}
+
+/**
+ * Id du programme perso, null s'il n'existe pas ENCORE ou si la lecture
+ * échoue (affichage uniquement ; pour écrire : `ensurePersonalProgram`).
+ */
+export async function getPersonalProgramId(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+): Promise<string | null> {
+  const read = await readPersonalProgramId(supabase, profileId);
+  return read.ok ? read.programId : null;
+}
+
+/**
+ * Équivalent perso d'`ensureSharedProgram` (CM-86) : la bibliothèque d'un
+ * utilisateur qui s'entraîne seul vit dans un programme à son nom, créé
+ * paresseusement à la PREMIÈRE ÉCRITURE (jamais au simple affichage d'une
+ * page) puis toujours réutilisé. Il reste à lui s'il rejoint un duo plus tard.
+ *
+ * Lecture en échec : refus, jamais de création « à l'aveugle » (sinon un
+ * doublon de programme à chaque coupure réseau).
+ */
+export async function ensurePersonalProgram(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+): Promise<EnsureSharedProgram> {
+  const existing = await readPersonalProgramId(supabase, profileId);
+  if (!existing.ok) {
+    return { ok: false, error: `Impossible de lire ta bibliothèque (${existing.error})` };
+  }
+  if (existing.programId) return { ok: true, programId: existing.programId };
+
+  const { data, error } = await supabase
+    .from("programs")
+    .insert({
+      name: PERSONAL_PROGRAM_NAME,
+      owner_profile_id: profileId,
+      duo_id: null,
+    })
+    .select("id")
+    .returns<{ id: string }[]>()
+    .single();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      error: error ? writeErrorMessage(error) : "Impossible de créer ta bibliothèque",
+    };
+  }
+
+  return { ok: true, programId: data.id };
+}
+
 // ---- Historique rattaché à une séance type ----
 
 export type LoggedSessionCount =

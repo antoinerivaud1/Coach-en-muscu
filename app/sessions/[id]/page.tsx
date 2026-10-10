@@ -150,7 +150,7 @@ export default async function SessionPage({
     // Catalogue d'ajout en séance (système + persos du couple), chargé ici
     // pour que la bottom sheet n'ait aucune requête à faire côté client.
     const duoId = await getDuoId(supabase, profileId);
-    const { data: catalogData } = await getCatalogExercises(supabase, duoId);
+    const { data: catalogData } = await getCatalogExercises(supabase, duoId, profileId);
     const catalog = (catalogData ?? []) as SystemExercise[];
 
     // Pré-remplissage des champs.
