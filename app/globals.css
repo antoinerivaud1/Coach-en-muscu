@@ -9,8 +9,9 @@
     --surface-2: #1f1f27;
     --energy: #ccff02;
     --flame: #ff8a3d;
-    --accent-lui: #2fe6ff;
-    --accent-elle: #ff4f7e;
+    /* CM-87 : accent du membre affiché (canaux RGB, voir tailwind.config.ts).
+       Cyan par défaut ; chaque écran pose la couleur du membre concerné. */
+    --member-rgb: 47 230 255;
     --fg: #f2f2f5;
     --fg-muted: #8c8c97;
     --fg-faint: #56565e;

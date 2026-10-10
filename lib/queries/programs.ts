@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { completedSessionsQuery } from "@/lib/queries/sessions";
 import { writeErrorMessage } from "@/lib/supabase/rlsErrors";
+import { seanceDestination, type SeanceTarget } from "@/lib/duo";
+import type { LibraryTarget } from "@/lib/duoMembership";
 
 /**
  * Id du programme partagé du couple (CM-80).
@@ -353,6 +355,30 @@ export async function ensurePersonalProgram(
   }
 
   return { ok: true, programId: data.id };
+}
+
+/**
+ * CM-87 : bibliothèque où va une NOUVELLE séance type. Fonction partagée par
+ * la création de séance, par-dessus `ensureSharedProgram` /
+ * `ensurePersonalProgram` (CM-86). `library` vient TOUJOURS de
+ * `libraryTarget(await readDuoId(…))` : une lecture du duo en échec est un
+ * refus, jamais un repli en perso (`seanceDestination`, lib/duo.ts).
+ */
+export async function resolveTargetProgram(
+  supabase: SupabaseClient<Database>,
+  input: {
+    profileId: string;
+    library: LibraryTarget;
+    target?: SeanceTarget | null;
+  },
+): Promise<EnsureSharedProgram & { target?: SeanceTarget }> {
+  const dest = seanceDestination(input.library, input.target);
+  if (!dest.ok) return { ok: false, error: dest.error };
+  const result =
+    dest.target === "duo" && input.library.kind === "shared"
+      ? await ensureSharedProgram(supabase, input.library.duoId)
+      : await ensurePersonalProgram(supabase, input.profileId);
+  return result.ok ? { ...result, target: dest.target } : result;
 }
 
 // ---- Historique rattaché à une séance type ----

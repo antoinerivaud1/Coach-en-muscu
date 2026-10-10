@@ -982,7 +982,7 @@ export default function SessionLogger({
         </button>
         <div className="text-center">
           <div className="flex items-center justify-center gap-1.5">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-elle" />
+            <span className="h-2 w-2 animate-pulse rounded-full bg-member" />
             <span className="font-oswald text-lg font-bold tracking-wide text-fg">
               {formatClock(elapsed)}
             </span>
@@ -1096,7 +1096,7 @@ export default function SessionLogger({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <div className="text-[13px] font-bold uppercase tracking-wide text-toi">
+              <div className="text-[13px] font-bold uppercase tracking-wide text-member">
                 Exercice {currentIdx + 1}
               </div>
               {ex.source === "extra" && (
@@ -1781,7 +1781,7 @@ function SetInputs({
         type="button"
         onClick={onToggleWarmup}
         className={`min-h-11 text-left text-[13px] font-semibold ${
-          isWarmup ? "text-toi" : "text-fg-faint"
+          isWarmup ? "text-member" : "text-fg-faint"
         }`}
       >
         {isWarmup ? "● Échauffement" : "○ Marquer comme échauffement"}

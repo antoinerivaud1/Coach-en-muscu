@@ -22,7 +22,7 @@ const oswald = Oswald({
 
 export const metadata: Metadata = {
   title: "Coach en Muscu",
-  description: "Tracker de séances pour Toi et Elle",
+  description: "Suivi de séances de musculation, seul ou à deux",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

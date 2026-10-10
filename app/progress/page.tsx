@@ -1,9 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import {
-  requireProfileId,
-  getDuoId,
-  getDuoProfileIds,
-} from "@/lib/profile";
+import { requireProfileId, getMemberProfiles } from "@/lib/profile";
+import { memberStyle, showsComparison, toMembers } from "@/lib/duo";
 import {
   getAllSetsForProgress,
   getCompletedSessionsSince,
@@ -19,8 +16,6 @@ import BottomNav from "@/components/BottomNav";
 import ProgressView, { type ExerciseSeries } from "./ProgressView";
 import StatsSummary, { type StatsData } from "./StatsSummary";
 
-type ProfileRow = { id: string; display_name: string; color_role: "toi" | "elle"; weekly_goal: number };
-
 export default async function ProgressPage({
   searchParams,
 }: {
@@ -30,24 +25,17 @@ export default async function ProgressPage({
   const profileId = await requireProfileId("/progress");
   const supabase = await createClient();
 
-  // Profils du couple (moi + partenaire).
-  const duoId = await getDuoId(supabase, profileId);
-  const ids = duoId
-    ? await getDuoProfileIds(supabase, duoId)
-    : [profileId];
-
-  const { data: profilesData } = await supabase
-    .from("profiles")
-    .select("id, display_name, color_role, weekly_goal")
-    .in("id", ids)
-    .returns<ProfileRow[]>();
-  const profiles = profilesData ?? [];
+  // CM-87 : moi, plus mon partenaire en duo actif, avec prénom et couleur.
+  const { profiles } = await getMemberProfiles(supabase, profileId);
+  const members = toMembers(profiles, profileId);
+  const ids = members.map((m) => m.id);
 
   const selectedProfileId =
     profileParam && ids.includes(profileParam) ? profileParam : profileId;
   const selectedProfile =
     profiles.find((p) => p.id === selectedProfileId) ?? null;
-  const color = selectedProfile?.color_role === "elle" ? "#FF4F7E" : "#2FE6FF";
+  const selectedMember = members.find((m) => m.id === selectedProfileId) ?? members[0];
+  const color = selectedMember?.color ?? "#2FE6FF";
 
   const { data: setsData } = await getAllSetsForProgress(
     supabase,
@@ -177,8 +165,8 @@ export default async function ProgressPage({
   const weekSessions = (weekSess ?? []).filter(
     (s) => s.profile_id === selectedProfileId,
   ).length;
-  let couple: { name: string; isElle: boolean; sets: number }[] = [];
-  if (profiles.length > 1 && (weekSess?.length ?? 0) > 0) {
+  let couple: { name: string; color: string; sets: number }[] = [];
+  if (showsComparison(members) && (weekSess?.length ?? 0) > 0) {
     const sessToProfile = new Map(
       (weekSess ?? []).map((s) => [s.id, s.profile_id]),
     );
@@ -195,10 +183,10 @@ export default async function ProgressPage({
       const pid = sessToProfile.get(r.session_id);
       if (pid) cnt[pid] = (cnt[pid] ?? 0) + 1;
     }
-    couple = profiles.map((p) => ({
-      name: p.display_name,
-      isElle: p.color_role === "elle",
-      sets: cnt[p.id] ?? 0,
+    couple = members.map((m) => ({
+      name: m.name,
+      color: m.color,
+      sets: cnt[m.id] ?? 0,
     }));
   }
 
@@ -217,28 +205,28 @@ export default async function ProgressPage({
   };
 
   return (
-    <main className="min-h-[100dvh] p-4 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
+    <main
+      className="min-h-[100dvh] p-4 pb-28 pt-[max(1rem,env(safe-area-inset-top))]"
+      style={memberStyle(color)}
+    >
       <div className="mx-auto max-w-lg">
         <h1 className="text-3xl font-black tracking-tight">Progression</h1>
 
-        {profiles.length > 1 && (
+        {showsComparison(members) && (
           <div className="mt-3 flex gap-2">
-            {profiles.map((p) => {
-              const active = p.id === selectedProfileId;
-              const c = p.color_role === "elle" ? "elle" : "toi";
+            {members.map((m) => {
+              const active = m.id === selectedProfileId;
               return (
                 <a
-                  key={p.id}
-                  href={`/progress?profile=${p.id}`}
-                  className={`rounded-full px-3 py-1.5 text-sm font-medium ${
-                    active
-                      ? c === "elle"
-                        ? "bg-elle text-ink"
-                        : "bg-toi text-ink"
-                      : "bg-surface2 text-fg-muted"
+                  key={m.id}
+                  href={`/progress?profile=${m.id}`}
+                  aria-current={active ? "page" : undefined}
+                  className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-bold ${
+                    active ? "text-ink" : "bg-surface2 text-fg-muted"
                   }`}
+                  style={active ? { background: m.color } : undefined}
                 >
-                  {p.display_name}
+                  {m.name}
                 </a>
               );
             })}

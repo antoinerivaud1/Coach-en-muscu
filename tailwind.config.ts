@@ -1,10 +1,13 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Design system — Refonte UI « Direction Sport » (CM-31).
+ * Design system : Refonte UI « Direction Sport » (CM-31).
  * Thème encre + vert acide, un accent par personne.
- * Les rôles couleur en base restent `toi`/`elle` ; seules les valeurs de
- * rendu changent (toi orange -> cyan, elle violet -> rose).
+ * CM-87 : l'accent de membre n'est plus « toi » / « elle » mais la couleur
+ * choisie par chacun (`profiles.accent_color`, lib/members.ts). La classe
+ * `member` (`bg-member`, `text-member/80`…) lit la variable CSS
+ * `--member-rgb`, posée par l'écran sur le conteneur du membre concerné
+ * (`memberStyle`, lib/duo.ts) ; cyan par défaut (app/globals.css).
  */
 const config: Config = {
   content: [
@@ -28,9 +31,8 @@ const config: Config = {
         flame: "#FF8A3D",
         // Texte
         fg: { DEFAULT: "#F2F2F5", muted: "#8C8C97", faint: "#56565E" },
-        // Accents par profil (rôles inchangés)
-        toi: { DEFAULT: "#2FE6FF", fg: "#0B0B0F" }, // Lui — cyan
-        elle: { DEFAULT: "#FF4F7E", fg: "#0B0B0F" } // Elle — rose
+        // Accent du membre affiché (CM-87), opacités comprises.
+        member: "rgb(var(--member-rgb) / <alpha-value>)"
       },
       // CM-101 : échelle de texte agrandie pour la lecture à bout de bras, à la
       // salle (design system « Coach en Muscu », 08/10/2026). Rien sous 12px.

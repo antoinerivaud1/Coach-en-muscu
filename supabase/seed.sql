@@ -26,18 +26,25 @@ insert into auth.users (
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111',
    'authenticated', 'authenticated', 'toi@coach-en-muscu.test',
    extensions.crypt('motdepasse-de-test', extensions.gen_salt('bf')), now(),
-   '{"provider":"email","providers":["email"]}', '{"display_name":"Toi","color_role":"toi"}',
+   '{"provider":"email","providers":["email"]}', '{"display_name":"Théo","color_role":"toi"}',
    now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', '22222222-2222-2222-2222-222222222222',
    'authenticated', 'authenticated', 'elle@coach-en-muscu.test',
    extensions.crypt('motdepasse-de-test', extensions.gen_salt('bf')), now(),
-   '{"provider":"email","providers":["email"]}', '{"display_name":"Elle","color_role":"elle"}',
+   '{"provider":"email","providers":["email"]}', '{"display_name":"Lina","color_role":"elle"}',
    now(), now(), '', '', '', ''),
   -- CM-59 : compte « Solo », HORS duo (tests RLS : ne voit rien du duo).
   ('00000000-0000-0000-0000-000000000000', '44444444-4444-4444-4444-444444444444',
    'authenticated', 'authenticated', 'solo@coach-en-muscu.test',
    extensions.crypt('motdepasse-de-test', extensions.gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{"display_name":"Solo","color_role":"toi"}',
+   now(), now(), '', '', '', ''),
+  -- CM-87 : compte « Duo2 », HORS duo, sans données (rejoint Solo dans les
+  -- tests du duo optionnel : pgTAP cm87_duo, e2e duo.spec.ts).
+  ('00000000-0000-0000-0000-000000000000', '55555555-5555-5555-5555-555555555555',
+   'authenticated', 'authenticated', 'duo2@coach-en-muscu.test',
+   extensions.crypt('motdepasse-de-test', extensions.gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}', '{"display_name":"Duo2","color_role":"toi"}',
    now(), now(), '', '', '', '');
 
 insert into auth.identities (
@@ -54,16 +61,24 @@ insert into auth.identities (
   ('44444444-4444-4444-4444-444444444444', '44444444-4444-4444-4444-444444444444',
    '44444444-4444-4444-4444-444444444444', 'email',
    '{"sub":"44444444-4444-4444-4444-444444444444","email":"solo@coach-en-muscu.test","email_verified":true}',
+   now(), now(), now()),
+  ('55555555-5555-5555-5555-555555555555', '55555555-5555-5555-5555-555555555555',
+   '55555555-5555-5555-5555-555555555555', 'email',
+   '{"sub":"55555555-5555-5555-5555-555555555555","email":"duo2@coach-en-muscu.test","email_verified":true}',
    now(), now(), now());
 
 -- Profils et duo ----------------------------------------------------------------
 
 -- CM-86 socle : couleur de membre (accent_color) et onboarding déjà fait pour
--- les 3 comptes (les e2e ne passent pas par l'onboarding).
+-- les 4 comptes (les e2e ne passent pas par l'onboarding).
 insert into public.profiles (id, display_name, color_role, weekly_goal, accent_color, onboarded_at) values
-  ('11111111-1111-1111-1111-111111111111', 'Toi',  'toi',  4, '#2FE6FF', now()),
-  ('22222222-2222-2222-2222-222222222222', 'Elle', 'elle', 3, '#FF4F7E', now()),
-  ('44444444-4444-4444-4444-444444444444', 'Solo', 'toi',  3, '#FF8A3D', now())
+  -- CM-87 : prénoms fictifs (les comptes restent « toi@ » / « elle@ ») : les
+  -- écrans affichent le prénom, plus jamais « Toi » / « Elle ».
+  ('11111111-1111-1111-1111-111111111111', 'Théo', 'toi',  4, '#2FE6FF', now()),
+  ('22222222-2222-2222-2222-222222222222', 'Lina', 'elle', 3, '#FF4F7E', now()),
+  ('44444444-4444-4444-4444-444444444444', 'Solo', 'toi',  3, '#FF8A3D', now()),
+  -- CM-87 : même couleur que Solo, pour le conflit de couleur à l'acceptation.
+  ('55555555-5555-5555-5555-555555555555', 'Duo2', 'toi',  3, '#FF8A3D', now())
 on conflict (id) do update set
   display_name = excluded.display_name,
   color_role   = excluded.color_role,

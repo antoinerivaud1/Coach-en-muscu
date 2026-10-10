@@ -1,16 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getDuoId, getDuoProfileIds } from "@/lib/profile";
+import { requireProfileId, getMemberProfiles } from "@/lib/profile";
+import { showsComparison, toMembers, type Member } from "@/lib/duo";
 import { getHistory } from "@/lib/queries/sessions";
 import type { HistorySessionRow } from "@/lib/queries/sessions";
 import { formatDateLong } from "@/lib/utils/training";
 import BottomNav from "@/components/BottomNav";
-
-type ProfileRow = {
-  id: string;
-  display_name: string;
-  color_role: "toi" | "elle";
-};
 
 const FEEDBACK_LABELS: Record<string, string> = {
   easy: "Facile",
@@ -23,18 +18,14 @@ export default async function HistoryPage() {
   const profileId = await requireProfileId("/history");
   const supabase = await createClient();
 
-  const duoId = await getDuoId(supabase, profileId);
-  const ids = duoId
-    ? await getDuoProfileIds(supabase, duoId)
-    : [profileId];
-
-  const { data: profilesData } = await supabase
-    .from("profiles")
-    .select("id, display_name, color_role")
-    .in("id", ids)
-    .returns<ProfileRow[]>();
-  const profiles: Record<string, ProfileRow> = {};
-  for (const p of profilesData ?? []) profiles[p.id] = p;
+  // CM-87 : moi, plus mon partenaire en duo actif ; prénom et couleur de
+  // chacun. Sans duo, aucun nom affiché (rien à comparer).
+  const { profiles } = await getMemberProfiles(supabase, profileId);
+  const members = toMembers(profiles, profileId);
+  const ids = members.map((m) => m.id);
+  const byId: Record<string, Member> = {};
+  for (const m of members) byId[m.id] = m;
+  const showNames = showsComparison(members);
 
   // `getHistory` ne renvoie que des séances TERMINÉES (CM-83) : une séance en
   // cours n'apparaît donc plus ici avec un compteur de séries qui bouge. Le
@@ -62,7 +53,7 @@ export default async function HistoryPage() {
             </p>
             <Link
               href="/dashboard"
-              className="mt-4 inline-block rounded-lg bg-toi px-5 py-2.5 font-semibold text-white"
+              className="mt-4 inline-block rounded-xl bg-energy px-5 py-2.5 font-extrabold text-ink"
             >
               Voir mes séances
             </Link>
@@ -70,27 +61,23 @@ export default async function HistoryPage() {
         ) : (
           <ul className="mt-4 space-y-3">
             {sessions.map((s) => {
-              const profile = profiles[s.profile_id];
-              const isElle = profile?.color_role === "elle";
+              const member = showNames ? byId[s.profile_id] : undefined;
               return (
                 <li key={s.id}>
                   <Link
                     href={`/sessions/${s.id}`}
                     className="block rounded-xl bg-surface p-4 transition-colors hover:bg-surface2"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                       <span className="font-medium">
                         {s.program_days?.name ?? "Séance"}
                       </span>
-                      {profile && (
+                      {member && (
                         <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            isElle
-                              ? "bg-elle/20 text-elle"
-                              : "bg-toi/20 text-toi"
-                          }`}
+                          className="rounded-full px-2.5 py-0.5 text-xs font-bold"
+                          style={{ color: member.color, background: `${member.color}33` }}
                         >
-                          {profile.display_name}
+                          {member.name}
                         </span>
                       )}
                     </div>

@@ -1,6 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { requireProfileId, readDuoId, DUO_READ_ERROR_MESSAGE } from "@/lib/profile";
+import { createClient } from "@/lib/supabase/server";
+import { requireProfileId, readMemberProfiles, DUO_READ_ERROR_MESSAGE } from "@/lib/profile";
+import { toMembers } from "@/lib/duo";
 import { getCatalogExercises } from "@/lib/queries/exercises";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import {
@@ -21,10 +22,12 @@ export default async function NewSeancePage() {
   const profileId = await requireProfileId("/seances/new");
   const supabase = await createClient();
 
-  // CM-86 : sans duo, la séance ira dans la bibliothèque perso (créée à
-  // l'enregistrement, jamais ici). C3 : duo illisible => écran d'erreur.
-  const membership = await readDuoId(supabase, profileId);
-  if (!membership.ok) {
+  // CM-86 : sans partenaire, la séance ira dans la bibliothèque perso.
+  // CM-87 : en duo, choix « Pour nous deux » (défaut) / « Pour moi ».
+  // C3 : duo illisible => écran d'erreur (jamais de séance rangée en perso
+  // par erreur ; `saveSeance` refuse aussi).
+  const read = await readMemberProfiles(supabase, profileId);
+  if (!read.ok) {
     return (
       <main className="min-h-screen p-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="mx-auto flex max-w-lg flex-col items-center gap-4 pt-16 text-center">
@@ -50,26 +53,38 @@ export default async function NewSeancePage() {
       </main>
     );
   }
-  const duoId = membership.duoId;
+  const { duoId, profiles } = read;
+  const members = toMembers(profiles, profileId);
+  const partner = members.find((m) => !m.isMe);
+  const me = members.find((m) => m.isMe);
 
   const { data: catalogData } = await getCatalogExercises(supabase, duoId, profileId);
   const catalog: SystemExercise[] = catalogData ?? [];
 
-  const libraryProgramId = duoId
-    ? await getSharedProgramId(supabase, duoId)
-    : await getPersonalProgramId(supabase, profileId);
-  const siblings = libraryProgramId
-    ? await getProgramDayNames(supabase, libraryProgramId)
-    : null;
-  const otherNames =
-    siblings && siblings.ok ? siblings.days.map((d) => d.name) : [];
+  const namesOf = async (programId: string | null) => {
+    if (!programId) return [];
+    const siblings = await getProgramDayNames(supabase, programId);
+    return siblings.ok ? siblings.days.map((d) => d.name) : [];
+  };
+  const persoNames = await namesOf(await getPersonalProgramId(supabase, profileId));
+  const duoNames = duoId ? await namesOf(await getSharedProgramId(supabase, duoId)) : [];
 
   return (
     <SeanceBuilder
       mode="create"
       initialName=""
       initialExercises={[]}
-      otherNames={otherNames}
+      otherNames={duoId ? duoNames : persoNames}
+      owner={
+        duoId && partner && me
+          ? {
+              partnerName: partner.name,
+              myColor: me.color,
+              initial: "duo",
+              otherNamesByTarget: { duo: duoNames, perso: persoNames },
+            }
+          : undefined
+      }
       catalog={catalog}
       canCreateExercise
       backHref="/seances"

@@ -29,6 +29,8 @@ import {
   estimatedOneRepMax,
 } from "@/lib/utils/training";
 import { suggestFirstSet } from "@/lib/utils/prefill";
+import { memberAccent } from "@/lib/members";
+import { memberStyle } from "@/lib/duo";
 import SessionLogger, {
   type LoggerExercise,
   type InitialSet,
@@ -75,6 +77,15 @@ export default async function SessionPage({
     }
   }
   const editSets = isMine && edit !== "1" && editsets === "1";
+
+  // CM-87 : accent du membre à qui est la séance (classes `*-member`).
+  const { data: owner } = await supabase
+    .from("profiles")
+    .select("accent_color")
+    .eq("id", session.profile_id)
+    .returns<{ accent_color: string }[]>()
+    .maybeSingle();
+  const ownerStyle = memberStyle(memberAccent(owner ?? {}));
 
   const { data: setsData } = await getSessionSets(supabase, id);
   const existingSets = (setsData ?? []) as SessionSetRow[];
@@ -221,7 +232,7 @@ export default async function SessionPage({
     }
 
     return (
-      <main className="min-h-screen p-4">
+      <main className="min-h-screen p-4" style={ownerStyle}>
         <SessionLogger
           sessionId={id}
           dayName={day.name}
@@ -300,7 +311,7 @@ export default async function SessionPage({
     : null;
 
   return (
-    <main className="min-h-screen p-4 pb-24">
+    <main className="min-h-screen p-4 pb-24" style={ownerStyle}>
       {/* CM-78 : séance terminée alors que des séries attendaient encore leur
           écriture. Le logger n'est plus là pour vider la file, ce composant
           prend le relais et rafraîchit le récap dès qu'elle est vide. */}
@@ -330,7 +341,7 @@ export default async function SessionPage({
         </p>
 
         {prCount > 0 && (
-          <div className="mt-4 rounded-xl bg-toi/15 px-4 py-3 text-sm font-medium text-toi">
+          <div className="mt-4 rounded-xl bg-member/15 px-4 py-3 text-sm font-medium text-member">
             🏆 {prCount} nouveau{prCount > 1 ? "x" : ""} record
             {prCount > 1 ? "s" : ""} sur cette séance !
           </div>
@@ -363,7 +374,7 @@ export default async function SessionPage({
                     {exerciseNames[exId] ?? "Exercice"}
                   </h2>
                   {prByExercise[exId] && (
-                    <span className="rounded-full bg-toi/20 px-2 py-0.5 text-xs font-medium text-toi">
+                    <span className="rounded-full bg-member/20 px-2 py-0.5 text-xs font-medium text-member">
                       🏆 Record
                     </span>
                   )}

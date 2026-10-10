@@ -3,11 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import {
   requireProfileId,
   getProfile,
-  readDuoId,
-  getDuoProfileIds,
+  readDuoMembership,
 } from "@/lib/profile";
 import { startSession } from "@/app/seances/actions";
 import {
+  getAllSetsForProgress,
   buildLastDoneByDay,
   getCompletedSessionsForDashboard,
   getCurrentSession,
@@ -16,6 +16,11 @@ import {
 import { resumeBannerState } from "@/lib/utils/currentSession";
 import BottomNav from "@/components/BottomNav";
 import FirstDayHome from "@/components/home/FirstDayHome";
+import MemberAvatar from "@/components/onboarding/MemberAvatar";
+import DuoAvatars from "@/components/duo/DuoAvatars";
+import DuoWeekCard, { type MemberWeek } from "@/components/duo/DuoWeekCard";
+import PartnerActivityCard from "@/components/duo/PartnerActivityCard";
+import { formatRecord, latestRecord, memberStyle, toMembers } from "@/lib/duo";
 import { getIdentity } from "@/lib/queries/identity";
 import { memberAccent } from "@/lib/members";
 import { estimateSeanceMinutes } from "@/lib/onboardingTemplates";
@@ -37,6 +42,17 @@ const WEEK = ["L", "M", "M", "J", "V", "S", "D"];
 
 /** Nombre de tags musculaires affichés sur une carte de la grille (2 colonnes). */
 const CARD_VISIBLE_TAGS = 2;
+
+/** « Semaine du 5 octobre » (lundi de la semaine en cours). */
+function weekLabel(now: Date): string {
+  const monday = new Date(now.getTime() - localWeekdayIndex(now) * 86400000);
+  const d = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: APP_TIME_ZONE,
+    day: "numeric",
+    month: "long",
+  }).format(monday);
+  return `Semaine du ${d}`;
+}
 
 function todayLabel(): string {
   const s = new Intl.DateTimeFormat("fr-FR", {
@@ -60,36 +76,39 @@ export default async function DashboardPage({
   const supabase = await createClient();
 
   const profile = await getProfile(supabase, profileId);
+  // CM-87 : duo actif (2 membres) seulement ; prénoms et couleurs de membre.
   // CM-86 (C3) : l'accueil du premier jour n'est montré qu'à un solo AVÉRÉ.
-  const membership = await readDuoId(supabase, profileId);
-  const duoId = membership.ok ? membership.duoId : null;
-  const isElle = profile?.color_role === "elle";
-  const accent = isElle ? "text-elle" : "text-toi";
+  const membershipRead = await readDuoMembership(supabase, profileId);
+  const membership = membershipRead.ok ? membershipRead.membership : null;
+  const duoId = membership?.duoId ?? null;
+  const partner = membership ? await getProfile(supabase, membership.partnerId) : null;
+  const members = toMembers(
+    [profile, partner].filter((p): p is NonNullable<typeof p> => Boolean(p)),
+    profileId,
+  );
+  const me = members.find((m) => m.isMe) ?? {
+    id: profileId,
+    name: profile?.display_name ?? "",
+    color: memberAccent({}),
+    isMe: true,
+  };
+  const partnerMember = members.find((m) => !m.isMe) ?? null;
 
-  let partnerName: string | null = null;
-  let partnerIsElle = false;
   let partnerLive: { dayName: string } | null = null;
-  if (duoId) {
-    const pids = await getDuoProfileIds(supabase, duoId);
-    const partnerId = pids.find((id) => id !== profileId);
-    if (partnerId) {
-      const partner = await getProfile(supabase, partnerId);
-      partnerName = partner?.display_name ?? null;
-      partnerIsElle = partner?.color_role === "elle";
-      // Séance en cours = pas encore terminée (duration null) et récente (< 3 h).
-      const since = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
-      const { data: live } = await supabase
-        .from("sessions")
-        .select("id, program_days(name)")
-        .eq("profile_id", partnerId)
-        .is("duration_seconds", null)
-        .gte("performed_at", since)
-        .order("performed_at", { ascending: false })
-        .limit(1)
-        .returns<{ id: string; program_days: { name: string } | null }[]>();
-      const row = live?.[0];
-      if (row) partnerLive = { dayName: row.program_days?.name ?? "une séance" };
-    }
+  if (partner) {
+    // Séance en cours = pas encore terminée (duration null) et récente (< 3 h).
+    const since = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+    const { data: live } = await supabase
+      .from("sessions")
+      .select("id, program_days(name)")
+      .eq("profile_id", partner.id)
+      .is("duration_seconds", null)
+      .gte("performed_at", since)
+      .order("performed_at", { ascending: false })
+      .limit(1)
+      .returns<{ id: string; program_days: { name: string } | null }[]>();
+    const row = live?.[0];
+    if (row) partnerLive = { dayName: row.program_days?.name ?? "une séance" };
   }
 
   const now = new Date();
@@ -217,7 +236,7 @@ export default async function DashboardPage({
   // aucune en cours) : accueil dédié, sans aucune section duo.
   const firstDay = seances[0];
   if (
-    membership.ok &&
+    membershipRead.ok &&
     !duoId &&
     loggedSessionCount === 0 &&
     banner.kind !== "banner" &&
@@ -243,28 +262,85 @@ export default async function DashboardPage({
     );
   }
 
+  // --- Duo (CM-87) : semaine de chaque membre, dernier record du partenaire ---
+  let duoWeek: MemberWeek[] = [];
+  let partnerRecord: { exerciseName: string; detail: string } | null = null;
+  if (partner && partnerMember) {
+    const weekOf = (rows: { performed_at: string; session_sets: unknown[] }[]) => {
+      const days = new Set<number>();
+      let count = 0;
+      for (const r of rows) {
+        if ((r.session_sets ?? []).length === 0) continue;
+        const d = new Date(r.performed_at);
+        if (localDayNumber(d) < weekStartDay) continue;
+        days.add(localWeekdayIndex(d));
+        count += 1;
+      }
+      return { doneDays: [...days], count };
+    };
+    const { data: partnerSessions } = await getCompletedSessionsForDashboard(
+      supabase,
+      partner.id,
+    );
+    duoWeek = [
+      { ...me, ...weekOf(sessions), goal: profile?.weekly_goal ?? 3 },
+      { ...partnerMember, ...weekOf(partnerSessions ?? []), goal: partner.weekly_goal },
+    ];
+
+    // Dernier record battu par le partenaire (charge max dépassée), parmi
+    // les exercices dont le nom m'est visible.
+    const { data: partnerSets } = await getAllSetsForProgress(supabase, partner.id);
+    const sets = (partnerSets ?? []).flatMap((r) =>
+      r.sessions?.performed_at
+        ? [{
+            exerciseId: r.exercise_id,
+            performedAt: r.sessions.performed_at,
+            weightKg: Number(r.weight_kg),
+            reps: r.reps,
+          }]
+        : [],
+    );
+    const exIds = [...new Set(sets.map((x) => x.exerciseId))];
+    const names = new Map<string, string>();
+    if (exIds.length > 0) {
+      const { data: exRows } = await supabase
+        .from("exercises")
+        .select("id, name")
+        .in("id", exIds)
+        .returns<{ id: string; name: string }[]>();
+      for (const e of exRows ?? []) names.set(e.id, e.name);
+    }
+    const record = latestRecord(sets, (id) => names.has(id));
+    if (record) {
+      partnerRecord = {
+        exerciseName: names.get(record.exerciseId)!,
+        detail: `${formatRecord(record.weightKg, record.reps)} · ${formatLastDone(
+          record.performedAt,
+          now,
+        ).toLocaleLowerCase("fr-FR")}`,
+      };
+    }
+  }
+
   return (
-    <main className="min-h-[100dvh] px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
+    <main
+      className="min-h-[100dvh] px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))]"
+      style={memberStyle(me.color)}
+    >
       <header className="flex items-start justify-between">
         <div>
           <div className="text-[15px] font-semibold tracking-wide text-fg-muted">
             {todayLabel()}
           </div>
           <h1 className="mt-1 text-[30px] font-black tracking-tight text-fg">
-            Salut, <span className={accent}>{profile?.display_name}</span>
+            Salut, <span style={{ color: me.color }}>{me.name}</span>
           </h1>
-          {partnerName && (
-            <p className="mt-1 text-sm text-fg-muted">En binôme avec {partnerName}</p>
-          )}
         </div>
-        <span
-          className={`flex h-[46px] w-[46px] items-center justify-center rounded-2xl border font-oswald text-xl font-bold ${
-            isElle ? "border-elle/40 bg-elle/10 text-elle" : "border-toi/40 bg-toi/10 text-toi"
-          }`}
-          aria-hidden
-        >
-          {isElle ? "E" : "L"}
-        </span>
+        {partnerMember ? (
+          <DuoAvatars members={[me, partnerMember]} />
+        ) : (
+          <MemberAvatar name={me.name} color={me.color} size={46} />
+        )}
       </header>
 
       {actionError && (
@@ -276,19 +352,22 @@ export default async function DashboardPage({
         </p>
       )}
 
-      {partnerLive && (
+      {partnerLive && partnerMember && (
         <div
-          className={`mt-5 flex items-center gap-3 rounded-2xl border px-4 py-3 ${
-            partnerIsElle ? "border-elle/30 bg-elle/10" : "border-toi/30 bg-toi/10"
-          }`}
+          className="mt-5 flex items-center gap-3 rounded-2xl border px-4 py-3"
+          style={{
+            borderColor: `${partnerMember.color}4D`,
+            background: `${partnerMember.color}1A`,
+          }}
         >
           <span
-            className={`h-2.5 w-2.5 flex-none animate-pulse rounded-full ${
-              partnerIsElle ? "bg-elle" : "bg-toi"
-            }`}
+            className="h-2.5 w-2.5 flex-none animate-pulse rounded-full"
+            style={{ background: partnerMember.color }}
           />
           <div className="text-sm">
-            <span className="font-bold text-fg">{partnerName}</span>
+            <span className="font-bold" style={{ color: partnerMember.color }}>
+              {partnerMember.name}
+            </span>
             <span className="text-fg-muted">
               {" "}s&apos;entraîne en ce moment · {partnerLive.dayName}
             </span>
@@ -296,31 +375,49 @@ export default async function DashboardPage({
         </div>
       )}
 
-      {/* Strip de la semaine */}
-      <div className="mt-6 flex justify-between gap-1.5 rounded-[18px] border border-line bg-surface px-4 py-3.5">
-        {WEEK.map((d, i) => {
-          const done = doneThisWeek.has(i);
-          const isToday = i === todayIdx;
-          return (
-            <div key={i} className="flex flex-col items-center gap-1.5">
-              <span
-                className={`text-[12px] font-bold ${isToday ? "text-energy" : "text-fg-muted"}`}
-              >
-                {d}
-              </span>
-              <span
-                className={`h-6 w-6 rounded-lg ${
-                  done
-                    ? "bg-energy"
-                    : isToday
-                      ? "border-2 border-energy bg-transparent"
-                      : "bg-surface2"
-                }`}
-              />
-            </div>
-          );
-        })}
-      </div>
+      {/* Semaine : une ligne par membre en duo (CM-87), sinon le strip solo. */}
+      {duoWeek.length > 1 ? (
+        <>
+          <DuoWeekCard
+            members={duoWeek}
+            todayIdx={todayIdx}
+            weekLabel={weekLabel(now)}
+          />
+          {partnerRecord && partnerMember && (
+            <PartnerActivityCard
+              name={partnerMember.name}
+              color={partnerMember.color}
+              exerciseName={partnerRecord.exerciseName}
+              detail={partnerRecord.detail}
+            />
+          )}
+        </>
+      ) : (
+        <div className="mt-6 flex justify-between gap-1.5 rounded-[18px] border border-line bg-surface px-4 py-3.5">
+          {WEEK.map((d, i) => {
+            const done = doneThisWeek.has(i);
+            const isToday = i === todayIdx;
+            return (
+              <div key={i} className="flex flex-col items-center gap-1.5">
+                <span
+                  className={`text-[12px] font-bold ${isToday ? "text-energy" : "text-fg-muted"}`}
+                >
+                  {d}
+                </span>
+                <span
+                  className={`h-6 w-6 rounded-lg ${
+                    done
+                      ? "bg-energy"
+                      : isToday
+                        ? "border-2 border-energy bg-transparent"
+                        : "bg-surface2"
+                  }`}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Séance en cours : toujours visible, même si la bibliothèque est vide.
           Ne bloque rien, la grille en dessous reste tapable (CM-83). */}

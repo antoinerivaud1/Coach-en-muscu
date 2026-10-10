@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Coach en Muscu",
     short_name: "Muscu",
-    description: "Suivi de séances de musculation pour Toi et Elle",
+    description: "Suivi de séances de musculation, seul ou à deux",
     start_url: "/dashboard",
     display: "standalone",
     background_color: "#09090b",

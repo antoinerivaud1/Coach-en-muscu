@@ -468,6 +468,36 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      // CM-87 : RPC du duo optionnel (supabase/migrations/20261010191000_cm87_duo_rpc.sql).
+      accept_duo_invitation: {
+        Args: { p_code: string; p_accent_color?: string | null }
+        Returns: string
+      }
+      create_duo_invitation: {
+        Args: never
+        Returns: { code: string; token: string; expires_at: string }[]
+      }
+      get_duo_invitation: {
+        Args: { p_code: string }
+        Returns: {
+          inviter_name: string
+          inviter_color: string
+          expires_at: string
+          my_color: string
+          color_conflict: boolean
+          already_in_duo: boolean
+        }[]
+      }
+      get_my_duo_invitation: {
+        Args: never
+        Returns: { code: string; token: string; expires_at: string }[]
+      }
+      leave_duo: { Args: never; Returns: undefined }
+      revoke_duo_invitation: { Args: never; Returns: undefined }
+      set_seance_shared: {
+        Args: { p_day_id: string; p_shared: boolean }
+        Returns: { status: "moved" | "copied" | "unchanged"; day_id: string }[]
+      }
       can_access_program: { Args: { p_program_id: string }; Returns: boolean }
       is_duo_member: { Args: { p_duo_id: string }; Returns: boolean }
       my_duo_id: { Args: never; Returns: string }

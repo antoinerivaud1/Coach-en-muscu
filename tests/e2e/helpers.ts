@@ -54,6 +54,16 @@ export const SEED_ACCOUNTS = {
   elle: { email: "elle@coach-en-muscu.test", password: SEED_PASSWORD },
   /** Hors duo : ne doit rien voir du duo (CM-59). */
   solo: { email: "solo@coach-en-muscu.test", password: SEED_PASSWORD },
+  /** Hors duo, sans données, même couleur que Solo : rejoint Solo (CM-87). */
+  duo2: { email: "duo2@coach-en-muscu.test", password: SEED_PASSWORD },
+} as const;
+
+/** CM-87 : prénoms affichés des comptes du seed (`profiles.display_name`). */
+export const SEED_NAMES = {
+  toi: "Théo",
+  elle: "Lina",
+  solo: "Solo",
+  duo2: "Duo2",
 } as const;
 
 /** Compte des parcours qui écrivent : « Toi » du seed, sauf E2E_EMAIL / E2E_PASSWORD. */

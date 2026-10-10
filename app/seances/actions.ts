@@ -8,11 +8,12 @@ import { getCatalogExercises } from "@/lib/queries/exercises";
 import {
   canAccessProgram,
   countLoggedSessionsForDay,
-  ensurePersonalProgram,
-  ensureSharedProgram,
   getProgramDayNames,
   nextOrderIndex,
+  resolveTargetProgram,
 } from "@/lib/queries/programs";
+import { duoRpcClient } from "@/lib/queries/duo";
+import { duoErrorMessage, shareDecision, STALE_DUO_MESSAGE, type SeanceTarget } from "@/lib/duo";
 import {
   SEANCE_DRAFT_LIMITS,
   validateSeanceName,
@@ -40,10 +41,26 @@ export type SaveSeanceInput = {
   /** Déjà proposé ou saisi côté client ; le serveur revalide. */
   name: string;
   exercises: SeanceDraftExercise[];
+  /**
+   * CM-87, en duo seulement (refusé sinon : page périmée) : « Pour nous
+   * deux » (`duo`) ou « Pour moi » (`perso`). En création, choisit la
+   * bibliothèque (défaut : `duo`). En édition, avec `initialTarget` : seul un
+   * CHANGEMENT du choix affiché déplace la séance (« Partager avec … » /
+   * « Garder pour moi »), après relecture de l'état réel (C2).
+   */
+  target?: SeanceTarget;
+  /** Édition : choix affiché à l'ouverture de l'écran. */
+  initialTarget?: SeanceTarget;
 };
 
 export type SaveSeanceResult =
-  | { success: true; dayId: string; programId: string }
+  | {
+      success: true;
+      dayId: string;
+      programId: string;
+      /** Message à afficher dans la bibliothèque (copie au lieu d'un déplacement). */
+      notice?: string;
+    }
   | { success: false; error: string };
 
 /**
@@ -181,14 +198,18 @@ export async function saveSeance(
   const profileId = await requireProfileId();
   const supabase = await createClient();
 
-  // CM-86 : sans duo, la séance va dans la bibliothèque perso (branche
-  // `ensurePersonalProgram` plus bas) ; en duo, rien ne change. Duo illisible
-  // (C3) : refus, jamais de séance rangée en perso par erreur.
-  const target = libraryTarget(await readDuoId(supabase, profileId));
-  if (target.kind === "error") {
-    return { success: false, error: target.error };
+  // CM-86 / CM-87 : sans partenaire, bibliothèque perso ; en duo, celle que
+  // l'utilisateur a choisie (`resolveTargetProgram`). Duo illisible (C3) :
+  // refus, jamais de séance rangée en perso par erreur.
+  const library = libraryTarget(await readDuoId(supabase, profileId));
+  if (library.kind === "error") {
+    return { success: false, error: library.error };
   }
-  const duoId = target.kind === "shared" ? target.duoId : null;
+  if (library.kind === "personal" && (input.target || input.initialTarget)) {
+    return { success: false, error: STALE_DUO_MESSAGE };
+  }
+  const duoId = library.kind === "shared" ? library.duoId : null;
+  let notice: string | undefined;
 
   const checkedExercises = validateExercises(input.exercises);
   if (!checkedExercises.ok) {
@@ -222,6 +243,8 @@ export async function saveSeance(
   // ----- Programme d'accueil + séance cible -----
   let programId: string;
   let excludeDayId: string | null = null;
+  /** Séance réellement modifiée (la copie perso si la RPC a copié, C1). */
+  let editDayId = dayId;
 
   if (dayId) {
     const { data: day, error: dayError } = await supabase
@@ -253,15 +276,70 @@ export async function saveSeance(
 
     programId = day.program_id;
     excludeDayId = day.id;
-  } else {
-    // CM-86 : utilisateur sans duo => bibliothèque perso.
-    const library = duoId
-      ? await ensureSharedProgram(supabase, duoId)
-      : await ensurePersonalProgram(supabase, profileId);
-    if (!library.ok) {
-      return { success: false, error: library.error };
+
+    // CM-87 : « Partager avec … » / « Garder pour moi » (C2). Seulement si
+    // l'utilisateur a changé le choix affiché, après relecture de l'état
+    // réel ; une lecture en échec ne bascule jamais rien. La RPC refuse un
+    // nom déjà pris AVANT tout changement, et COPIE au lieu de déplacer une
+    // séance du duo que le partenaire a déjà utilisée (C1).
+    if (duoId && input.target && input.initialTarget && input.target !== input.initialTarget) {
+      const { data: prog, error: progError } = await supabase
+        .from("programs")
+        .select("duo_id")
+        .eq("id", day.program_id)
+        .returns<{ duo_id: string | null }[]>()
+        .maybeSingle();
+      const actual: SeanceTarget | null =
+        progError || !prog ? null : prog.duo_id ? "duo" : "perso";
+      const decision = shareDecision(input.initialTarget, input.target, actual);
+      if (decision.kind === "error") {
+        return {
+          success: false,
+          error: "Impossible de vérifier où est rangée cette séance. Rien n'a été modifié.",
+        };
+      }
+      if (decision.kind === "stale") {
+        return { success: false, error: STALE_DUO_MESSAGE };
+      }
+      if (decision.kind === "toggle") {
+        const rpc = await duoRpcClient();
+        const { data: moved, error: moveError } = await rpc.rpc("set_seance_shared", {
+          p_day_id: day.id,
+          p_shared: decision.shared,
+        });
+        if (moveError) {
+          return { success: false, error: duoErrorMessage(moveError.message) };
+        }
+        const result = moved?.[0];
+        if (result?.status === "copied" && result.day_id) {
+          // L'original reste dans « Nos séances » : les modifications de
+          // l'écran s'appliquent à la copie perso.
+          editDayId = result.day_id;
+          excludeDayId = result.day_id;
+          notice =
+            "Une copie a été ajoutée à « Mes séances ». La séance reste aussi dans « Nos séances » : ton partenaire l'a déjà utilisée.";
+        }
+        const { data: now, error: nowError } = await supabase
+          .from("program_days")
+          .select("program_id")
+          .eq("id", editDayId ?? day.id)
+          .returns<{ program_id: string }[]>()
+          .maybeSingle();
+        if (nowError) return { success: false, error: nowError.message };
+        if (!now) return { success: false, error: NOT_FOUND };
+        programId = now.program_id;
+      }
     }
-    programId = library.programId;
+  } else {
+    const target = await resolveTargetProgram(supabase, {
+      profileId,
+      library,
+      target: input.target,
+    });
+    if (!target.ok) {
+      return { success: false, error: target.error };
+    }
+    programId = target.programId;
   }
 
   // ----- Nom -----
@@ -286,12 +364,12 @@ export async function saveSeance(
   // ----- Écriture de la séance -----
   let savedDayId: string;
 
-  if (dayId) {
+  if (editDayId) {
     // CM-59 B : sous RLS, un update refusé touche 0 ligne sans erreur.
     const { data: renamed, error } = await supabase
       .from("program_days")
       .update({ name: checkedName.name })
-      .eq("id", dayId)
+      .eq("id", editDayId)
       .select("id");
     if (error) {
       return { success: false, error: writeErrorMessage(error) };
@@ -299,14 +377,14 @@ export async function saveSeance(
     if (!touchedRows(renamed)) {
       return { success: false, error: REFUSED_MESSAGE };
     }
-    savedDayId = dayId;
+    savedDayId = editDayId;
 
     // 0 ligne ici n'est PAS un refus : la séance peut être vide. L'accès à la
     // séance vient d'être prouvé par l'update ci-dessus.
     const { error: clearError } = await supabase
       .from("program_exercises")
       .delete()
-      .eq("program_day_id", dayId);
+      .eq("program_day_id", editDayId);
     if (clearError) {
       return { success: false, error: writeErrorMessage(clearError) };
     }
@@ -377,9 +455,30 @@ export async function saveSeance(
     return { success: false, error: insertMessage };
   }
 
+  // CM-87 : une séance du duo n'utilise que des exercices visibles des deux.
+  // Mes exercices perso qu'elle contient deviennent des exercices du duo.
+  if (duoId) {
+    const { data: prog } = await supabase
+      .from("programs")
+      .select("duo_id")
+      .eq("id", programId)
+      .returns<{ duo_id: string | null }[]>()
+      .maybeSingle();
+    if (prog?.duo_id === duoId) {
+      const { error: shareError } = await supabase
+        .from("exercises")
+        .update({ owner_profile_id: null, duo_id: duoId })
+        .eq("owner_profile_id", profileId)
+        .in("id", checkedExercises.exerciseIds);
+      if (shareError) {
+        return { success: false, error: writeErrorMessage(shareError) };
+      }
+    }
+  }
+
   revalidateLibrary();
 
-  return { success: true, dayId: savedDayId, programId };
+  return { success: true, dayId: savedDayId, programId, notice };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
