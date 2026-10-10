@@ -8,7 +8,7 @@ import { exerciseKey } from "@/lib/exerciseKey";
 // Tests unitaires purs (CM-30) : contenu statique des fiches exercice.
 // Lancer : npm run test:unit
 
-/** Noms des exercices système (`duo_id` / `couple_id` null) du seed local. */
+/** Noms des exercices système (`duo_id` null) du seed local. */
 function seedSystemExerciseNames(): string[] {
   const sql = readFileSync(path.join(process.cwd(), "supabase/seed.sql"), "utf8");
   const names: string[] = [];

@@ -14,7 +14,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(46);
+select plan(44);
 
 -- Données propres aux tests (en postgres, avant tout changement de rôle) ------
 -- Une séance d'Elle (le seed n'en a pas) et un exercice propre au duo.
@@ -33,8 +33,6 @@ set local role anon;
 set local request.jwt.claims = '{"role":"anon"}';
 
 select throws_ok($$ select * from public.profiles $$,          '42501', null, '1. anon : profiles refusé');
-select throws_ok($$ select * from public.couples $$,           '42501', null, '1. anon : couples refusé');
-select throws_ok($$ select * from public.couple_members $$,    '42501', null, '1. anon : couple_members refusé');
 select throws_ok($$ select * from public.duos $$,              '42501', null, '1. anon : duos refusé');
 select throws_ok($$ select * from public.duo_members $$,       '42501', null, '1. anon : duo_members refusé');
 select throws_ok($$ select * from public.duo_invitations $$,   '42501', null, '1. anon : duo_invitations refusé');
@@ -149,7 +147,6 @@ select lives_ok(
      values ('aaaaaaaa-5959-0000-0000-000000000011', 'Programme duo (test)',
              '33333333-3333-3333-3333-333333333333') $$,
   '11. Toi crée un programme du duo');
--- Le trigger programs_sync_duo (sans EXECUTE pour authenticated) a tourné.
 select is((select duo_id from public.programs where id = 'aaaaaaaa-5959-0000-0000-000000000011'),
           '33333333-3333-3333-3333-333333333333'::uuid, '11. programme du duo visible par Toi');
 select throws_ok(

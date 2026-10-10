@@ -3,9 +3,9 @@
 -- Chargé automatiquement par `supabase db reset` (config.toml, [db.seed]).
 --
 -- Tout est fictif, SAUF :
---   - les uuid des 2 profils et du couple / duo, identiques à la prod car l'app
+--   - les uuid des 2 profils et du duo, identiques à la prod car l'app
 --     les utilise comme profils fixes (cookie cm_profile) ;
---   - les exercices système (catalogue commun, couple_id NULL), copiés de la
+--   - les exercices système (catalogue commun, duo_id NULL), copiés de la
 --     prod avec leurs uuid : ce sont des données de catalogue, non personnelles.
 -- Aucune séance, série ni email réels.
 -- ============================================================================
@@ -56,7 +56,7 @@ insert into auth.identities (
    '{"sub":"44444444-4444-4444-4444-444444444444","email":"solo@coach-en-muscu.test","email_verified":true}',
    now(), now(), now());
 
--- Profils, couple et duo -------------------------------------------------------
+-- Profils et duo ----------------------------------------------------------------
 
 insert into public.profiles (id, display_name, color_role, weekly_goal) values
   ('11111111-1111-1111-1111-111111111111', 'Toi',  'toi',  4),
@@ -67,28 +67,17 @@ on conflict (id) do update set
   color_role   = excluded.color_role,
   weekly_goal  = excluded.weekly_goal;
 
--- CM-85 partie A : le couple est recopié en duo (même uuid) par les triggers
--- de synchro ; les inserts duo explicites sont là pour la lisibilité (sans
--- effet si la synchro les a déjà faits). Partie B : ne garder que le duo.
-insert into public.couples (id, name) values
-  ('33333333-3333-3333-3333-333333333333', 'Nous');
-
-insert into public.couple_members (couple_id, profile_id) values
-  ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111'),
-  ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222');
-
+-- Duo « Nous » (CM-85), uuid identique à la prod.
 insert into public.duos (id, name) values
-  ('33333333-3333-3333-3333-333333333333', 'Nous')
-on conflict (id) do nothing;
+  ('33333333-3333-3333-3333-333333333333', 'Nous');
 
 insert into public.duo_members (duo_id, profile_id) values
   ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111'),
-  ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222')
-on conflict do nothing;
+  ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222');
 
 -- Exercices système (extrait du catalogue prod, 12 sur 81) ---------------------
 
-insert into public.exercises (id, name, muscle_group, is_compound, couple_id) values
+insert into public.exercises (id, name, muscle_group, is_compound, duo_id) values
   ('5c691ede-719c-4f3a-b714-34f91005f3dd', 'Développé couché barre',        'chest',      true,  null),
   ('fd03f868-f416-46da-8fad-bc6eda6e0f93', 'Développé incliné haltères',    'chest',      true,  null),
   ('c0a6396d-079d-4d92-ae55-5d409c817d41', 'Tirage vertical poulie',        'back',       true,  null),
@@ -104,9 +93,9 @@ insert into public.exercises (id, name, muscle_group, is_compound, couple_id) va
 
 -- Programme partagé « Nos séances » (SHARED_PROGRAM_NAME, CM-81) -------------
 
-insert into public.programs (id, name, owner_profile_id, couple_id, duo_id) values
+insert into public.programs (id, name, owner_profile_id, duo_id) values
   ('44444444-4444-4444-4444-444444444444', 'Nos séances', null,
-   '33333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333333');
+   '33333333-3333-3333-3333-333333333333');
 
 insert into public.program_days (id, program_id, name, order_index) values
   ('55555555-5555-5555-5555-000000000001', '44444444-4444-4444-4444-444444444444', 'Haut du corps', 0),
@@ -150,9 +139,9 @@ insert into public.session_sets (id, session_id, exercise_id, set_index, weight_
 -- Nb : l'uuid 4444… du profil Solo est aussi celui du programme « Nos
 -- séances » (tables différentes, aucun conflit).
 
-insert into public.programs (id, name, owner_profile_id, couple_id, duo_id) values
+insert into public.programs (id, name, owner_profile_id, duo_id) values
   ('99999999-9999-9999-9999-000000000001', 'Programme solo',
-   '44444444-4444-4444-4444-444444444444', null, null);
+   '44444444-4444-4444-4444-444444444444', null);
 
 insert into public.program_days (id, program_id, name, order_index) values
   ('99999999-9999-9999-9999-000000000002', '99999999-9999-9999-9999-000000000001', 'Full body', 0);

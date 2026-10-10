@@ -5,12 +5,11 @@ import { completedSessionsQuery } from "@/lib/queries/sessions";
 /**
  * Id du programme partagé du couple (CM-80).
  *
- * Un programme partagé a `duo_id` renseigné et `owner_profile_id` à null —
- * la contrainte `program_owner_xor` garantit que les deux sont exclusifs
- * (CM-85 partie A : elle porte encore sur `couple_id`, tenu égal à `duo_id`
- * par le trigger `programs_sync_duo` ; partie B : elle passera sur `duo_id`). Il
- * n'y en a qu'un en pratique ; s'il y en avait plusieurs, on retient le plus
- * ancien pour que l'accueil et le Profil pointent toujours au même endroit.
+ * Un programme partagé a `duo_id` renseigné et `owner_profile_id` à null :
+ * la contrainte `programs_owner_xor_duo` garantit que les deux sont exclusifs
+ * (CM-99). Il n'y en a qu'un en pratique ; s'il y en avait plusieurs, on
+ * retient le plus ancien pour que l'accueil et le Profil pointent toujours au
+ * même endroit.
  */
 export async function getSharedProgramId(
   supabase: SupabaseClient<Database>,
@@ -254,8 +253,6 @@ export async function ensureSharedProgram(
     .from("programs")
     .insert({
       name: SHARED_PROGRAM_NAME,
-      // CM-85 : seul `duo_id` est écrit ; le trigger `programs_sync_duo`
-      // recopie la valeur dans `couple_id` (supprimé en partie B).
       duo_id: duoId,
       owner_profile_id: null,
     })
