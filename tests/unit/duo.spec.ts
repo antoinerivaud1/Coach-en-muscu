@@ -79,6 +79,34 @@ test.describe("erreurs des RPC (CM-87)", () => {
   });
 });
 
+test.describe("limite d'essais des codes (CM-102)", () => {
+  const TOO_MANY = "Trop d'essais. Réessaie dans une heure.";
+
+  test("cm102:too_many_attempts reconnu et traduit", () => {
+    expect(duoErrorCode("cm102:too_many_attempts")).toBe("too_many_attempts");
+    expect(duoErrorCode("ERROR: cm102:too_many_attempts (P0001)")).toBe("too_many_attempts");
+    expect(duoErrorMessage("cm102:too_many_attempts")).toBe(TOO_MANY);
+    expect(duoErrorCode("cm102:inconnu")).toBeNull();
+  });
+
+  test("aller-retour confirmer -> rejoindre (?erreur=too_many_attempts)", () => {
+    // confirmer/page.tsx redirige avec le code extrait, rejoindre/page.tsx
+    // l'affiche via `cm87:${erreur}`.
+    const erreur = duoErrorCode("cm102:too_many_attempts");
+    expect(erreur).toBe("too_many_attempts");
+    expect(duoErrorMessage(`cm87:${erreur}`)).toBe(TOO_MANY);
+  });
+
+  test("même code d'erreur que la migration", async () => {
+    const { readFileSync } = await import("node:fs");
+    const sql = readFileSync(
+      "supabase/migrations/20261011110000_cm102_invitation_rate_limit.sql",
+      "utf8",
+    );
+    expect(sql).toContain("raise exception 'cm102:too_many_attempts'");
+  });
+});
+
 test.describe("membres affichés (CM-87)", () => {
   const me = { id: "a", display_name: "Léa", accent_color: "#FF4F7E" };
   const partner = { id: "b", display_name: "Antoine", accent_color: "#2FE6FF" };

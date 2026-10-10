@@ -4,7 +4,8 @@
  *
  * - code d'invitation : 6 caractères, alphabet sans 0, O, 1 ni I (même
  *   alphabet que `cm87_new_code()` en base) ;
- * - erreurs des RPC (`cm87:<code>`) traduites en français ;
+ * - erreurs des RPC (`cm87:<code>`, `cm102:too_many_attempts`) traduites en
+ *   français ;
  * - membres affichés : prénom et couleur (`memberAccent`), jamais
  *   « Toi » / « Elle » ni `color_role` ;
  * - règles d'affichage solo / duo.
@@ -71,7 +72,9 @@ export type DuoErrorCode =
   | "not_in_duo"
   | "no_partner"
   | "seance_not_found"
-  | "name_taken";
+  | "name_taken"
+  // CM-102 : trop de codes faux essayés (seuils en base).
+  | "too_many_attempts";
 
 const DUO_ERROR_MESSAGES: Record<DuoErrorCode, string> = {
   not_authenticated: "Ta session a expiré. Reconnecte-toi.",
@@ -86,11 +89,15 @@ const DUO_ERROR_MESSAGES: Record<DuoErrorCode, string> = {
   no_partner: "Ton partenaire n'a pas encore rejoint le duo.",
   seance_not_found: "Séance introuvable",
   name_taken: "Une séance porte déjà ce nom de l'autre côté : renomme-la d'abord.",
+  too_many_attempts: "Trop d'essais. Réessaie dans une heure.",
 };
 
-/** Code `cm87:<code>` extrait d'un message d'erreur PostgreSQL, sinon null. */
+/**
+ * Code `cm87:<code>` (ou `cm102:<code>`, limite d'essais) extrait d'un message
+ * d'erreur PostgreSQL, sinon null.
+ */
 export function duoErrorCode(message: string | null | undefined): DuoErrorCode | null {
-  const m = /cm87:([a-z_]+)/.exec(message ?? "");
+  const m = /cm(?:87|102):([a-z_]+)/.exec(message ?? "");
   const code = m?.[1];
   return code && code in DUO_ERROR_MESSAGES ? (code as DuoErrorCode) : null;
 }

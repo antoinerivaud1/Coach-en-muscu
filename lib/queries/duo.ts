@@ -76,7 +76,13 @@ export type InvitationPreview = {
   alreadyInDuo: boolean;
 };
 
-/** Aperçu d'une invitation pour l'écran de confirmation, ou message d'erreur brut. */
+/**
+ * Aperçu d'une invitation pour l'écran de confirmation, ou message d'erreur brut.
+ * CM-102 : un code inconnu, expiré, révoqué ou déjà utilisé ne lève plus
+ * d'erreur (l'échec est compté en base) : aucune ligne. Trop d'échecs :
+ * `cm102:too_many_attempts`. Cet aperçu est aussi exigé avant
+ * `accept_duo_invitation`.
+ */
 export async function previewInvitation(
   code: string,
 ): Promise<{ ok: true; preview: InvitationPreview } | { ok: false; error: string }> {

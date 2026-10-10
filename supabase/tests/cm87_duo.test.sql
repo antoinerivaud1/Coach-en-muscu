@@ -17,7 +17,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(96);
+select plan(97);
 
 -- ---------------------------------------------------------------------------
 -- Données de test (postgres)
@@ -144,11 +144,13 @@ select ok((select revoked_at is not null from public.duo_invitations
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"55555555-5555-5555-5555-555555555555","role":"authenticated"}';
 
-select throws_ok(
+-- CM-102 : un mauvais code ne lève plus d'erreur dans l'aperçu (l'échec doit
+-- être enregistré, une exception l'annulerait) : aucune ligne.
+select is_empty(
   $$ select * from public.get_duo_invitation((select code from t_codes where k = 'solo1')) $$,
-  'P0001', 'cm87:invitation_invalid', '3. code révoqué refusé');
-select throws_ok($$ select * from public.get_duo_invitation('ABC') $$,
-  'P0001', 'cm87:invitation_invalid', '3. code mal formé refusé');
+  '3. code révoqué refusé');
+select is_empty($$ select * from public.get_duo_invitation('ABC') $$,
+  '3. code mal formé refusé');
 
 select results_eq(
   $$ select inviter_name, inviter_color, my_color, color_conflict, already_in_duo
@@ -251,12 +253,13 @@ reset role;
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-select throws_ok(
-  $$ select public.accept_duo_invitation((select code from t_codes where k = 'tiersA')) $$,
-  'P0001', 'cm87:already_in_duo', '5. Toi, déjà en duo, ne rejoint pas Tiers A');
+-- CM-102 : accept_duo_invitation exige l'aperçu du code : il passe avant.
 select results_eq(
   $$ select already_in_duo from public.get_duo_invitation((select code from t_codes where k = 'tiersA')) $$,
   $$ values (true) $$, '5. aperçu : « déjà en duo » signalé');
+select throws_ok(
+  $$ select public.accept_duo_invitation((select code from t_codes where k = 'tiersA')) $$,
+  'P0001', 'cm87:already_in_duo', '5. Toi, déjà en duo, ne rejoint pas Tiers A');
 reset role;
 
 -- Expiration simulée (postgres).
@@ -497,6 +500,10 @@ select lives_ok(
 reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"55555555-5555-5555-5555-555555555555","role":"authenticated"}';
+-- CM-102 : aperçu du nouveau code d'abord (exigé par accept_duo_invitation).
+select isnt_empty(
+  $$ select * from public.get_duo_invitation((select code from t_codes where k = 'solo3')) $$,
+  '7. Duo2 voit l''aperçu de la nouvelle invitation');
 select lives_ok(
   $$ select public.accept_duo_invitation((select code from t_codes where k = 'solo3')) $$,
   '7. Duo2 revient avec la nouvelle invitation (couleurs déjà différentes)');
