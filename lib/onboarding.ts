@@ -5,16 +5,21 @@
  * - drapeau serveur d'inscription (`SIGNUP_ENABLED`) ;
  * - validation du profil saisi à l'onboarding et dans « Mon profil »
  *   (prénom, couleur, objectif hebdo) ;
- * - règle de redirection vers `/onboarding` (appliquée par le middleware).
+ * - règle de redirection vers `/onboarding` (appliquée par le middleware) ;
+ * - CM-103 : destination de fin d'onboarding (`next` conservé depuis un lien
+ *   d'invitation).
  */
 
 import { isMemberColor, type MemberColor } from "@/lib/members";
 import { isPublicPath } from "@/lib/auth/publicPaths";
+import { isValidInviteCode, normalizeInviteCode } from "@/lib/duo";
 import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   isValidEmail,
   normalizeEmail,
+  safeNextPath,
+  withNext,
 } from "@/lib/auth/core";
 
 // ---- Drapeau d'inscription ---------------------------------------------------
@@ -157,14 +162,21 @@ export function isOnboardingExemptPath(pathname: string | null | undefined): boo
  */
 export type OnboardingState = "done" | "pending" | "unknown";
 
-/** Où envoyer la requête, ou null pour la laisser passer. */
+/**
+ * Où envoyer la requête, ou null pour la laisser passer. CM-103 : un lien
+ * d'invitation (`/duo/rejoindre?code=…`) ouvert avant la fin de l'onboarding
+ * est conservé en `next`, pour finir sur la confirmation de l'invitation.
+ * `search` : query de la requête (`?code=…`), facultative.
+ */
 export function onboardingRedirectTarget(
   pathname: string,
   state: OnboardingState,
+  search = "",
 ): string | null {
   if (state !== "pending") return null;
   if (isOnboardingExemptPath(pathname)) return null;
-  return ONBOARDING_PATH;
+  const code = invitationCodeFromPath(`${pathname}${search}`);
+  return code ? withNext(ONBOARDING_PATH, invitationJoinPath(code)) : ONBOARDING_PATH;
 }
 
 /**
@@ -200,6 +212,54 @@ export function safeOnboardingExit(raw: unknown): OnboardingExit {
   return (ONBOARDING_EXITS as readonly unknown[]).includes(raw)
     ? (raw as OnboardingExit)
     : "/dashboard";
+}
+
+// ---- CM-103 : invitation conservée pendant l'inscription -----------------------
+
+const INVITE_JOIN_PATH = "/duo/rejoindre";
+const INVITE_CONFIRM_PATH = "/duo/rejoindre/confirmer";
+
+/** Lien d'invitation canonique (saisie du code, pré-remplie). */
+function invitationJoinPath(code: string): string {
+  return `${INVITE_JOIN_PATH}?code=${code}`;
+}
+
+/**
+ * Code d'invitation porté par un chemin interne `/duo/rejoindre?code=…` ou
+ * `/duo/rejoindre/confirmer?code=…`, sinon null (autre chemin, code
+ * incomplet, chemin refusé par `safeNextPath`).
+ */
+export function invitationCodeFromPath(path: string | null | undefined): string | null {
+  const safe = safeNextPath(path, "");
+  if (!safe) return null;
+  let url: URL;
+  try {
+    url = new URL(safe, "http://interne.invalid");
+  } catch {
+    return null;
+  }
+  if (url.pathname !== INVITE_JOIN_PATH && url.pathname !== INVITE_CONFIRM_PATH) return null;
+  const code = normalizeInviteCode(url.searchParams.get("code"));
+  return isValidInviteCode(code) ? code : null;
+}
+
+/** Étapes d'avant compte et d'onboarding : jamais une destination finale. */
+const NOT_A_DESTINATION: readonly string[] = [ONBOARDING_PATH, "/signup", "/welcome"];
+
+/**
+ * Destination une fois `onboarded_at` posé :
+ * - `next` sûr (conservé depuis `/login?next=…`) : on y va ; un lien
+ *   d'invitation mène directement à l'écran de CONFIRMATION de l'invitation ;
+ * - sinon la sortie choisie (`/dashboard` ou `/seances/new`).
+ */
+export function onboardingDestination(exit: unknown, next: unknown): string {
+  const safe = safeNextPath(typeof next === "string" ? next : "", "");
+  const pathname = safe.split(/[?#]/)[0] ?? "";
+  if (safe && !NOT_A_DESTINATION.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    const code = invitationCodeFromPath(safe);
+    return code ? `${INVITE_CONFIRM_PATH}?code=${code}` : safe;
+  }
+  return safeOnboardingExit(exit);
 }
 
 // ---- Inscription -----------------------------------------------------------------

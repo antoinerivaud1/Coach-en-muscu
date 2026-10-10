@@ -22,7 +22,6 @@ export default function ExerciseInfo({
   muscleGroup,
   isCompound,
   isCustom = false,
-  colorRole,
   className,
   triggerClassName,
   children,
@@ -33,14 +32,12 @@ export default function ExerciseInfo({
   isCompound?: boolean;
   /** Exercice perso du duo : pas de fiche technique. */
   isCustom?: boolean;
-  /** Rôle couleur du profil actif, pour la silhouette par défaut. */
-  colorRole?: "toi" | "elle" | null;
   className?: string;
   triggerClassName?: string;
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [silhouette, setSilhouette] = useSilhouette(colorRole);
+  const [silhouette, setSilhouette] = useSilhouette();
   const titleId = useId();
   const guide = getGuide(name, { isCustom });
 

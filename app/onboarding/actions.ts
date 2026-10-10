@@ -10,8 +10,9 @@ import { getCurrentProfileId } from "@/lib/profile";
 import {
   ONBOARDED_COOKIE,
   ONBOARDED_COOKIE_OPTIONS,
-  safeOnboardingExit,
+  onboardingDestination,
 } from "@/lib/onboarding";
+import { withNext } from "@/lib/auth/core";
 import { findTemplate, uniqueSeanceName } from "@/lib/onboardingTemplates";
 import { exerciseKey } from "@/lib/exerciseKey";
 import {
@@ -34,6 +35,10 @@ import {
 // - « Passer pour l'instant ».
 // L'onboarding se termine AVANT d'aller sur `/seances/new` : sinon le
 // middleware renverrait aussitôt vers `/onboarding`.
+//
+// CM-103 : un `next` conservé depuis un lien d'invitation l'emporte sur la
+// sortie choisie (`onboardingDestination`) : l'invité finit sur l'écran de
+// confirmation de l'invitation.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type TemplateFormState = { error?: string };
@@ -71,16 +76,17 @@ async function markOnboarded(
 
 /** « Passer pour l'instant » ou « Créer ma séance ». */
 export async function finishOnboarding(formData: FormData): Promise<void> {
-  const exit = safeOnboardingExit(String(formData.get("next") ?? ""));
+  const next = String(formData.get("next") ?? "");
+  const destination = onboardingDestination(String(formData.get("exit") ?? ""), next);
   const profileId = await getCurrentProfileId();
   if (!profileId) redirect("/login");
 
   const supabase = await createClient();
   const done = await markOnboarded(supabase, profileId);
   if (!done.ok) {
-    redirect(`/onboarding/seances?error=${encodeURIComponent(done.error)}`);
+    redirect(withNext(`/onboarding/seances?error=${encodeURIComponent(done.error)}`, next));
   }
-  redirect(exit);
+  redirect(destination);
 }
 
 /** Exercices système du catalogue, indexés par nom normalisé. */
@@ -193,5 +199,5 @@ export async function applyOnboardingTemplate(
 
   revalidatePath("/seances");
   revalidatePath("/dashboard");
-  redirect("/dashboard");
+  redirect(onboardingDestination("/dashboard", String(formData.get("next") ?? "")));
 }

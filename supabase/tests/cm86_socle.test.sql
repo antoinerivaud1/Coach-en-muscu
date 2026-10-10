@@ -27,7 +27,7 @@ select col_is_null('public', 'profiles', 'avatar_url', '1. avatar_url facultativ
 select has_column('public', 'profiles', 'onboarded_at', '1. profiles.onboarded_at présente');
 select col_type_is('public', 'profiles', 'onboarded_at', 'timestamp with time zone',
                    '1. onboarded_at en timestamptz');
-select has_column('public', 'profiles', 'color_role', '1. color_role conservée (retrait plus tard)');
+select hasnt_column('public', 'profiles', 'color_role', '1. color_role supprimée (CM-103)');
 select has_column('public', 'exercises', 'owner_profile_id', '1. exercises.owner_profile_id présente');
 select fk_ok('public', 'exercises', 'owner_profile_id', 'public', 'profiles', 'id',
              '1. owner_profile_id référence profiles(id)');

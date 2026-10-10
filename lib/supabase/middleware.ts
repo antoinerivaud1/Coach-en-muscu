@@ -26,6 +26,7 @@ import { AUTH_COOKIE_OPTIONS, authEnv, hasSupabaseAuthCookie } from "./auth-conf
  *   l'onboarding (`profiles.onboarded_at` null) est envoyé vers `/onboarding`
  *   (règle pure `onboardingRedirectTarget`, lib/onboarding.ts). C'est un
  *   parcours, pas un contrôle d'accès : en cas de doute, on laisse passer.
+ *   CM-103 : un lien d'invitation y est conservé (`/onboarding?next=…`).
  */
 export async function updateSession(request: NextRequest) {
   // CM-93 : pages légales et support publiques. Aucun appel Supabase : elles
@@ -67,7 +68,7 @@ export async function updateSession(request: NextRequest) {
     const cookieValue = request.cookies.get(ONBOARDED_COOKIE)?.value;
     if (!onboardedCookieMatches(cookieValue, userId)) {
       const state = await readOnboardingState(supabase, userId);
-      const target = onboardingRedirectTarget(pathname, state);
+      const target = onboardingRedirectTarget(pathname, state, request.nextUrl.search);
       if (target) {
         const redirect = NextResponse.redirect(new URL(target, request.url));
         // Cookies de session rafraîchis par getClaims : conservés.

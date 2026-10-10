@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthState } from "@/lib/profile";
-import { safeNextPath } from "@/lib/auth/core";
+import { readNextParam, safeNextPath, withNext } from "@/lib/auth/core";
 import LoginForm from "@/components/LoginForm";
 
 export const metadata: Metadata = { title: "Connexion · Coach en Muscu" };
 
 // CM-58 : connexion par compte (email + mot de passe). CM-86 : lien vers
 // l'écran de bienvenue (inscription, fermée tant que SIGNUP_ENABLED est off).
+// CM-103 : le `next` suit vers la bienvenue puis l'inscription.
 export default async function LoginPage({
   searchParams,
 }: {
@@ -17,7 +18,10 @@ export default async function LoginPage({
   const { profileId } = await getAuthState();
 
   const { next: rawNext } = await searchParams;
-  const next = safeNextPath(Array.isArray(rawNext) ? rawNext[0] : rawNext);
+  // CM-103 : `next` demandé (lien d'invitation…), transmis aussi à « Créer un
+  // compte » pour le retrouver à la fin de l'onboarding.
+  const requested = readNextParam(rawNext);
+  const next = safeNextPath(requested);
   if (profileId) redirect(next);
 
   return (
@@ -45,7 +49,7 @@ export default async function LoginPage({
 
         <p className="mt-5 text-center text-base text-fg-muted">
           Pas encore de compte&nbsp;?{" "}
-          <Link href="/welcome" className="inline-flex min-h-11 items-center font-bold text-energy">
+          <Link href={withNext("/welcome", requested)} className="inline-flex min-h-11 items-center font-bold text-energy">
             Créer un compte
           </Link>
         </p>

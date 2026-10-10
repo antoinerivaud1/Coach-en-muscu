@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireProfileId } from "@/lib/profile";
 import { createClient, createAuthClient } from "@/lib/supabase/server";
 import { readIdentity, type Identity } from "@/lib/queries/identity";
+import { onboardingDestination } from "@/lib/onboarding";
 
 export type OnboardingContext =
   | { ok: true; identity: Identity; email: string | null }
@@ -9,20 +10,24 @@ export type OnboardingContext =
 
 /**
  * CM-86 : contexte serveur des écrans d'onboarding. Sans session : connexion.
- * Onboarding déjà terminé : accueil (Antoine et Léa ne le revoient jamais).
+ * Onboarding déjà terminé : accueil (Antoine et Léa ne le revoient jamais),
+ * ou CM-103 la destination `next` conservée (confirmation d'invitation).
  *
  * C7 : profil illisible (erreur réseau) ou introuvable : `{ ok: false }`, la
  * page affiche un écran d'erreur avec « Réessayer ». Surtout pas de
  * redirection : le middleware renverrait vers /onboarding (boucle possible
  * /onboarding → /login → /dashboard → /onboarding).
  */
-export async function requireOnboardingIdentity(path: string): Promise<OnboardingContext> {
+export async function requireOnboardingIdentity(
+  path: string,
+  next = "",
+): Promise<OnboardingContext> {
   const profileId = await requireProfileId(path);
   const supabase = await createClient();
   const read = await readIdentity(supabase, profileId);
   if (!read.ok || !read.identity) return { ok: false };
   const identity = read.identity;
-  if (identity.onboarded_at) redirect("/dashboard");
+  if (identity.onboarded_at) redirect(onboardingDestination("/dashboard", next));
 
   let email: string | null = null;
   try {

@@ -19,13 +19,22 @@ export type TemplateCard = {
  * (le premier par défaut) s'ajoute en un tap ; « Créer ma séance » ouvre
  * l'écran de création existant, « Passer pour l'instant » va à l'accueil.
  * Les trois terminent l'onboarding.
+ *
+ * CM-103 : `next` (lien d'invitation) remplace l'accueil comme destination
+ * finale. Pour un invité (`invited`), « Créer ma séance » n'est pas proposé :
+ * il quitterait le parcours avant la confirmation de l'invitation ; les
+ * modèles restent facultatifs, comme pour un solo.
  */
 export default function TemplatePicker({
   templates,
   initialError,
+  next = "",
+  invited = false,
 }: {
   templates: TemplateCard[];
   initialError?: string;
+  next?: string;
+  invited?: boolean;
 }) {
   const [picked, setPicked] = useState(templates[0]?.id ?? "");
   const [state, action, pending] = useActionState<TemplateFormState, FormData>(
@@ -80,18 +89,21 @@ export default function TemplatePicker({
         })}
       </div>
 
-      <form action={finishOnboarding}>
-        <input type="hidden" name="next" value="/seances/new" />
-        <button
-          type="submit"
-          className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-[18px] border-[1.5px] border-dashed border-white/15 text-base font-bold text-fg"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
-            <path d="M5 12h14" /><path d="M12 5v14" />
-          </svg>
-          Créer ma séance
-        </button>
-      </form>
+      {!invited && (
+        <form action={finishOnboarding}>
+          <input type="hidden" name="exit" value="/seances/new" />
+          {next && <input type="hidden" name="next" value={next} />}
+          <button
+            type="submit"
+            className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-[18px] border-[1.5px] border-dashed border-white/15 text-base font-bold text-fg"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+              <path d="M5 12h14" /><path d="M12 5v14" />
+            </svg>
+            Créer ma séance
+          </button>
+        </form>
+      )}
 
       {error && (
         <p role="alert" className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">
@@ -103,6 +115,7 @@ export default function TemplatePicker({
 
       <form action={action} className="mt-8">
         <input type="hidden" name="template" value={picked} />
+        {next && <input type="hidden" name="next" value={next} />}
         <button
           type="submit"
           disabled={pending || !picked}
@@ -112,7 +125,8 @@ export default function TemplatePicker({
         </button>
       </form>
       <form action={finishOnboarding}>
-        <input type="hidden" name="next" value="/dashboard" />
+        <input type="hidden" name="exit" value="/dashboard" />
+        {next && <input type="hidden" name="next" value={next} />}
         <button
           type="submit"
           className="mt-1.5 flex h-11 w-full items-center justify-center text-base font-semibold text-fg-muted"

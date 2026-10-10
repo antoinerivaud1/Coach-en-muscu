@@ -210,7 +210,12 @@ export type Database = {
         Row: {
           accent_color: string
           avatar_url: string | null
-          color_role: Database["public"]["Enums"]["color_role"]
+          /**
+           * CM-103 : obsolète, plus lue ni écrite par le code. Supprimée en
+           * base par la migration 20261011120000 (appliquée APRÈS le
+           * déploiement) : optionnelle ici pour couvrir les deux états.
+           */
+          color_role?: Database["public"]["Enums"]["color_role"]
           created_at: string
           display_name: string
           id: string
@@ -220,7 +225,6 @@ export type Database = {
         Insert: {
           accent_color?: string
           avatar_url?: string | null
-          color_role?: Database["public"]["Enums"]["color_role"]
           created_at?: string
           display_name: string
           id: string
@@ -230,7 +234,6 @@ export type Database = {
         Update: {
           accent_color?: string
           avatar_url?: string | null
-          color_role?: Database["public"]["Enums"]["color_role"]
           created_at?: string
           display_name?: string
           id?: string

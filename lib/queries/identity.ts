@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import type { PartnerColor } from "@/lib/members";
+import { readDuoMembership, DUO_READ_ERROR_MESSAGE } from "@/lib/profile";
 
 /**
  * CM-86 : identité d'un profil telle que l'onboarding et la section « Mon
@@ -10,7 +12,6 @@ export type Identity = {
   id: string;
   display_name: string;
   accent_color: string;
-  color_role: "toi" | "elle";
   weekly_goal: number;
   avatar_url: string | null;
   onboarded_at: string | null;
@@ -28,7 +29,7 @@ export async function readIdentity(
   try {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, display_name, accent_color, color_role, weekly_goal, avatar_url, onboarded_at")
+      .select("id, display_name, accent_color, weekly_goal, avatar_url, onboarded_at")
       .eq("id", profileId)
       .returns<Identity[]>()
       .maybeSingle();
@@ -46,4 +47,38 @@ export async function getIdentity(
 ): Promise<Identity | null> {
   const read = await readIdentity(supabase, profileId);
   return read.ok ? read.identity : null;
+}
+
+export type PartnerColorRead =
+  | { ok: true; partner: PartnerColor | null }
+  | { ok: false; error: string };
+
+/**
+ * CM-103 : prénom et couleur du partenaire de duo ACTIF (données du duo :
+ * `readDuoMembership`, puis son profil), pour refuser sa couleur. Solo, ou
+ * invitation encore en attente : `partner` null (aucune restriction). Une
+ * lecture du duo en échec n'est jamais prise pour « solo » (C3) : erreur.
+ */
+export async function readPartnerColor(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+): Promise<PartnerColorRead> {
+  const read = await readDuoMembership(supabase, profileId);
+  if (!read.ok) return { ok: false, error: DUO_READ_ERROR_MESSAGE };
+  if (!read.membership) return { ok: true, partner: null };
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("display_name, accent_color")
+      .eq("id", read.membership.partnerId)
+      .returns<{ display_name: string; accent_color: string }[]>()
+      .maybeSingle();
+    if (error) return { ok: false, error: DUO_READ_ERROR_MESSAGE };
+    return {
+      ok: true,
+      partner: data ? { name: data.display_name, color: data.accent_color } : null,
+    };
+  } catch {
+    return { ok: false, error: DUO_READ_ERROR_MESSAGE };
+  }
 }

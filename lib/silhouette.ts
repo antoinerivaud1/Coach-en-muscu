@@ -2,9 +2,9 @@
 //
 // Libellés neutres « Homme » / « Femme » et non « Toi » / « Elle » : les
 // libellés et couleurs en dur des membres disparaissent au profit des prénoms
-// et couleurs choisis (CM-87). Le défaut suit le profil actif quand on le
-// connaît (`color_role` 'elle' -> femme), sinon homme. Le choix manuel est
-// mémorisé sur l'appareil.
+// et couleurs choisis (CM-87). CM-103 : plus aucun lien avec l'ancien
+// `color_role` (retiré) ; défaut homme, le choix manuel est mémorisé sur
+// l'appareil.
 
 export type Silhouette = "homme" | "femme";
 
@@ -15,11 +15,9 @@ export const SILHOUETTE_LABELS: Record<Silhouette, string> = {
   femme: "Femme",
 };
 
-/** Silhouette par défaut, déduite du rôle couleur du profil actif. */
-export function defaultSilhouette(
-  colorRole: "toi" | "elle" | null | undefined,
-): Silhouette {
-  return colorRole === "elle" ? "femme" : "homme";
+/** Silhouette par défaut, tant qu'aucun choix n'est mémorisé. */
+export function defaultSilhouette(): Silhouette {
+  return "homme";
 }
 
 /** Valeur relue du stockage, ou `null` si absente ou invalide. */
@@ -27,12 +25,9 @@ export function parseSilhouette(raw: unknown): Silhouette | null {
   return raw === "homme" || raw === "femme" ? raw : null;
 }
 
-/** Choix mémorisé s'il existe, sinon défaut du profil. */
-export function resolveSilhouette(
-  stored: unknown,
-  colorRole: "toi" | "elle" | null | undefined,
-): Silhouette {
-  return parseSilhouette(stored) ?? defaultSilhouette(colorRole);
+/** Choix mémorisé s'il existe, sinon le défaut. */
+export function resolveSilhouette(stored: unknown): Silhouette {
+  return parseSilhouette(stored) ?? defaultSilhouette();
 }
 
 export function readStoredSilhouette(): Silhouette | null {

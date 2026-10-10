@@ -29,7 +29,7 @@ import {
   estimatedOneRepMax,
 } from "@/lib/utils/training";
 import { suggestFirstSet } from "@/lib/utils/prefill";
-import { memberAccent } from "@/lib/members";
+import { memberAccent, sessionExerciseLabel } from "@/lib/members";
 import { memberStyle } from "@/lib/duo";
 import SessionLogger, {
   type LoggerExercise,
@@ -79,11 +79,13 @@ export default async function SessionPage({
   const editSets = isMine && edit !== "1" && editsets === "1";
 
   // CM-87 : accent du membre à qui est la séance (classes `*-member`).
+  // CM-103 : et son prénom (exercice perso illisible : « Exercice personnel
+  // de <prénom> »).
   const { data: owner } = await supabase
     .from("profiles")
-    .select("accent_color")
+    .select("accent_color, display_name")
     .eq("id", session.profile_id)
-    .returns<{ accent_color: string }[]>()
+    .returns<{ accent_color: string; display_name: string }[]>()
     .maybeSingle();
   const ownerStyle = memberStyle(memberAccent(owner ?? {}));
 
@@ -260,6 +262,10 @@ export default async function SessionPage({
   }
 
   // Noms d'exercices.
+  // CM-103 : un exercice perso du partenaire (owner_profile_id = lui) est
+  // illisible sous RLS ; il est aussi écarté en code, pour que le filet
+  // `DATA_CLIENT=service` (RLS contournée) affiche la même chose. Il apparaît
+  // en « Exercice personnel de <prénom> ».
   const setExerciseIds = Array.from(
     new Set(existingSets.map((s) => s.exercise_id)),
   );
@@ -267,11 +273,16 @@ export default async function SessionPage({
   if (setExerciseIds.length > 0) {
     const { data: exData } = await supabase
       .from("exercises")
-      .select("id, name")
+      .select("id, name, owner_profile_id")
       .in("id", setExerciseIds)
-      .returns<{ id: string; name: string }[]>();
-    for (const ex of exData ?? []) exerciseNames[ex.id] = ex.name;
+      .returns<{ id: string; name: string; owner_profile_id: string | null }[]>();
+    for (const ex of exData ?? []) {
+      if (ex.owner_profile_id && ex.owner_profile_id !== profileId) continue;
+      exerciseNames[ex.id] = ex.name;
+    }
   }
+  const exerciseLabel = (exId: string) =>
+    sessionExerciseLabel(exerciseNames[exId], { isMine, name: owner?.display_name });
 
   // Données historiques pour détecter les records (relatif au propriétaire).
   const { data: allSetsData } = await getAllSetsForProgress(
@@ -370,8 +381,8 @@ export default async function SessionPage({
             return (
               <section key={exId} className="rounded-xl bg-surface p-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-semibold">
-                    {exerciseNames[exId] ?? "Exercice"}
+                  <h2 className={`font-semibold ${exerciseNames[exId] ? "" : "text-fg-muted"}`}>
+                    {exerciseLabel(exId)}
                   </h2>
                   {prByExercise[exId] && (
                     <span className="rounded-full bg-member/20 px-2 py-0.5 text-xs font-medium text-member">

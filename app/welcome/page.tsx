@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthState } from "@/lib/profile";
+import { readNextParam, safeNextPath, withNext } from "@/lib/auth/core";
 
 export const metadata: Metadata = { title: "Bienvenue · Coach en Muscu" };
 
@@ -36,9 +37,15 @@ function SocialButton({ label, light }: { label: string; light?: boolean }) {
   );
 }
 
-export default async function WelcomePage() {
+export default async function WelcomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string | string[] }>;
+}) {
+  // CM-103 : `next` (lien d'invitation) transmis à l'inscription et à la connexion.
+  const next = readNextParam((await searchParams).next);
   const { profileId } = await getAuthState();
-  if (profileId) redirect("/dashboard");
+  if (profileId) redirect(safeNextPath(next));
 
   return (
     <main className="relative flex min-h-[100dvh] flex-col overflow-hidden px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
@@ -73,13 +80,13 @@ export default async function WelcomePage() {
           <SocialButton label="Continuer avec Apple" light />
           <SocialButton label="Continuer avec Google" />
           <Link
-            href="/signup"
+            href={withNext("/signup", next)}
             className="flex h-14 w-full items-center justify-center rounded-2xl bg-energy text-base font-extrabold text-ink"
           >
             Créer un compte avec un email
           </Link>
           <Link
-            href="/login"
+            href={withNext("/login", next)}
             className="flex h-12 w-full items-center justify-center text-base font-semibold text-fg"
           >
             J&apos;ai déjà un compte
