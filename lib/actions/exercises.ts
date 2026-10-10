@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfileId, getDuoId } from "@/lib/profile";
+import { writeErrorMessage } from "@/lib/supabase/rlsErrors";
 import type { Database } from "@/lib/types/database";
 
 type MuscleGroup = Database["public"]["Enums"]["muscle_group"];
@@ -72,7 +73,9 @@ export async function createCustomExercise(input: {
   if (error || !data) {
     return {
       success: false,
-      error: error?.message ?? "Erreur lors de la création de l'exercice",
+      error: error
+        ? writeErrorMessage(error)
+        : "Erreur lors de la création de l'exercice",
     };
   }
 

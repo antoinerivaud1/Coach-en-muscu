@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireProfileId,
-  getAuthState,
   getProfile,
   getDuoId,
   getDuoProfileIds,
@@ -17,7 +16,6 @@ import {
 import { resumeBannerState } from "@/lib/utils/currentSession";
 import BottomNav from "@/components/BottomNav";
 import ResumeSessionBanner from "@/components/ResumeSessionBanner";
-import { clearProfile } from "@/app/actions";
 import { countSets, deriveMuscleTags, splitVisibleTags } from "@/lib/utils/seances";
 import type { MuscleGroup } from "@/lib/utils/seances";
 import {
@@ -54,10 +52,7 @@ export default async function DashboardPage({
   // `startSession` redirige ici en cas d'échec : le message voyage en query
   // string et doit être affiché (CM-70).
   const { error: actionError } = await searchParams;
-  const profileId = await requireProfileId();
-  // CM-58 : « Changer de profil » n'a de sens que pour un profil choisi par
-  // cookie ; connecté par compte, on se déconnecte depuis Profil.
-  const { source: profileSource } = await getAuthState();
+  const profileId = await requireProfileId("/dashboard");
   const supabase = await createClient();
 
   const profile = await getProfile(supabase, profileId);
@@ -413,16 +408,6 @@ export default async function DashboardPage({
         <Link href="/seances" className="text-sm font-semibold text-energy">
           Gérer mes séances
         </Link>
-        {profileSource === "cookie" && (
-          <form action={clearProfile}>
-            <button
-              type="submit"
-              className="text-sm font-medium text-fg-muted underline-offset-4 hover:text-fg hover:underline"
-            >
-              Changer de profil
-            </button>
-          </form>
-        )}
       </div>
 
       <BottomNav />

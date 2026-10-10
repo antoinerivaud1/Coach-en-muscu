@@ -7,6 +7,12 @@ import { requireProfileId, getCurrentProfileId } from "@/lib/profile";
 import { getLastSetsByExercise } from "@/lib/queries/sessions";
 import type { LastExerciseData } from "@/lib/queries/sessions";
 import { closingDurationSeconds } from "@/lib/utils/currentSession";
+import {
+  REFUSED_MESSAGE,
+  SESSION_EXPIRED_MESSAGE,
+  touchedRows,
+  writeErrorMessage,
+} from "@/lib/supabase/rlsErrors";
 import type { Database } from "@/lib/types/database";
 
 type Feedback = Database["public"]["Enums"]["session_feedback"];
@@ -35,7 +41,16 @@ export type FinishSessionInput = {
 
 export type FinishSessionResult =
   | { ok: true }
-  | { ok: false; error: string };
+  /**
+   * CM-59 B :
+   * - `refused` : refus définitif (séance introuvable ou pas à toi, ou update à
+   *   0 ligne). La file `cm_pending_sessions` met l'entrée de côté
+   *   (`cm_refused_sessions`) au lieu de la rejouer en boucle.
+   * - `expired` : plus de session, rejouable après reconnexion.
+   * - Un 42501 reste rejouable : l'appartenance vient d'être prouvée, c'est un
+   *   jeton parti en anon ou un grant manquant, pas un vrai refus.
+   */
+  | { ok: false; error: string; refused?: true; expired?: true };
 
 /**
  * Clôture d'une séance (CM-78).
@@ -48,7 +63,10 @@ export type FinishSessionResult =
 export async function finishSession(
   input: FinishSessionInput,
 ): Promise<FinishSessionResult> {
-  const profileId = await requireProfileId();
+  // CM-59 B : pas de `requireProfileId()` (sa redirection vers /login
+  // éjecterait l'utilisateur du logger) : « Session expirée », rejouable.
+  const profileId = await getCurrentProfileId();
+  if (!profileId) return { ok: false, error: SESSION_EXPIRED_MESSAGE, expired: true };
   const supabase = await createClient();
 
   // Vérifie que la séance appartient bien au profil courant.
@@ -63,7 +81,7 @@ export async function finishSession(
     return { ok: false, error: sessionError.message };
   }
   if (!session || session.profile_id !== profileId) {
-    return { ok: false, error: "Séance introuvable" };
+    return { ok: false, error: "Séance introuvable", refused: true };
   }
 
   const legacySets = (input.sets ?? []).filter(
@@ -89,22 +107,27 @@ export async function finishSession(
         })),
       );
       if (insertError) {
-        return { ok: false, error: insertError.message };
+        return { ok: false, error: writeErrorMessage(insertError) };
       }
     }
   }
 
-  const { error: updateError } = await supabase
+  // CM-59 B : sous RLS, un update refusé touche 0 ligne sans erreur.
+  const { data: updated, error: updateError } = await supabase
     .from("sessions")
     .update({
       feedback: input.feedback,
       duration_seconds: input.durationSeconds,
       ...(input.notes === undefined ? {} : { notes: input.notes }),
     })
-    .eq("id", input.sessionId);
+    .eq("id", input.sessionId)
+    .select("id");
 
   if (updateError) {
-    return { ok: false, error: updateError.message };
+    return { ok: false, error: writeErrorMessage(updateError) };
+  }
+  if (!touchedRows(updated)) {
+    return { ok: false, error: REFUSED_MESSAGE, refused: true };
   }
 
   revalidatePath("/dashboard");
@@ -126,7 +149,9 @@ export async function fetchLastForExercise(
   exerciseId: string,
   excludeSessionId: string,
 ): Promise<LastExerciseData | null> {
-  const profileId = await requireProfileId();
+  // Appelée par le logger : pas de redirection (CM-59 B), rien sans session.
+  const profileId = await getCurrentProfileId();
+  if (!profileId) return null;
   const supabase = await createClient();
   const byExercise = await getLastSetsByExercise(
     supabase,
@@ -143,11 +168,15 @@ export async function deleteSession(formData: FormData) {
   const supabase = await createClient();
   if (!profileId || !sessionId) return;
 
-  await supabase
+  // CM-59 B : sous RLS, un delete refusé touche 0 ligne sans erreur.
+  const { data: deleted, error } = await supabase
     .from("sessions")
     .delete()
     .eq("id", sessionId)
-    .eq("profile_id", profileId);
+    .eq("profile_id", profileId)
+    .select("id");
+  if (error) backToDashboard(`Impossible de supprimer la séance : ${writeErrorMessage(error)}`);
+  if (!touchedRows(deleted)) backToDashboard("Séance introuvable.");
 
   revalidatePath("/history");
   revalidatePath("/progress");
@@ -162,10 +191,18 @@ export async function updateSet(formData: FormData) {
   const profileId = await getCurrentProfileId();
   const supabase = await createClient();
   if (profileId && setId && Number.isFinite(weight) && Number.isFinite(reps) && reps > 0) {
-    await supabase
+    // CM-59 B : contrôle d'appartenance en code, en plus de la RLS, pour que
+    // le filet `DATA_CLIENT=service` n'ouvre pas les séries d'un autre compte.
+    await assertRecapSessionOwned(supabase, sessionId, profileId);
+    // Sous RLS, un update refusé touche 0 ligne sans erreur.
+    const { data: updated, error } = await supabase
       .from("session_sets")
       .update({ weight_kg: weight, reps })
-      .eq("id", setId);
+      .eq("id", setId)
+      .eq("session_id", sessionId)
+      .select("id");
+    if (error) backToDashboard(`Série non modifiée : ${writeErrorMessage(error)}`);
+    if (!touchedRows(updated)) backToDashboard("Série introuvable.");
   }
   revalidatePath(`/sessions/${sessionId}`);
   revalidatePath("/progress");
@@ -178,7 +215,17 @@ export async function deleteSet(formData: FormData) {
   const profileId = await getCurrentProfileId();
   const supabase = await createClient();
   if (profileId && setId) {
-    await supabase.from("session_sets").delete().eq("id", setId);
+    // CM-59 B : contrôle d'appartenance en code (filet `DATA_CLIENT=service`).
+    await assertRecapSessionOwned(supabase, sessionId, profileId);
+    // Sous RLS, un delete refusé touche 0 ligne sans erreur.
+    const { data: deleted, error } = await supabase
+      .from("session_sets")
+      .delete()
+      .eq("id", setId)
+      .eq("session_id", sessionId)
+      .select("id");
+    if (error) backToDashboard(`Série non supprimée : ${writeErrorMessage(error)}`);
+    if (!touchedRows(deleted)) backToDashboard("Série introuvable.");
   }
   revalidatePath(`/sessions/${sessionId}`);
   revalidatePath("/progress");
@@ -192,11 +239,32 @@ export async function deleteSet(formData: FormData) {
 // reprise : elles reçoivent donc un `FormData` et redirigent, le message
 // d'erreur voyageant en query string comme pour `startSession` (CM-70).
 //
-// Le client serveur est en clé service : la RLS n'isole pas les deux profils du
-// couple (CM-17). Chaque action vérifie donc elle-même l'appartenance de la
-// séance au profil courant, et refuse par « introuvable » sans distinguer le cas
-// « pas à toi » du cas « n'existe pas » (même logique que CM-78 / CM-82).
+// La RLS laisse LIRE les séances du partenaire de duo (CM-59). Chaque action
+// vérifie donc elle-même l'appartenance de la séance au profil courant, et
+// refuse par « introuvable » sans distinguer le cas « pas à toi » du cas
+// « n'existe pas » (même logique que CM-78 / CM-82).
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Formulaires du récap (`updateSet`, `deleteSet`) : la séance doit être celle
+ * du profil courant, sinon retour à l'accueil avec « Séance introuvable. »
+ * (même message qu'une séance inexistante).
+ */
+async function assertRecapSessionOwned(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+  profileId: string,
+): Promise<void> {
+  if (!sessionId) backToDashboard("Séance introuvable.");
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("id, profile_id")
+    .eq("id", sessionId)
+    .returns<{ id: string; profile_id: string }[]>()
+    .maybeSingle();
+  if (error) backToDashboard(`Série non modifiée : ${writeErrorMessage(error)}`);
+  if (!data || data.profile_id !== profileId) backToDashboard("Séance introuvable.");
+}
 
 function backToDashboard(message?: string): never {
   redirect(
@@ -300,18 +368,23 @@ export async function discardSession(formData: FormData) {
     .from("session_sets")
     .delete()
     .eq("session_id", sessionId);
+  // 0 ligne ici n'est PAS un refus : une séance peut n'avoir aucune série.
+  // L'appartenance est vérifiée juste au-dessus, et le delete de la séance
+  // ci-dessous, lui, doit toucher une ligne.
   if (setsError) {
-    backToDashboard(`Impossible de supprimer la séance : ${setsError.message}`);
+    backToDashboard(`Impossible de supprimer la séance : ${writeErrorMessage(setsError)}`);
   }
 
-  const { error: deleteError } = await supabase
+  const { data: deleted, error: deleteError } = await supabase
     .from("sessions")
     .delete()
     .eq("id", sessionId)
-    .eq("profile_id", profileId);
+    .eq("profile_id", profileId)
+    .select("id");
   if (deleteError) {
-    backToDashboard(`Impossible de supprimer la séance : ${deleteError.message}`);
+    backToDashboard(`Impossible de supprimer la séance : ${writeErrorMessage(deleteError)}`);
   }
+  if (!touchedRows(deleted)) backToDashboard("Séance introuvable.");
 
   revalidatePath("/dashboard");
   revalidatePath("/history");

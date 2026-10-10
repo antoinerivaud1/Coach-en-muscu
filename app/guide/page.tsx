@@ -21,7 +21,7 @@ const GROUP_ORDER = [
 ];
 
 export default async function GuidePage() {
-  const profileId = await requireProfileId();
+  const profileId = await requireProfileId("/guide");
   const supabase = await createClient();
   const duoId = await getDuoId(supabase, profileId);
 

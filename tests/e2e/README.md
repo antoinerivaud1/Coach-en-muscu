@@ -4,14 +4,15 @@ Parcours critiques joués dans un vrai navigateur contre l'app démarrée.
 
 | Fichier | Parcours | Écrit en base |
 | --- | --- | --- |
-| `smoke.spec.ts` | l'accueil affiche le sélecteur de profil ; `/login` renvoie au sélecteur en mode cookie (CM-58) | non |
-| `profil.spec.ts` | choisir un profil, changer de profil | oui (purge CM-83 du tableau de bord) |
+| `smoke.spec.ts` | sans session, l'accueil et le tableau de bord renvoient à `/login` (CM-59 B) | non |
+| `isolation.spec.ts` | RLS (CM-59 B) : Solo n'ouvre pas une séance du duo et ne voit ni son programme ni son historique ; le duo n'ouvre pas une séance de Solo ; Elle voit l'historique de Toi | non (purge CM-83 du tableau de bord) |
+| `profil.spec.ts` | se connecter, se déconnecter | oui (purge CM-83 du tableau de bord) |
 | `seance.spec.ts` | démarrer, valider une série, abandonner, quitter puis reprendre, supprimer, terminer via la croix (CM-94) | oui |
 | `progression.spec.ts` | une séance terminée apparaît dans « Stats » | oui |
 
-Tous les parcours supposent l'app en `AUTH_MODE=cookie` (variable absente,
-défaut). Les modes `hybrid` et `required` (CM-58) se testent à la main : voir
-`supabase/ops/2026-10-cm58-bascule.md`.
+Depuis CM-59 B, l'app n'a plus de sélecteur de profil ni de mode d'auth : les
+parcours se connectent par `/login` avec les comptes du seed (helper `login`),
+et toutes les requêtes passent par le client utilisateur, sous RLS.
 
 Chaque séance créée est supprimée à la fin du test **par l'UI** (feuille de
 sortie ou bouton « Supprimer » du récap), même si le test échoue.
@@ -45,8 +46,14 @@ sur `main`, sans aucun secret :
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` et `SUPABASE_SERVICE_ROLE_KEY` (clés de démo
    locales) ; le job refuse toute URL qui n'est pas `http://127.0.0.1:…`.
 4. `npm run build` puis `next start` sur le port 3000, attente de la réponse.
-5. `npm run test:e2e` avec `E2E_ALLOW_WRITES=1`, `E2E_PROFILE_NAME=Toi`,
-   `E2E_SEANCE_NAME=Haut du corps` (données du seed).
+5. `npm run test:e2e` avec `E2E_ALLOW_WRITES=1` et
+   `E2E_SEANCE_NAME=Haut du corps` (données du seed) ; les parcours se
+   connectent avec le compte « Toi » du seed.
+
+6. CM-59 B : l'app redémarre avec `DATA_CLIENT=service` (filet de
+   déploiement : client service-role, RLS contournée) et **toute la suite e2e
+   est rejouée**, isolation comprise ; la CI vérifie dans `next-service.log`
+   que le client service-role a bien servi.
 
 En cas d'échec, l'artefact `playwright-report` contient le rapport HTML, les
 traces (`test-results/`), `next.log` et les logs PostgREST. Le job e2e tourne
@@ -75,7 +82,7 @@ npx playwright install chromium          # une fois
 E2E_ALLOW_WRITES=1 \
 E2E_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
 E2E_BASE_URL=http://localhost:3000 \
-E2E_PROFILE_NAME=Toi E2E_SEANCE_NAME="Haut du corps" \
+E2E_SEANCE_NAME="Haut du corps" \
 npm run test:e2e
 
 # 5. Fin
@@ -87,11 +94,12 @@ local contre la stack Docker, rebuilder avant tout usage avec `.env.local`.
 
 ## Données attendues
 
-Celles de `supabase/seed.sql` (fictives) : profils « Toi » et « Elle »
-(plus « Solo », hors duo, pour les tests RLS de CM-59 : le sélecteur affiche
-donc 3 cartes, d'où le ciblage par `E2E_PROFILE_NAME`),
-programme « Nos séances » avec les séances types « Haut du corps » et
-« Bas du corps » (4 exercices chacune). Sans `E2E_PROFILE_NAME` /
-`E2E_SEANCE_NAME`, les tests prennent le premier profil et la première séance
-non vide. Les tests tournent en série (`--workers=1`) : ils partagent un
-profil, et chacun supprime ses séances par l'UI.
+Celles de `supabase/seed.sql` (fictives) : comptes Auth
+`toi@coach-en-muscu.test` et `elle@coach-en-muscu.test` (duo « Nous ») et
+`solo@coach-en-muscu.test` (hors duo, pour les tests RLS de CM-59), mot de
+passe `motdepasse-de-test` ; programme « Nos séances » avec les séances types
+« Haut du corps » et « Bas du corps » (4 exercices chacune). Les parcours qui
+écrivent utilisent « Toi » (ou `E2E_EMAIL` / `E2E_PASSWORD`). Sans
+`E2E_SEANCE_NAME`, ils prennent la première séance non vide. Les tests tournent
+en série (`--workers=1`) : ils partagent un compte, et chacun supprime ses
+séances par l'UI.

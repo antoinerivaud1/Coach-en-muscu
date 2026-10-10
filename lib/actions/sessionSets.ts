@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId } from "@/lib/profile";
+import { getCurrentProfileId } from "@/lib/profile";
+import {
+  REFUSED_MESSAGE,
+  SESSION_EXPIRED_MESSAGE,
+  touchedRows,
+  writeErrorMessage,
+} from "@/lib/supabase/rlsErrors";
 
 /**
  * Écriture série par série (CM-78).
@@ -15,9 +21,21 @@ import { requireProfileId } from "@/lib/profile";
  *
  * Ces actions ne jettent jamais vers le client : une erreur réseau ou une
  * erreur Postgres revient en `{ ok: false }`, que la file rejoue.
+ *
+ * CM-59 B :
+ * - `refused: true` = refus définitif : séance introuvable ou pas à toi
+ *   (contrôle du code), ou delete qui ne touche aucune ligne. La file met
+ *   l'opération de côté (`cm:refusedSets:<id>`) au lieu de boucler.
+ * - Un 42501 sur l'écriture elle-même reste REJOUABLE : l'appartenance vient
+ *   d'être prouvée, c'est donc un jeton parti en anon ou un grant manquant,
+ *   pas un vrai refus (et l'avertissement « bloqué » doit s'afficher).
+ * - `expired: true` = plus de session : rejouable après reconnexion. Jamais de
+ *   redirection vers `/login` ici, elle éjecterait l'utilisateur du logger.
  */
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type ActionResult =
+  | { ok: true }
+  | { ok: false; error: string; refused?: true; expired?: true };
 
 export interface UpsertSetInput {
   id: string;
@@ -38,17 +56,15 @@ export interface DeleteSetInput {
 /**
  * Vérifie que la séance appartient au profil courant.
  *
- * Le client serveur utilise la clé `service_role` et contourne donc la RLS
- * (cf. lib/supabase/server.ts) : ce contrôle est la seule chose qui empêche
- * d'écrire dans la séance de quelqu'un d'autre. Même logique que
- * `canAccessProgram` (CM-80) : on ne distingue pas « inexistante » de « pas à
- * toi », les deux renvoient « introuvable ».
+ * CM-59 B : la RLS (client utilisateur) l'empêche aussi ; ce contrôle reste
+ * en place (ceinture et bretelles, et filet `DATA_CLIENT=service`). Même
+ * logique que `canAccessProgram` (CM-80) : on ne distingue pas « inexistante »
+ * de « pas à toi », les deux renvoient « introuvable ».
  */
-async function assertOwnsSession(
-  sessionId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!sessionId) return { ok: false, error: "Séance introuvable" };
-  const profileId = await requireProfileId();
+async function assertOwnsSession(sessionId: string): Promise<ActionResult> {
+  if (!sessionId) return { ok: false, error: "Séance introuvable", refused: true };
+  const profileId = await getCurrentProfileId();
+  if (!profileId) return { ok: false, error: SESSION_EXPIRED_MESSAGE, expired: true };
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sessions")
@@ -59,7 +75,7 @@ async function assertOwnsSession(
 
   if (error) return { ok: false, error: error.message };
   if (!data || data.profile_id !== profileId) {
-    return { ok: false, error: "Séance introuvable" };
+    return { ok: false, error: "Séance introuvable", refused: true };
   }
   return { ok: true };
 }
@@ -98,7 +114,8 @@ export async function upsertSet(input: UpsertSetInput): Promise<ActionResult> {
     { onConflict: "id" },
   );
 
-  if (error) return { ok: false, error: error.message };
+  // 42501 : rejouable (voir l'en-tête), message générique sans détail.
+  if (error) return { ok: false, error: writeErrorMessage(error) };
 
   revalidateSession(input.sessionId);
   return { ok: true };
@@ -111,13 +128,21 @@ export async function deleteSet(input: DeleteSetInput): Promise<ActionResult> {
   if (!owns.ok) return owns;
 
   const supabase = await createClient();
-  const { error } = await supabase
+  // CM-59 B : sous RLS, un delete refusé touche 0 ligne sans erreur. La
+  // séance est à nous (vérifié ci-dessus) : 0 ligne veut aussi dire « déjà
+  // supprimée » (réessai dont la réponse s'est perdue). Dans les deux cas,
+  // rejouer ne sert à rien : définitif. Un 42501, lui, reste rejouable.
+  const { data, error } = await supabase
     .from("session_sets")
     .delete()
     .eq("id", input.id)
-    .eq("session_id", input.sessionId);
+    .eq("session_id", input.sessionId)
+    .select("id");
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: writeErrorMessage(error) };
+  if (!touchedRows(data)) {
+    return { ok: false, error: REFUSED_MESSAGE, refused: true };
+  }
 
   revalidateSession(input.sessionId);
   return { ok: true };

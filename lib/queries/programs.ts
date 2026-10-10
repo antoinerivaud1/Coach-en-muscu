@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { completedSessionsQuery } from "@/lib/queries/sessions";
+import { writeErrorMessage } from "@/lib/supabase/rlsErrors";
 
 /**
  * Id du programme partagé du couple (CM-80).
@@ -34,11 +35,10 @@ export type ProgramAccess =
 /**
  * Le profil courant a-t-il le droit d'agir sur ce programme ?
  *
- * Le client serveur utilise la clé `service_role` et contourne donc la RLS
- * (cf. `lib/supabase/server.ts`, CM-17) : `auth.uid()` est toujours null,
- * l'app identifie le profil par cookie. Le périmètre des données est garanti
- * par le code, pas par la base — une server action qui reçoit un id arbitraire
- * doit donc vérifier elle-même à qui appartient la ligne visée.
+ * CM-59 B : la RLS (client utilisateur) garantit déjà le périmètre ; ce
+ * contrôle reste en place (ceinture et bretelles, et filet
+ * `DATA_CLIENT=service` où la RLS est contournée). Une server action qui reçoit
+ * un id arbitraire vérifie donc toujours à qui appartient la ligne visée.
  *
  * Accès accordé si le programme est personnel et appartient au profil, ou s'il
  * est partagé et que le profil est membre de ce couple. `allowed: false`
@@ -263,7 +263,9 @@ export async function ensureSharedProgram(
   if (error || !data) {
     return {
       ok: false,
-      error: error?.message ?? "Impossible de créer la bibliothèque du couple",
+      error: error
+        ? writeErrorMessage(error)
+        : "Impossible de créer la bibliothèque du couple",
     };
   }
 

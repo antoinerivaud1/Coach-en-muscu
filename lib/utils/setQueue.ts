@@ -30,6 +30,18 @@ export function queueStorageKey(sessionId: string): string {
   return `${PENDING_SETS_PREFIX}${sessionId}`;
 }
 
+/**
+ * CM-59 B : séries refusées définitivement par le serveur (séance introuvable
+ * ou pas à toi). Mises de côté sous cette clé, une par séance, au lieu d'être
+ * jetées : aucune saisie ne disparaît en silence.
+ */
+export const REFUSED_SETS_PREFIX = "cm:refusedSets:";
+
+/** Clé `localStorage` des séries refusées d'une séance. */
+export function refusedStorageKey(sessionId: string): string {
+  return `${REFUSED_SETS_PREFIX}${sessionId}`;
+}
+
 /** Id de la série visée par l'opération. */
 export function opSetId(op: QueuedOp): string {
   return op.kind === "upsert" ? op.set.id : op.id;

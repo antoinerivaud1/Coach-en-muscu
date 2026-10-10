@@ -14,7 +14,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(44);
+select plan(48);
 
 -- Données propres aux tests (en postgres, avant tout changement de rôle) ------
 -- Une séance d'Elle (le seed n'en a pas) et un exercice propre au duo.
@@ -221,6 +221,42 @@ select lives_ok(
   '17. création d''un compte Auth');
 select is((select display_name from public.profiles where id = 'aaaaaaaa-5959-0000-0000-000000000017'),
           'Cas 17', '17. profil créé par le trigger');
+
+-- ---------------------------------------------------------------------------
+-- 18. Upsert sur conflit d'id dans session_sets (CM-59 B : c'est ce que fait
+--     upsertSet, `on conflict (id) do update`). Toi sur sa série : OK.
+--     Elle sur une série de Toi : refus 42501, la série reste intacte.
+-- ---------------------------------------------------------------------------
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+select lives_ok(
+  $$ insert into public.session_sets
+       (id, session_id, exercise_id, set_index, weight_kg, reps, is_warmup)
+     values ('88888888-8888-8888-8888-000000000002', '77777777-7777-7777-7777-000000000001',
+             '5c691ede-719c-4f3a-b714-34f91005f3dd', 2, 71.00, 8, false)
+     on conflict (id) do update
+       set weight_kg = excluded.weight_kg, reps = excluded.reps $$,
+  '18. Toi : upsert sur conflit id de sa propre série');
+select is((select weight_kg from public.session_sets where id = '88888888-8888-8888-8888-000000000002'),
+          71.00::numeric, '18. série de Toi mise à jour par l''upsert');
+
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+select throws_ok(
+  $$ insert into public.session_sets
+       (id, session_id, exercise_id, set_index, weight_kg, reps, is_warmup)
+     values ('88888888-8888-8888-8888-000000000002', '77777777-7777-7777-7777-000000000001',
+             '5c691ede-719c-4f3a-b714-34f91005f3dd', 2, 1.00, 1, false)
+     on conflict (id) do update
+       set weight_kg = excluded.weight_kg, reps = excluded.reps $$,
+  '42501', null, '18. Elle : upsert sur une série de Toi refusé');
+select is((select weight_kg from public.session_sets where id = '88888888-8888-8888-8888-000000000002'),
+          71.00::numeric, '18. série de Toi intacte après le refus');
+
+reset role;
 
 select * from finish();
 

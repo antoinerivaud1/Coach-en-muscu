@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { loginPath } from "@/lib/auth/core";
 import {
   discardSession,
   finishSession,
@@ -190,6 +192,8 @@ export default function SessionLogger({
   });
   const [feedback, setFeedback] = useState<Feedback | null>(initialFeedback);
   const [error, setError] = useState<string | null>(null);
+  /** CM-59 B : « Terminer » a reçu « Session expirée » du serveur. */
+  const [finishExpired, setFinishExpired] = useState(false);
   /** Série validée dont la suppression attend confirmation : `exId:index`. */
   const [confirmDeleteSet, setConfirmDeleteSet] = useState<string | null>(null);
   /** Confirmation « terminer alors que des séries restent en attente ». */
@@ -677,9 +681,13 @@ export default function SessionLogger({
       try {
         const result = await finishSession(input);
         if (!result.ok) {
+          // CM-59 B : session expirée : rien n'est perdu, le bandeau propose
+          // de se reconnecter puis de revenir ici terminer la séance.
+          if (result.expired) setFinishExpired(true);
           setError(result.error);
           return;
         }
+        setFinishExpired(false);
         router.push(`/sessions/${sessionId}`);
         router.refresh();
       } catch {
@@ -1531,6 +1539,26 @@ export default function SessionLogger({
         {persistence.isStalled && !confirmFinish && (
           <p className="mt-2 text-center text-[13px] font-medium text-fg-muted">
             Enregistrement en attente, réessai automatique
+          </p>
+        )}
+
+        {/* CM-59 B : session expirée en pleine séance. Les séries restent dans
+            la file de ce téléphone et repartent après reconnexion. */}
+        {(persistence.sessionExpired || finishExpired) && (
+          <p role="alert" className="mt-2 text-center text-[13px] font-medium text-flame">
+            Session expirée : tes séries sont gardées sur ce téléphone.{" "}
+            <Link href={loginPath(`/sessions/${sessionId}`)} className="font-bold underline">
+              Se reconnecter
+            </Link>
+          </p>
+        )}
+
+        {/* CM-59 B : séries refusées par le serveur, mises de côté
+            (cm:refusedSets:<id>), jamais jetées en silence. */}
+        {persistence.refusedCount > 0 && (
+          <p role="status" className="mt-2 text-center text-[13px] font-medium text-fg-muted">
+            {persistence.refusedCount} série{persistence.refusedCount > 1 ? "s n'ont" : " n'a"} pas
+            pu être enregistrée{persistence.refusedCount > 1 ? "s" : ""}.
           </p>
         )}
 

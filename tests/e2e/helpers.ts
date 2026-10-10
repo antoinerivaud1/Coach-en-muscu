@@ -3,12 +3,13 @@ import { test, expect, type Page } from "@playwright/test";
 /**
  * Outils partagés des parcours e2e qui ÉCRIVENT en base (CM-56).
  *
- * Données attendues dans la base de test : au moins un profil, et pour ce
- * profil au moins une séance type avec un exercice. Deux variables permettent
- * de cibler des données précises (sinon : premier profil, première séance non
- * vide de la grille) :
- *   E2E_PROFILE_NAME  nom affiché du profil (ex. « Antoine »)
- *   E2E_SEANCE_NAME   nom d'une séance type de ce profil
+ * Données attendues dans la base de test : celles de `supabase/seed.sql`
+ * (comptes Auth « Toi », « Elle » et « Solo », CM-59). Les parcours se
+ * connectent par `/login` (CM-59 B : plus de sélecteur de profil). Variables
+ * facultatives pour une autre base de test :
+ *   E2E_EMAIL / E2E_PASSWORD  compte des parcours (défaut : « Toi » du seed)
+ *   E2E_SEANCE_NAME           nom d'une séance type de ce compte (sinon : la
+ *                             première séance non vide de la grille)
  */
 
 /** Référence du seul projet Supabase existant : la prod. */
@@ -35,10 +36,6 @@ export function guardWrites(): void {
   );
 }
 
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /** Id de séance extrait d'une URL `/sessions/<uuid>`. */
 const SESSION_URL = /\/sessions\/([0-9a-f-]{36})(?:[?#]|$)/;
 
@@ -48,15 +45,30 @@ export function sessionIdFromUrl(url: string): string {
   return id;
 }
 
-/** Sélecteur de profil (accueil) → tableau de bord. */
-export async function selectProfile(page: Page): Promise<void> {
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Qui s'entraîne/i })).toBeVisible();
-  const name = process.env.E2E_PROFILE_NAME;
-  const card = name
-    ? page.getByRole("button", { name: new RegExp(escapeRegExp(name)) })
-    : page.getByRole("button");
-  await card.first().click();
+/** Mot de passe des comptes de `supabase/seed.sql` (base locale uniquement). */
+export const SEED_PASSWORD = "motdepasse-de-test";
+
+/** Comptes de `supabase/seed.sql` (fictifs, domaine `.test`). */
+export const SEED_ACCOUNTS = {
+  toi: { email: "toi@coach-en-muscu.test", password: SEED_PASSWORD },
+  elle: { email: "elle@coach-en-muscu.test", password: SEED_PASSWORD },
+  /** Hors duo : ne doit rien voir du duo (CM-59). */
+  solo: { email: "solo@coach-en-muscu.test", password: SEED_PASSWORD },
+} as const;
+
+/** Compte des parcours qui écrivent : « Toi » du seed, sauf E2E_EMAIL / E2E_PASSWORD. */
+export const E2E_ACCOUNT = {
+  email: process.env.E2E_EMAIL ?? SEED_ACCOUNTS.toi.email,
+  password: process.env.E2E_PASSWORD ?? SEED_ACCOUNTS.toi.password,
+};
+
+/** Connexion par `/login` (CM-59 B) → tableau de bord. */
+export async function login(page: Page, email: string, password: string): Promise<void> {
+  await page.goto("/login");
+  await expect(page.getByRole("heading", { name: /Connexion/ })).toBeVisible();
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Mot de passe").fill(password);
+  await page.getByRole("button", { name: "Se connecter" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { name: /^Salut,/ })).toBeVisible();
 }

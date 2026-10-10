@@ -62,8 +62,8 @@ jobs:
     env:
       E2E_BASE_URL: http://localhost:3000
       E2E_ALLOW_WRITES: "1"
-      # Données de supabase/seed.sql (fictives).
-      E2E_PROFILE_NAME: Toi
+      # Données de supabase/seed.sql (fictives). Les parcours se connectent
+      # avec le compte « Toi » du seed (tests/e2e/helpers.ts, CM-59 B).
       E2E_SEANCE_NAME: Haut du corps
     steps:
       - uses: actions/checkout@v4
@@ -142,6 +142,36 @@ jobs:
       - name: Tests e2e
         run: npm run test:e2e
 
+      # CM-59 B : le filet DATA_CLIENT=service (client service-role, RLS
+      # contournée, contrôles d'appartenance du code seuls) doit faire passer
+      # les MÊMES parcours, isolation comprise. Même build : la variable est
+      # lue à l'exécution, seul le serveur redémarre. La clé service-role est
+      # celle de la stack locale (étape « Variables Supabase locales »).
+      - name: Redémarrer l'app avec DATA_CLIENT=service
+        run: |
+          pkill -f "next start" || true
+          pkill -f "next-server" || true
+          for i in $(seq 1 20); do
+            curl -s -o /dev/null http://localhost:3000/ || break
+            sleep 1
+          done
+          DATA_CLIENT=service npm run start -- -p 3000 > next-service.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:3000/ && exit 0
+            sleep 1
+          done
+          echo "L'app (filet) n'a pas répondu en 60 s" && cat next-service.log && exit 1
+
+      - name: Tests e2e (filet DATA_CLIENT=service)
+        run: npm run test:e2e
+
+      # Preuve que les parcours ci-dessus sont bien passés par le client
+      # service-role (ligne écrite par lib/supabase/server.ts).
+      - name: Vérifier que le filet a servi
+        run: |
+          grep -F "[CM-59] DATA_CLIENT=service" next-service.log \
+            || { echo "::error::le client service-role n'a jamais été utilisé" && cat next-service.log && exit 1; }
+
       - name: Logs Supabase
         if: failure()
         run: docker logs supabase_rest_coach-en-muscu > supabase-rest.log 2>&1 || true
@@ -155,5 +185,6 @@ jobs:
             playwright-report/
             test-results/
             next.log
+            next-service.log
             supabase-rest.log
           retention-days: 7
