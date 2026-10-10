@@ -64,7 +64,6 @@ export async function createCustomExercise(input: {
       name,
       muscle_group: input.muscle_group,
       is_compound: false,
-      // CM-85 : `couple_id` est rempli par le trigger `exercises_sync_duo`.
       duo_id: duoId,
     })
     .select("id, name, muscle_group, is_compound, duo_id")

@@ -1,4 +1,6 @@
--- CM-85 partie A : vérifications SQL du modèle duo sur la base LOCALE seedée.
+-- CM-85 : vérifications SQL du modèle duo sur la base LOCALE seedée
+-- (modèle duo seul depuis CM-99 ; le XOR sur duo_id est testé en pgTAP,
+-- supabase/tests/cm99_schema.test.sql).
 -- Lancé par la CI (job e2e) après `supabase db reset` :
 --   docker exec -i supabase_db_coach-en-muscu psql -U postgres -v ON_ERROR_STOP=1 < supabase/checks/cm85_duos.sql
 -- Tout se passe dans une transaction annulée à la fin : la base de test reste
@@ -18,13 +20,16 @@ do $$
 declare
   v_ok boolean;
 begin
-  -- 0. Seed rapatrié : duo 3333… avec 2 membres, programme du duo synchronisé.
+  -- 0. Seed : duo 3333… avec 2 membres, programme « Nos séances » du duo.
   if (select count(*) from public.duo_members
       where duo_id = '33333333-3333-3333-3333-333333333333') <> 2 then
     raise exception 'ÉCHEC : le duo 3333… doit avoir 2 membres';
   end if;
-  if exists (select 1 from public.programs where duo_id is distinct from couple_id) then
-    raise exception 'ÉCHEC : programs.duo_id doit être égal à couple_id';
+  if not exists (select 1 from public.programs
+                 where id = '44444444-4444-4444-4444-444444444444'
+                   and duo_id = '33333333-3333-3333-3333-333333333333'
+                   and owner_profile_id is null) then
+    raise exception 'ÉCHEC : le programme « Nos séances » doit appartenir au duo 3333…';
   end if;
   if (select count(*) from public.profiles) <> 5 then
     raise exception 'ÉCHEC : le trigger aurait dû créer 2 profils de test (total 5 : Toi, Elle, Solo CM-59 + 2)';
@@ -60,28 +65,7 @@ begin
   end;
   if not v_ok then raise exception 'ÉCHEC : un profil sans compte Auth a été accepté'; end if;
 
-  -- 4. Synchro couple_id ↔ duo_id (programmes).
-  insert into public.programs (id, name, duo_id)
-    values ('dddddddd-0000-0000-0000-000000000001', 'Écrit par le nouveau code', '33333333-3333-3333-3333-333333333333');
-  insert into public.programs (id, name, couple_id)
-    values ('dddddddd-0000-0000-0000-000000000002', 'Écrit par l''ancien code', '33333333-3333-3333-3333-333333333333');
-  if exists (select 1 from public.programs
-             where id in ('dddddddd-0000-0000-0000-000000000001', 'dddddddd-0000-0000-0000-000000000002')
-               and (duo_id is null or couple_id is null or duo_id <> couple_id)) then
-    raise exception 'ÉCHEC : synchro couple_id / duo_id des programmes';
-  end if;
-
-  -- 5. Synchro couple → duo (couples / couple_members).
-  insert into public.couples (id, name) values ('eeeeeeee-0000-0000-0000-000000000001', 'Couple synchro');
-  insert into public.couple_members (couple_id, profile_id)
-    values ('eeeeeeee-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000002');
-  if not exists (select 1 from public.duo_members
-                 where duo_id = 'eeeeeeee-0000-0000-0000-000000000001'
-                   and profile_id = 'aaaaaaaa-0000-0000-0000-000000000002') then
-    raise exception 'ÉCHEC : synchro couple_members → duo_members';
-  end if;
-
-  -- 6. Rien d'ouvert à anon.
+  -- 4. Rien d'ouvert à anon.
   if has_table_privilege('anon', 'public.duos', 'select')
      or has_table_privilege('anon', 'public.duo_members', 'select')
      or has_table_privilege('anon', 'public.duo_invitations', 'select')

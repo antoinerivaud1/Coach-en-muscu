@@ -9,25 +9,22 @@ export type Json =
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCHS MANUELS À RÉAPPLIQUER APRÈS CHAQUE REGÉNÉRATION DU TYPEGEN (CM-7)
 //
-// Ce fichier est généré par le typegen Supabase. Trois points à connaître :
+// Ce fichier est généré par le typegen Supabase. Deux points à connaître :
 //
-// 1. `create_couple.Args.couple_name` est forcé en `string` (obligatoire). Le
-//    typegen le sort parfois en optionnel (`couple_name?: string`) ; on le
-//    remet en requis pour que l'inférence du `rpc("create_couple", …)` exige
-//    bien l'argument. Si tu régénères les types, vérifie cette ligne.
-//
-// 2. `@supabase/supabase-js` est épinglé EXACTEMENT à `2.55.0` dans
+// 1. `@supabase/supabase-js` est épinglé EXACTEMENT à `2.55.0` dans
 //    package.json (sans caret). Les versions intermédiaires 2.45→2.55 ont un
 //    bug d'inférence qui type le 2e argument de `rpc()` comme `undefined`
 //    (cf. https://www.answeroverflow.com/m/1409468021931511849). Avant de
 //    lever le pin, vérifier que le bug est officiellement corrigé :
 //    https://github.com/supabase/supabase-js/issues
 //
-// 3. CM-85 partie A : bloc `public` régénéré depuis la base locale
+// 2. CM-85 partie A : bloc `public` régénéré depuis la base locale
 //    (`supabase gen types typescript --local` après `supabase db reset`),
-//    formaté pour coller au reste du fichier ; `__InternalSupabase` et le
-//    patch 1 conservés. Le typegen local écrit `Args: Record<PropertyKey, never>`
-//    là où celui de la prod écrit `Args: never` : on garde `never`.
+//    formaté pour coller au reste du fichier ; `__InternalSupabase` conservé.
+//    Le typegen local écrit `Args: Record<PropertyKey, never>` là où celui de
+//    la prod écrit `Args: never` : on garde `never`. CM-99 : tables
+//    `couples` / `couple_members`, colonnes `couple_id` et fonctions couple
+//    retirées à la main (supprimées du schéma).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type Database = {
@@ -38,57 +35,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      couple_members: {
-        Row: {
-          couple_id: string
-          joined_at: string
-          profile_id: string
-        }
-        Insert: {
-          couple_id: string
-          joined_at?: string
-          profile_id: string
-        }
-        Update: {
-          couple_id?: string
-          joined_at?: string
-          profile_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "couple_members_couple_id_fkey"
-            columns: ["couple_id"]
-            isOneToOne: false
-            referencedRelation: "couples"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "couple_members_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      couples: {
-        Row: {
-          created_at: string
-          id: string
-          name: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string | null
-        }
-        Relationships: []
-      }
       duo_invitations: {
         Row: {
           accepted_at: string | null
@@ -214,7 +160,6 @@ export type Database = {
       }
       exercises: {
         Row: {
-          couple_id: string | null
           created_at: string
           duo_id: string | null
           id: string
@@ -223,7 +168,6 @@ export type Database = {
           name: string
         }
         Insert: {
-          couple_id?: string | null
           created_at?: string
           duo_id?: string | null
           id?: string
@@ -232,7 +176,6 @@ export type Database = {
           name: string
         }
         Update: {
-          couple_id?: string | null
           created_at?: string
           duo_id?: string | null
           id?: string
@@ -241,13 +184,6 @@ export type Database = {
           name?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "exercises_couple_id_fkey"
-            columns: ["couple_id"]
-            isOneToOne: false
-            referencedRelation: "couples"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "exercises_duo_id_fkey"
             columns: ["duo_id"]
@@ -369,7 +305,6 @@ export type Database = {
       }
       programs: {
         Row: {
-          couple_id: string | null
           created_at: string
           duo_id: string | null
           id: string
@@ -377,7 +312,6 @@ export type Database = {
           owner_profile_id: string | null
         }
         Insert: {
-          couple_id?: string | null
           created_at?: string
           duo_id?: string | null
           id?: string
@@ -385,7 +319,6 @@ export type Database = {
           owner_profile_id?: string | null
         }
         Update: {
-          couple_id?: string | null
           created_at?: string
           duo_id?: string | null
           id?: string
@@ -393,13 +326,6 @@ export type Database = {
           owner_profile_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "programs_couple_id_fkey"
-            columns: ["couple_id"]
-            isOneToOne: false
-            referencedRelation: "couples"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "programs_duo_id_fkey"
             columns: ["duo_id"]
@@ -520,14 +446,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      accessible_profile_ids: { Args: never; Returns: string[] }
       can_access_program: { Args: { p_program_id: string }; Returns: boolean }
-      // couple_name : requis (patch manuel CM-7, voir note en tête de fichier)
-      create_couple: { Args: { couple_name: string }; Returns: string }
       is_duo_member: { Args: { p_duo_id: string }; Returns: boolean }
-      join_couple: { Args: { target_couple_id: string }; Returns: string }
       my_duo_id: { Args: never; Returns: string }
-      user_couple_id: { Args: never; Returns: string }
       visible_profile_ids: { Args: never; Returns: string[] }
     }
     Enums: {
