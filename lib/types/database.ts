@@ -24,7 +24,10 @@ export type Json =
 //    Le typegen local écrit `Args: Record<PropertyKey, never>` là où celui de
 //    la prod écrit `Args: never` : on garde `never`. CM-99 : tables
 //    `couples` / `couple_members`, colonnes `couple_id` et fonctions couple
-//    retirées à la main (supprimées du schéma).
+//    retirées à la main (supprimées du schéma). CM-86 socle : colonnes
+//    `profiles.accent_color`, `avatar_url`, `onboarded_at` et
+//    `exercises.owner_profile_id` (+ sa FK) ajoutées à la main, au format du
+//    typegen (migration 20261010180000_cm86_socle_profil.sql).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type Database = {
@@ -166,6 +169,7 @@ export type Database = {
           is_compound: boolean
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
+          owner_profile_id: string | null
         }
         Insert: {
           created_at?: string
@@ -174,6 +178,7 @@ export type Database = {
           is_compound?: boolean
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
+          owner_profile_id?: string | null
         }
         Update: {
           created_at?: string
@@ -182,6 +187,7 @@ export type Database = {
           is_compound?: boolean
           muscle_group?: Database["public"]["Enums"]["muscle_group"]
           name?: string
+          owner_profile_id?: string | null
         }
         Relationships: [
           {
@@ -190,29 +196,45 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "duos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercises_owner_profile_id_fkey"
+            columns: ["owner_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           }
         ]
       }
       profiles: {
         Row: {
+          accent_color: string
+          avatar_url: string | null
           color_role: Database["public"]["Enums"]["color_role"]
           created_at: string
           display_name: string
           id: string
+          onboarded_at: string | null
           weekly_goal: number
         }
         Insert: {
+          accent_color?: string
+          avatar_url?: string | null
           color_role?: Database["public"]["Enums"]["color_role"]
           created_at?: string
           display_name: string
           id: string
+          onboarded_at?: string | null
           weekly_goal?: number
         }
         Update: {
+          accent_color?: string
+          avatar_url?: string | null
           color_role?: Database["public"]["Enums"]["color_role"]
           created_at?: string
           display_name?: string
           id?: string
+          onboarded_at?: string | null
           weekly_goal?: number
         }
         Relationships: []

@@ -58,14 +58,18 @@ insert into auth.identities (
 
 -- Profils et duo ----------------------------------------------------------------
 
-insert into public.profiles (id, display_name, color_role, weekly_goal) values
-  ('11111111-1111-1111-1111-111111111111', 'Toi',  'toi',  4),
-  ('22222222-2222-2222-2222-222222222222', 'Elle', 'elle', 3),
-  ('44444444-4444-4444-4444-444444444444', 'Solo', 'toi',  3)
+-- CM-86 socle : couleur de membre (accent_color) et onboarding déjà fait pour
+-- les 3 comptes (les e2e ne passent pas par l'onboarding).
+insert into public.profiles (id, display_name, color_role, weekly_goal, accent_color, onboarded_at) values
+  ('11111111-1111-1111-1111-111111111111', 'Toi',  'toi',  4, '#2FE6FF', now()),
+  ('22222222-2222-2222-2222-222222222222', 'Elle', 'elle', 3, '#FF4F7E', now()),
+  ('44444444-4444-4444-4444-444444444444', 'Solo', 'toi',  3, '#FF8A3D', now())
 on conflict (id) do update set
   display_name = excluded.display_name,
   color_role   = excluded.color_role,
-  weekly_goal  = excluded.weekly_goal;
+  weekly_goal  = excluded.weekly_goal,
+  accent_color = excluded.accent_color,
+  onboarded_at = excluded.onboarded_at;
 
 -- Duo « Nous » (CM-85), uuid identique à la prod.
 insert into public.duos (id, name) values
@@ -138,6 +142,11 @@ insert into public.session_sets (id, session_id, exercise_id, set_index, weight_
 -- désormais 3 cartes ; les e2e ciblent « Toi » par son nom (E2E_PROFILE_NAME).
 -- Nb : l'uuid 4444… du profil Solo est aussi celui du programme « Nos
 -- séances » (tables différentes, aucun conflit).
+
+-- CM-86 socle : un exercice perso de Solo (owner_profile_id, duo_id null).
+insert into public.exercises (id, name, muscle_group, is_compound, duo_id, owner_profile_id) values
+  ('99999999-9999-9999-9999-000000000006', 'Exercice perso de Solo', 'other', false,
+   null, '44444444-4444-4444-4444-444444444444');
 
 insert into public.programs (id, name, owner_profile_id, duo_id) values
   ('99999999-9999-9999-9999-000000000001', 'Programme solo',
