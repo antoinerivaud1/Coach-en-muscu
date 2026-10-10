@@ -71,7 +71,9 @@ test.describe("Onboarding solo (CM-86)", () => {
     const today = page.getByRole("region", { name: "Aujourd'hui" });
     await expect(today).toBeVisible();
     await expect(today).toContainText("Push");
-    await expect(today).toContainText("6 exercices");
+    // Seed de la CI : extrait du catalogue (81 en prod), un modèle peut y
+    // perdre un exercice ; le nombre exact n'est donc pas figé ici.
+    await expect(today).toContainText(/\d\u00a0exercices? · environ\u00a0\d+\u00a0min/);
     await expect(today.getByRole("button", { name: "Démarrer la séance" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Cette semaine" })).toContainText("0 / 4");
     // Aucune section duo pour un solo.
