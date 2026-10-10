@@ -80,7 +80,10 @@ select is((select count(*)::int from public.exercises where duo_id is not null),
 -- ---------------------------------------------------------------------------
 -- 4. Solo voit le catalogue système.
 -- ---------------------------------------------------------------------------
-select ok((select count(*) from public.exercises where duo_id is null) > 0,
+-- CM-86 : « système » = ni duo ni propriétaire (duo_id null vaut aussi pour
+-- un exercice perso).
+select ok((select count(*) from public.exercises
+           where duo_id is null and owner_profile_id is null) > 0,
           '4. Solo voit les exercices système');
 
 -- ---------------------------------------------------------------------------

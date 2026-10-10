@@ -54,7 +54,7 @@ export async function createCustomExercise(input: {
     .from("exercises")
     .select("id")
     .eq("name", name)
-    .or(`duo_id.is.null,duo_id.eq.${duoId}`);
+    .or(`and(duo_id.is.null,owner_profile_id.is.null),duo_id.eq.${duoId}`);
   if (dupes && dupes.length > 0) {
     return { success: false, error: "Un exercice porte déjà ce nom" };
   }
