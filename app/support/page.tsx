@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 const TOC = [
   { id: "contact", title: "Nous contacter" },
   { id: "mot-de-passe", title: "J’ai oublié mon mot de passe" },
-  { id: "suppression", title: "Comment supprimer mon compte ?" },
+  { id: "suppression", title: "Comment supprimer mon compte ou exporter mes données ?" },
   { id: "duo", title: "Comment quitter un duo ?" },
   { id: "abonnement", title: "Gérer ou résilier mon abonnement" },
   { id: "partenaire", title: "Mon partenaire doit-il payer ?" },
@@ -49,13 +49,19 @@ export default function SupportPage() {
 
       <Section id="suppression" n={3} title={TOC[2].title}>
         <P>
-          La suppression du compte directement depuis l’app, dans Profil, arrive bientôt.
-          Elle effacera ton compte et tes données personnelles (profil, séances, séries,
-          exercices personnalisés, appartenance à un duo).
+          Dans l’app : <B>Profil</B>, section <B>Mes données</B>, puis{" "}
+          <B>Supprimer mon compte</B>. L’app te rappelle ce qui sera effacé, puis te demande
+          d’écrire « SUPPRIMER » pour confirmer. La suppression est immédiate et définitive :
+          compte, profil, séances, séries, séances types et exercices personnalisés.
         </P>
         <P>
-          En attendant, écris au support depuis l’adresse email de ton compte en demandant la
-          suppression : nous la confirmons par email une fois faite.
+          En duo, ton partenaire garde ses séances, ses séries et la bibliothèque « Nos
+          séances », qui devient la sienne.
+        </P>
+        <P>
+          Pour garder une copie avant de partir : <B>Exporter mes données</B>, dans la même
+          section. Tu reçois un fichier ZIP avec tes séances et séries (CSV, pour un tableur)
+          et toutes tes données (JSON).
         </P>
         <Muted>
           Si tu as un abonnement Premium, pense à le résilier aussi dans les réglages de ton
@@ -70,8 +76,8 @@ export default function SupportPage() {
           restent dans ton compte.
         </P>
         <P>
-          L’option « Quitter le duo » arrive dans Profil. D’ici là, écris au support et nous
-          nous en chargeons.
+          Dans l’app : <B>Profil</B>, puis <B>Quitter le duo</B>. Tu reçois une copie des
+          séances types du duo dans ta bibliothèque.
         </P>
       </Section>
 
