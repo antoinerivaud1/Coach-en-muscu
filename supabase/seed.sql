@@ -32,6 +32,12 @@ insert into auth.users (
    'authenticated', 'authenticated', 'elle@coach-en-muscu.test',
    extensions.crypt('motdepasse-de-test', extensions.gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{"display_name":"Elle","color_role":"elle"}',
+   now(), now(), '', '', '', ''),
+  -- CM-59 : compte « Solo », HORS duo (tests RLS : ne voit rien du duo).
+  ('00000000-0000-0000-0000-000000000000', '44444444-4444-4444-4444-444444444444',
+   'authenticated', 'authenticated', 'solo@coach-en-muscu.test',
+   extensions.crypt('motdepasse-de-test', extensions.gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}', '{"display_name":"Solo","color_role":"toi"}',
    now(), now(), '', '', '', '');
 
 insert into auth.identities (
@@ -44,13 +50,18 @@ insert into auth.identities (
   ('22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222',
    '22222222-2222-2222-2222-222222222222', 'email',
    '{"sub":"22222222-2222-2222-2222-222222222222","email":"elle@coach-en-muscu.test","email_verified":true}',
+   now(), now(), now()),
+  ('44444444-4444-4444-4444-444444444444', '44444444-4444-4444-4444-444444444444',
+   '44444444-4444-4444-4444-444444444444', 'email',
+   '{"sub":"44444444-4444-4444-4444-444444444444","email":"solo@coach-en-muscu.test","email_verified":true}',
    now(), now(), now());
 
 -- Profils, couple et duo -------------------------------------------------------
 
 insert into public.profiles (id, display_name, color_role, weekly_goal) values
   ('11111111-1111-1111-1111-111111111111', 'Toi',  'toi',  4),
-  ('22222222-2222-2222-2222-222222222222', 'Elle', 'elle', 3)
+  ('22222222-2222-2222-2222-222222222222', 'Elle', 'elle', 3),
+  ('44444444-4444-4444-4444-444444444444', 'Solo', 'toi',  3)
 on conflict (id) do update set
   display_name = excluded.display_name,
   color_role   = excluded.color_role,
@@ -129,3 +140,33 @@ insert into public.session_sets (id, session_id, exercise_id, set_index, weight_
   ('88888888-8888-8888-8888-000000000005', '77777777-7777-7777-7777-000000000001', 'c0a6396d-079d-4d92-ae55-5d409c817d41', 1, 55.00, 12, 7,    false),
   ('88888888-8888-8888-8888-000000000006', '77777777-7777-7777-7777-000000000001', 'c0a6396d-079d-4d92-ae55-5d409c817d41', 2, 55.00, 10, 8,    false),
   ('88888888-8888-8888-8888-000000000007', '77777777-7777-7777-7777-000000000001', 'c0a6396d-079d-4d92-ae55-5d409c817d41', 3, 55.00, 9,  9,    false);
+
+-- CM-59 : données du compte « Solo » (hors duo) --------------------------------
+-- Programme perso (owner_profile_id = Solo, duo_id null), une séance type, un
+-- exercice système, une séance terminée et une série. Sert aux tests RLS
+-- (supabase/tests/rls.test.sql) : Solo ne doit rien voir du duo, et le duo
+-- rien de Solo. Le sélecteur de profil (mode cookie, service-role) affiche
+-- désormais 3 cartes ; les e2e ciblent « Toi » par son nom (E2E_PROFILE_NAME).
+-- Nb : l'uuid 4444… du profil Solo est aussi celui du programme « Nos
+-- séances » (tables différentes, aucun conflit).
+
+insert into public.programs (id, name, owner_profile_id, couple_id, duo_id) values
+  ('99999999-9999-9999-9999-000000000001', 'Programme solo',
+   '44444444-4444-4444-4444-444444444444', null, null);
+
+insert into public.program_days (id, program_id, name, order_index) values
+  ('99999999-9999-9999-9999-000000000002', '99999999-9999-9999-9999-000000000001', 'Full body', 0);
+
+insert into public.program_exercises
+  (id, program_day_id, exercise_id, order_index, target_sets, target_reps_min, target_reps_max, rest_seconds, notes)
+values
+  ('99999999-9999-9999-9999-000000000003', '99999999-9999-9999-9999-000000000002',
+   '1e56eade-5cd1-4ea0-9742-9ac31b8c37ed', 0, 3, 8, 10, 120, null);
+
+insert into public.sessions (id, profile_id, program_day_id, performed_at, feedback, notes, duration_seconds) values
+  ('99999999-9999-9999-9999-000000000004', '44444444-4444-4444-4444-444444444444',
+   '99999999-9999-9999-9999-000000000002', '2026-10-02 12:00:00+02', 'easy', 'Séance solo (seed)', 1800);
+
+insert into public.session_sets (id, session_id, exercise_id, set_index, weight_kg, reps, rpe, is_warmup) values
+  ('99999999-9999-9999-9999-000000000005', '99999999-9999-9999-9999-000000000004',
+   '1e56eade-5cd1-4ea0-9742-9ac31b8c37ed', 1, 60.00, 10, 7, false);
