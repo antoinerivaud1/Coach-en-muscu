@@ -65,6 +65,9 @@ jobs:
       # Données de supabase/seed.sql (fictives). Les parcours se connectent
       # avec le compte « Toi » du seed (tests/e2e/helpers.ts, CM-59 B).
       E2E_SEANCE_NAME: Haut du corps
+      # CM-86 : inscription ouverte pour le parcours d'onboarding (variable
+      # serveur lue par `next start` ; en prod elle reste désactivée).
+      SIGNUP_ENABLED: "1"
     steps:
       - uses: actions/checkout@v4
 

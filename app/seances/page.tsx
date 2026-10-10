@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfileId, getDuoId } from "@/lib/profile";
-import { ensureSharedProgram, getProgramWithDays } from "@/lib/queries/programs";
+import {
+  ensurePersonalProgram,
+  ensureSharedProgram,
+  getProgramWithDays,
+} from "@/lib/queries/programs";
 import type { ProgramFull, ProgramDayFull } from "@/lib/queries/programs";
 import { getLastDoneByDay } from "@/lib/queries/sessions";
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
@@ -20,7 +24,7 @@ import type { SeanceView } from "./SeanceLibrary";
  * « créer un premier programme ».
  */
 
-/** Cadre commun aux écrans qui n'ont rien à afficher (pas de couple, erreur). */
+/** Cadre commun aux écrans qui n'ont rien à afficher (erreur). */
 function Message({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-screen p-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -62,18 +66,12 @@ export default async function SeancesPage({
   const profileId = await requireProfileId("/seances");
   const supabase = await createClient();
 
+  // CM-86 : sans duo, la bibliothèque perso.
   const duoId = await getDuoId(supabase, profileId);
-  if (!duoId) {
-    return (
-      <Message>
-        <p className="text-sm text-fg-muted">
-          Cette fonctionnalité nécessite un couple.
-        </p>
-      </Message>
-    );
-  }
 
-  const shared = await ensureSharedProgram(supabase, duoId);
+  const shared = duoId
+    ? await ensureSharedProgram(supabase, duoId)
+    : await ensurePersonalProgram(supabase, profileId);
   if (!shared.ok) {
     return (
       <Message>

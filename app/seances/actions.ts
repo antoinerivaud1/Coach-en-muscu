@@ -8,6 +8,7 @@ import { getCatalogExercises } from "@/lib/queries/exercises";
 import {
   canAccessProgram,
   countLoggedSessionsForDay,
+  ensurePersonalProgram,
   ensureSharedProgram,
   getProgramDayNames,
   nextOrderIndex,
@@ -180,28 +181,22 @@ export async function saveSeance(
   const profileId = await requireProfileId();
   const supabase = await createClient();
 
+  // CM-86 : sans duo, la séance va dans la bibliothèque perso (branche
+  // `ensurePersonalProgram` plus bas) ; en duo, rien ne change.
   const duoId = await getDuoId(supabase, profileId);
-  if (!duoId) {
-    // Pas de programme personnel créé en silence : l'app est pensée pour le
-    // couple, et une bibliothèque solo deviendrait invisible une fois le
-    // couple rejoint.
-    return {
-      success: false,
-      error: "Tu dois être en couple pour créer une séance",
-    };
-  }
 
   const checkedExercises = validateExercises(input.exercises);
   if (!checkedExercises.ok) {
     return { success: false, error: checkedExercises.error };
   }
 
-  // Chaque exercice doit exister dans le catalogue accessible au couple : un
-  // id arbitraire ne doit pas pouvoir rattacher l'exercice perso d'un autre
-  // couple à cette séance.
+  // Chaque exercice doit exister dans le catalogue accessible (système, mes
+  // exercices perso, ceux du duo) : un id arbitraire ne doit pas pouvoir
+  // rattacher l'exercice perso d'un autre compte à cette séance.
   const { data: catalogData, error: catalogError } = await getCatalogExercises(
     supabase,
     duoId,
+    profileId,
   );
   if (catalogError) {
     return {
@@ -254,11 +249,14 @@ export async function saveSeance(
     programId = day.program_id;
     excludeDayId = day.id;
   } else {
-    const shared = await ensureSharedProgram(supabase, duoId);
-    if (!shared.ok) {
-      return { success: false, error: shared.error };
+    // CM-86 : utilisateur sans duo => bibliothèque perso.
+    const target = duoId
+      ? await ensureSharedProgram(supabase, duoId)
+      : await ensurePersonalProgram(supabase, profileId);
+    if (!target.ok) {
+      return { success: false, error: target.error };
     }
-    programId = shared.programId;
+    programId = target.programId;
   }
 
   // ----- Nom -----

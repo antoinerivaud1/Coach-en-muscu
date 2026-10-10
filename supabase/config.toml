@@ -29,6 +29,14 @@ port = 54323
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
+# CM-86 : l'inscription est ouverte en LOCAL / CI (parcours e2e d'onboarding),
+# sans confirmation d'email (pas de SMTP avant CM-97). En prod, l'inscription
+# reste fermée dans le dashboard Supabase tant que l'app n'est pas publique.
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
 
 # Services inutilisés par l'app : coupés pour accélérer le démarrage en CI.
 [realtime]

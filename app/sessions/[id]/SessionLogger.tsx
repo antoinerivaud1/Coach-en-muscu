@@ -12,6 +12,7 @@ import {
 } from "./actions";
 import type { LastExerciseData } from "@/lib/queries/sessions";
 import type { SystemExercise } from "@/lib/queries/exercises";
+import { isCustomExercise } from "@/lib/queries/exercises";
 import {
   formatWeight,
   formatDateShort,
@@ -1136,7 +1137,7 @@ export default function SessionLogger({
             name={ex.name}
             muscleGroup={ex.muscleGroup}
             isCompound={catalogEntry?.is_compound}
-            isCustom={catalogEntry ? catalogEntry.duo_id !== null : false}
+            isCustom={catalogEntry ? isCustomExercise(catalogEntry) : false}
           />
         </div>
         <p className="mt-1 text-xs text-fg-muted">

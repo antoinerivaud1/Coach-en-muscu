@@ -272,6 +272,63 @@ export async function ensureSharedProgram(
   return { ok: true, programId: data.id };
 }
 
+/** Nom du programme perso, jamais montré à l'utilisateur (CM-86). */
+export const PERSONAL_PROGRAM_NAME = "Mes séances";
+
+/**
+ * Id du programme PERSO du profil (`owner_profile_id` = lui, `duo_id` null),
+ * le plus ancien s'il y en a plusieurs (CM-86).
+ */
+export async function getPersonalProgramId(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("programs")
+    .select("id")
+    .eq("owner_profile_id", profileId)
+    .is("duo_id", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .returns<{ id: string }[]>();
+
+  return data?.[0]?.id ?? null;
+}
+
+/**
+ * Équivalent perso d'`ensureSharedProgram` (CM-86) : la bibliothèque d'un
+ * utilisateur qui s'entraîne seul vit dans un programme à son nom, créé en
+ * silence à la première séance puis toujours réutilisé. Il reste à lui s'il
+ * rejoint un duo plus tard (ses séances perso ne deviennent pas celles du duo).
+ */
+export async function ensurePersonalProgram(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+): Promise<EnsureSharedProgram> {
+  const existing = await getPersonalProgramId(supabase, profileId);
+  if (existing) return { ok: true, programId: existing };
+
+  const { data, error } = await supabase
+    .from("programs")
+    .insert({
+      name: PERSONAL_PROGRAM_NAME,
+      owner_profile_id: profileId,
+      duo_id: null,
+    })
+    .select("id")
+    .returns<{ id: string }[]>()
+    .single();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      error: error ? writeErrorMessage(error) : "Impossible de créer ta bibliothèque",
+    };
+  }
+
+  return { ok: true, programId: data.id };
+}
+
 // ---- Historique rattaché à une séance type ----
 
 export type LoggedSessionCount =

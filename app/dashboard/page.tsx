@@ -15,6 +15,10 @@ import {
 } from "@/lib/queries/sessions";
 import { resumeBannerState } from "@/lib/utils/currentSession";
 import BottomNav from "@/components/BottomNav";
+import FirstDayHome from "@/components/home/FirstDayHome";
+import { getIdentity } from "@/lib/queries/identity";
+import { memberAccent } from "@/lib/members";
+import { estimateSeanceMinutes } from "@/lib/onboardingTemplates";
 import ResumeSessionBanner from "@/components/ResumeSessionBanner";
 import { countSets, deriveMuscleTags, splitVisibleTags } from "@/lib/utils/seances";
 import type { MuscleGroup } from "@/lib/utils/seances";
@@ -206,6 +210,30 @@ export default async function DashboardPage({
     loggedSessionCount,
     now,
   );
+
+  // CM-86 : premier jour d'un utilisateur sans duo (aucune séance terminée,
+  // aucune en cours) : accueil dédié, sans aucune section duo.
+  const firstDay = seances[0];
+  if (!duoId && loggedSessionCount === 0 && banner.kind !== "banner" && firstDay) {
+    const identity = await getIdentity(supabase, profileId);
+    const { data: todayExercises } = await supabase
+      .from("program_exercises")
+      .select("target_sets, rest_seconds")
+      .eq("program_day_id", firstDay.id)
+      .returns<{ target_sets: number; rest_seconds: number }[]>();
+    return (
+      <FirstDayHome
+        name={identity?.display_name ?? profile?.display_name ?? ""}
+        accent={memberAccent(identity ?? {})}
+        weeklyGoal={identity?.weekly_goal ?? profile?.weekly_goal ?? 3}
+        todayIdx={todayIdx}
+        today={firstDay}
+        todayMinutes={estimateSeanceMinutes(todayExercises ?? [])}
+        seances={seances}
+        error={actionError}
+      />
+    );
+  }
 
   return (
     <main className="min-h-[100dvh] px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">

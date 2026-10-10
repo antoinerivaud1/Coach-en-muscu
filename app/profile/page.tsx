@@ -6,7 +6,8 @@ import {
   getDuoId,
   getDuoProfileIds,
 } from "@/lib/profile";
-import { updateWeeklyGoal } from "@/app/actions";
+import IdentitySection from "@/components/profile/IdentitySection";
+import { getIdentity } from "@/lib/queries/identity";
 import SignOutButton from "@/components/SignOutButton";
 import BottomNav from "@/components/BottomNav";
 import OnboardingPhoto from "@/components/OnboardingPhoto";
@@ -33,6 +34,7 @@ export default async function ProfilePage() {
   const profileId = await requireProfileId("/profile");
   const supabase = await createClient();
   const profile = await getProfile(supabase, profileId);
+  const identity = await getIdentity(supabase, profileId);
   const isElle = profile?.color_role === "elle";
   const { badges, earnedCount } = await getBadges(
     supabase,
@@ -71,32 +73,15 @@ export default async function ProfilePage() {
 
       <OnboardingPhoto />
 
-      <div className="mt-6 rounded-2xl border border-line bg-surface p-4">
-        <div className="text-[13px] font-extrabold uppercase tracking-[0.14em] text-fg-muted">
-          Objectif hebdomadaire
-        </div>
-        <p className="mt-1 text-sm text-fg-muted">
-          Nombre de séances visées par semaine (anneau des Stats).
-        </p>
-        <div className="mt-3 flex gap-2">
-          {[3, 4, 5, 6].map((g) => {
-            const active = (profile?.weekly_goal ?? 4) === g;
-            return (
-              <form key={g} action={updateWeeklyGoal} className="flex-1">
-                <input type="hidden" name="weekly_goal" value={g} />
-                <button
-                  type="submit"
-                  className={`w-full rounded-xl py-2.5 font-oswald text-lg font-bold ${
-                    active ? "bg-energy text-ink" : "bg-surface2 text-fg-muted"
-                  }`}
-                >
-                  {g}
-                </button>
-              </form>
-            );
-          })}
-        </div>
-      </div>
+      {/* CM-86 : prénom, couleur et objectif (remplace l'ancien bloc
+          « Objectif hebdomadaire » 3 à 6, l'objectif va désormais de 1 à 7). */}
+      {identity && (
+        <IdentitySection
+          displayName={identity.display_name}
+          accentColor={identity.accent_color}
+          weeklyGoal={identity.weekly_goal}
+        />
+      )}
 
       <div className="mt-6">
         <div className="mb-2.5 flex items-center justify-between">

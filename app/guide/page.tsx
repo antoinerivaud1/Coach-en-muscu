@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireProfileId, getDuoId } from "@/lib/profile";
-import { getCatalogExercises } from "@/lib/queries/exercises";
+import { getCatalogExercises, isCustomExercise } from "@/lib/queries/exercises";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
 import BottomNav from "@/components/BottomNav";
@@ -25,7 +25,7 @@ export default async function GuidePage() {
   const supabase = await createClient();
   const duoId = await getDuoId(supabase, profileId);
 
-  const { data } = await getCatalogExercises(supabase, duoId);
+  const { data } = await getCatalogExercises(supabase, duoId, profileId);
   const exercises: SystemExercise[] = data ?? [];
 
   const byGroup: Record<string, SystemExercise[]> = {};
@@ -55,7 +55,7 @@ export default async function GuidePage() {
                   name={ex.name}
                   muscleGroup={ex.muscle_group}
                   isCompound={ex.is_compound}
-                  isCustom={ex.duo_id !== null}
+                  isCustom={isCustomExercise(ex)}
                   triggerClassName="flex w-full items-center justify-between rounded-lg bg-surface px-4 py-3 text-left active:bg-surface2"
                 >
                   <span className="text-base">{ex.name}</span>
