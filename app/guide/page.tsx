@@ -54,9 +54,11 @@ export default async function GuidePage() {
                   key={ex.id}
                   name={ex.name}
                   muscleGroup={ex.muscle_group}
+                  isCompound={ex.is_compound}
+                  isCustom={ex.duo_id !== null}
                   triggerClassName="flex w-full items-center justify-between rounded-lg bg-surface px-4 py-3 text-left active:bg-surface2"
                 >
-                  <span className="text-sm">{ex.name}</span>
+                  <span className="text-base">{ex.name}</span>
                   <span className="text-lg text-fg-muted" aria-hidden>
                     ›
                   </span>

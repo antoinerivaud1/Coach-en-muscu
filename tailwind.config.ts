@@ -21,7 +21,10 @@ const config: Config = {
         surface2: "#1F1F27",
         line: "rgba(255,255,255,0.07)",
         // Accent d'énergie (vert acide)
-        energy: { DEFAULT: "#CCFF02", fg: "#0B0B0F" },
+        // `dim` : muscles secondaires sur la carte musculaire (CM-30).
+        energy: { DEFAULT: "#CCFF02", fg: "#0B0B0F", dim: "#6F8A0B" },
+        // Carte musculaire (CM-30) : muscle non sollicité / zone hors muscle.
+        body: { idle: "#3A3A44", base: "#26262E" },
         flame: "#FF8A3D",
         // Texte
         fg: { DEFAULT: "#F2F2F5", muted: "#8C8C97", faint: "#56565E" },
