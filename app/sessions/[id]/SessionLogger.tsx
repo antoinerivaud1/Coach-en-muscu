@@ -35,6 +35,7 @@ import {
 } from "@/lib/utils/setQueue";
 import { useSetPersistence } from "@/hooks/useSetPersistence";
 import ExerciseInfo from "@/components/ExerciseInfo";
+import ExerciseMuscleSummary from "@/components/ExerciseMuscleSummary";
 import AddExerciseSheet from "@/components/AddExerciseSheet";
 import ExitSessionSheet from "@/components/ExitSessionSheet";
 import { addPending } from "@/lib/pendingSessions";
@@ -755,6 +756,8 @@ export default function SessionLogger({
   );
   const isLast = currentIdx >= allExercises.length - 1;
   const last = ex.last;
+  // CM-30 : type de mouvement et « perso » pour la fiche exercice.
+  const catalogEntry = catalogState.find((c) => c.id === ex.exerciseId);
   // La croix de retrait ne vit que tant que l'exercice ajouté n'a aucune série
   // enregistrée : dès la première validation, il n'est plus « retirable ».
   const canRemove = ex.source === "extra" && vcount === 0;
@@ -1121,11 +1124,19 @@ export default function SessionLogger({
               )}
             </div>
           </div>
-          <ExerciseInfo name={ex.name} muscleGroup={ex.muscleGroup} />
+          <ExerciseInfo
+            name={ex.name}
+            muscleGroup={ex.muscleGroup}
+            isCompound={catalogEntry?.is_compound}
+            isCustom={catalogEntry ? catalogEntry.duo_id !== null : false}
+          />
         </div>
         <p className="mt-1 text-xs text-fg-muted">
           Objectif {ex.targetSets} × {ex.targetRepsMin}–{ex.targetRepsMax}
         </p>
+
+        {/* CM-30 : carte musculaire compacte, la fiche complète est derrière « i ». */}
+        <ExerciseMuscleSummary name={ex.name} muscleGroup={ex.muscleGroup} />
 
         {/* Confirmation de retrait en ligne : `window.confirm` est inerte en
             PWA iOS standalone et dans la WKWebView Capacitor (cf. CM-70). */}

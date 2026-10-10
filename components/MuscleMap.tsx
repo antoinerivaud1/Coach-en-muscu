@@ -1,66 +1,86 @@
 "use client";
 
-// Carte anatomique des muscles sollicités (face + dos).
-// Primaire = rouge vif, secondaire = rouge clair.
-// Silhouettes anatomiques : react-body-highlighter (licence MIT).
-import Model, { type IExerciseData } from "react-body-highlighter";
+// Carte anatomique des muscles sollicités, face et dos (CM-30).
+// Principal en vert acide, secondaires en vert atténué, le reste en gris.
+// Silhouettes homme / femme : tracés de react-native-body-highlighter (MIT),
+// voir lib/bodyMapPaths.ts.
+import { FEMALE_FIGURE, MALE_FIGURE, type BodyPath } from "@/lib/bodyMapPaths";
 import { getExerciseMuscles } from "@/lib/exerciseMuscles";
+import { zoneRole, zoneRoles, type BodyView, type ZoneRole } from "@/lib/bodyMap";
+import type { Silhouette } from "@/lib/silhouette";
 
-const BODY = "#3f3f46"; // zinc-700
-const SECONDARY = "#fca5a5"; // red-300
-const PRIMARY = "#ef4444"; // red-500
+const FILL_CLASS: Record<ZoneRole, string> = {
+  primary: "fill-energy",
+  secondary: "fill-energy-dim",
+  idle: "fill-body-idle",
+  base: "fill-body-base",
+};
+
+function Figure({
+  paths,
+  viewBox,
+  roles,
+  label,
+  caption,
+  size,
+}: {
+  paths: readonly BodyPath[];
+  viewBox: string;
+  roles: Map<string, "primary" | "secondary">;
+  label: string;
+  caption: string;
+  size: "full" | "compact";
+}) {
+  return (
+    <figure className="m-0 flex min-w-0 flex-1 flex-col items-center gap-1.5">
+      <svg
+        viewBox={viewBox}
+        role="img"
+        aria-label={label}
+        className={size === "full" ? "h-[300px] w-full max-w-[150px]" : "h-[150px] w-full max-w-[75px]"}
+      >
+        {paths.map(([slug, d], i) => (
+          <path key={i} d={d} className={FILL_CLASS[zoneRole(slug, roles)]} />
+        ))}
+      </svg>
+      <figcaption className="font-oswald text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">
+        {caption}
+      </figcaption>
+    </figure>
+  );
+}
 
 export default function MuscleMap({
   name,
   muscleGroup,
+  silhouette,
+  size = "full",
 }: {
   name: string;
   muscleGroup: string;
+  silhouette: Silhouette;
+  size?: "full" | "compact";
 }) {
-  const { primary, secondary } = getExerciseMuscles(name, muscleGroup);
-
-  // fréquence 1 -> rouge clair (secondaire), fréquence 2 -> rouge vif (primaire)
-  const data: IExerciseData[] = [];
-  if (secondary.length) data.push({ name: "sec", muscles: secondary, frequency: 1 });
-  if (primary.length) data.push({ name: "prim", muscles: primary, frequency: 2 });
-
-  const common = {
-    data,
-    bodyColor: BODY,
-    highlightedColors: [SECONDARY, PRIMARY],
-    svgStyle: { width: "100%", height: "100%" },
-  };
+  const muscles = getExerciseMuscles(name, muscleGroup);
+  const figure = silhouette === "femme" ? FEMALE_FIGURE : MALE_FIGURE;
+  const views: { view: BodyView; caption: string; paths: readonly BodyPath[]; viewBox: string }[] = [
+    { view: "front", caption: "Face", paths: figure.front, viewBox: figure.viewBoxFront },
+    { view: "back", caption: "Dos", paths: figure.back, viewBox: figure.viewBoxBack },
+  ];
 
   return (
-    <div>
-      <div className="flex items-stretch justify-center gap-4">
-        <figure className="m-0 flex flex-col items-center">
-          <div className="h-40 w-24" style={{ filter: "blur(0.5px)" }}>
-            <Model type="anterior" {...common} />
-          </div>
-          <figcaption className="mt-1 text-[12px] font-medium text-zinc-500">
-            Face
-          </figcaption>
-        </figure>
-        <figure className="m-0 flex flex-col items-center">
-          <div className="h-40 w-24" style={{ filter: "blur(0.5px)" }}>
-            <Model type="posterior" {...common} />
-          </div>
-          <figcaption className="mt-1 text-[12px] font-medium text-zinc-500">
-            Dos
-          </figcaption>
-        </figure>
-      </div>
-      <div className="mt-1 flex items-center justify-center gap-4 text-[12px] text-zinc-400">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: PRIMARY }} />
-          Principal
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: SECONDARY }} />
-          Secondaire
-        </span>
-      </div>
+    <div className={`flex justify-center ${size === "full" ? "gap-2" : "gap-1"}`}>
+      {views.map((v) => (
+        <Figure
+          key={v.view}
+          paths={v.paths}
+          viewBox={v.viewBox}
+          roles={zoneRoles(muscles, v.view)}
+          caption={v.caption}
+          label={`Silhouette ${silhouette}, vue de ${v.view === "front" ? "face" : "dos"}, muscles sollicités en surbrillance`}
+          size={size}
+        />
+      ))}
     </div>
   );
 }

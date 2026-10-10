@@ -1,7 +1,9 @@
-// Muscles sollicités par exercice (primaire = rouge vif, secondaire = rouge clair).
-// Slugs anatomiques de react-body-highlighter. Mapping par nom d'exercice,
-// fallback par muscle_group pour les exercices persos.
+// Muscles sollicités par exercice (principal en vert acide, secondaires en vert
+// atténué sur la carte, CM-30). Slugs anatomiques de react-body-highlighter.
+// Mapping par nom d'exercice (clé normalisée), fallback par muscle_group pour
+// les exercices persos.
 import type { Muscle } from "react-body-highlighter";
+import { exerciseKey } from "@/lib/exerciseKey";
 
 export type ExerciseMuscles = { primary: Muscle[]; secondary: Muscle[] };
 
@@ -114,43 +116,71 @@ export const EXERCISE_MUSCLES: Record<string, ExerciseMuscles> = {
   "Cardio tapis": { primary: ["quadriceps", "calves"], secondary: ["hamstring", "gluteal"] },
 };
 
+const MUSCLES_BY_KEY: ReadonlyMap<string, ExerciseMuscles> = new Map(
+  Object.entries(EXERCISE_MUSCLES).map(([name, m]) => [exerciseKey(name), m]),
+);
+
 export function getExerciseMuscles(
   name: string,
   muscleGroup: string,
 ): ExerciseMuscles {
   return (
-    EXERCISE_MUSCLES[name] ??
+    MUSCLES_BY_KEY.get(exerciseKey(name)) ??
     FALLBACK_BY_GROUP[muscleGroup] ??
     FALLBACK_BY_GROUP.other!
   );
 }
 
-const MUSCLE_FR: Record<string, string> = {
+const MUSCLE_LABELS: Record<Muscle, string> = {
   chest: "Pectoraux",
-  "upper-back": "Dos",
+  "upper-back": "Dorsaux",
   "lower-back": "Lombaires",
   trapezius: "Trapèzes",
-  "front-deltoids": "Épaules",
-  "back-deltoids": "Épaules",
+  "front-deltoids": "Deltoïdes antérieurs",
+  "back-deltoids": "Deltoïdes postérieurs",
   biceps: "Biceps",
   triceps: "Triceps",
   forearm: "Avant-bras",
-  abs: "Abdos",
+  abs: "Abdominaux",
   obliques: "Obliques",
+  adductor: "Adducteurs",
+  abductors: "Abducteurs",
   quadriceps: "Quadriceps",
-  hamstring: "Ischios",
+  hamstring: "Ischio-jambiers",
   gluteal: "Fessiers",
   calves: "Mollets",
+  head: "Tête",
   neck: "Cou",
+  knees: "Genoux",
+  "left-soleus": "Soléaire",
+  "right-soleus": "Soléaire",
 };
 
-/** Tags muscles lisibles (primaire puis secondaire, dédupliqués). */
-export function getMuscleTags(name: string, muscleGroup: string): string[] {
-  const m = getExerciseMuscles(name, muscleGroup);
+/**
+ * Noms lisibles d'une liste de muscles, dédupliqués. Deltoïdes antérieurs et
+ * postérieurs ensemble se lisent « Deltoïdes » (élévations latérales).
+ */
+export function muscleLabels(muscles: readonly Muscle[]): string[] {
+  const hasBothDeltoids =
+    muscles.includes("front-deltoids") && muscles.includes("back-deltoids");
   const out: string[] = [];
-  for (const slug of [...m.primary, ...m.secondary]) {
-    const fr = MUSCLE_FR[slug as string] ?? String(slug);
-    if (!out.includes(fr)) out.push(fr);
+  for (const m of muscles) {
+    const label =
+      hasBothDeltoids && (m === "front-deltoids" || m === "back-deltoids")
+        ? "Deltoïdes"
+        : MUSCLE_LABELS[m];
+    if (!out.includes(label)) out.push(label);
   }
-  return out.slice(0, 4);
+  return out;
+}
+
+/** Libellés « Principal » / « Secondaires » de la légende de la carte. */
+export function getMuscleLegend(
+  name: string,
+  muscleGroup: string,
+): { primary: string[]; secondary: string[] } {
+  const m = getExerciseMuscles(name, muscleGroup);
+  const primary = muscleLabels(m.primary);
+  const secondary = muscleLabels(m.secondary).filter((l) => !primary.includes(l));
+  return { primary, secondary };
 }
