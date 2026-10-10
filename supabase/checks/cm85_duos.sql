@@ -26,8 +26,8 @@ begin
   if exists (select 1 from public.programs where duo_id is distinct from couple_id) then
     raise exception 'ÉCHEC : programs.duo_id doit être égal à couple_id';
   end if;
-  if (select count(*) from public.profiles) <> 4 then
-    raise exception 'ÉCHEC : le trigger aurait dû créer 2 profils de test (total 4)';
+  if (select count(*) from public.profiles) <> 5 then
+    raise exception 'ÉCHEC : le trigger aurait dû créer 2 profils de test (total 5 : Toi, Elle, Solo CM-59 + 2)';
   end if;
 
   -- 1. Deux membres max par duo.

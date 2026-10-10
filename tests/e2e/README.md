@@ -87,7 +87,9 @@ local contre la stack Docker, rebuilder avant tout usage avec `.env.local`.
 
 ## Données attendues
 
-Celles de `supabase/seed.sql` (fictives) : profils « Toi » et « Elle »,
+Celles de `supabase/seed.sql` (fictives) : profils « Toi » et « Elle »
+(plus « Solo », hors duo, pour les tests RLS de CM-59 : le sélecteur affiche
+donc 3 cartes, d'où le ciblage par `E2E_PROFILE_NAME`),
 programme « Nos séances » avec les séances types « Haut du corps » et
 « Bas du corps » (4 exercices chacune). Sans `E2E_PROFILE_NAME` /
 `E2E_SEANCE_NAME`, les tests prennent le premier profil et la première séance

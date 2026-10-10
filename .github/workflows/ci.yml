@@ -88,6 +88,12 @@ jobs:
       - name: Recréer la base (migrations + seed)
         run: supabase db reset
 
+      # CM-59 : policies RLS par duo et droits anon / authenticated
+      # (supabase/tests/*.sql, pgTAP). Transaction annulée : la base seedée
+      # reste intacte pour la suite.
+      - name: Tests RLS (pgTAP)
+        run: supabase test db
+
       # CM-85 : contraintes du modèle duo (2 membres max, un seul duo par
       # membre, FK profils / comptes, synchro couple ↔ duo, rien pour anon).
       # Transaction annulée : la base seedée reste intacte pour les e2e.
