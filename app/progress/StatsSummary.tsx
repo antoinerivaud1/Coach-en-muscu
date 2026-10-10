@@ -11,7 +11,8 @@ export type StatsData = {
   groups: { group: string; pct: number }[];
   weekGoal: number;
   weekSessions: number;
-  couple: { name: string; isElle: boolean; sets: number }[];
+  /** CM-87 : membres du duo (prénom, couleur) ; vide sans duo. */
+  couple: { name: string; color: string; sets: number }[];
 };
 
 function volumeParts(kg: number): { value: string; unit: string } {
@@ -103,7 +104,7 @@ export default function StatsSummary({
         </div>
       </div>
 
-      {/* Anneau objectif + comparaison couple */}
+      {/* Anneau objectif + comparaison du duo */}
       <div className="flex gap-3.5">
         <div className="flex w-[130px] flex-none flex-col items-center justify-center rounded-[20px] border border-line bg-surface p-4">
           <div className="relative h-24 w-24">
@@ -135,15 +136,13 @@ export default function StatsSummary({
         {stats.couple.length > 1 ? (
           <div className="flex-1 rounded-[20px] border border-line bg-surface p-4">
             <div className="mb-3.5 text-[13px] font-extrabold uppercase tracking-wide text-fg-muted">
-              Couple · séries (semaine)
+              Duo · séries (semaine)
             </div>
             <div className="space-y-3">
               {stats.couple.map((c) => (
                 <div key={c.name}>
                   <div className="mb-1.5 flex justify-between">
-                    <span
-                      className={`text-xs font-bold ${c.isElle ? "text-elle" : "text-toi"}`}
-                    >
+                    <span className="text-xs font-bold" style={{ color: c.color }}>
                       {c.name}
                     </span>
                     <span className="font-oswald text-[15px] text-fg">{c.sets}</span>
@@ -153,7 +152,7 @@ export default function StatsSummary({
                       className="block h-full rounded-full"
                       style={{
                         width: `${Math.max(4, (c.sets / maxCouple) * 100)}%`,
-                        backgroundColor: c.isElle ? "#FF4F7E" : "#2FE6FF",
+                        backgroundColor: c.color,
                       }}
                     />
                   </div>

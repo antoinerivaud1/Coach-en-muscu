@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { SEED_ACCOUNTS, guardWrites, login } from "./helpers";
+import { SEED_ACCOUNTS, SEED_NAMES, guardWrites, login } from "./helpers";
 
 // CM-59 B : isolation par la RLS, sous le vrai client utilisateur. Ne crée
 // rien, mais le tableau de bord purge les séances vides abandonnées (CM-83) :
@@ -55,7 +55,9 @@ test.describe("Isolation des données (RLS, CM-59)", () => {
     const toiSession = page.locator(`a[href="/sessions/${TOI_SESSION}"]`);
     await expect(toiSession).toBeVisible();
     await expect(toiSession).toContainText("Haut du corps");
-    await expect(toiSession).toContainText("Toi");
+    // CM-87 : prénom du membre (seed : « Théo »), plus jamais « Toi ».
+    await expect(toiSession).toContainText(SEED_NAMES.toi);
+    await expect(toiSession).not.toContainText(/\bToi\b/);
     await expect(page.locator(`a[href="/sessions/${SOLO_SESSION}"]`)).toHaveCount(0);
   });
 });

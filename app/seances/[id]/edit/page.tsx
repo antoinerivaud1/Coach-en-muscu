@@ -1,15 +1,18 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getDuoId } from "@/lib/profile";
+import { requireProfileId, getMemberProfiles } from "@/lib/profile";
+import { toMembers } from "@/lib/duo";
 import { getCatalogExercises } from "@/lib/queries/exercises";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import {
   canAccessProgram,
   getDayWithExercises,
+  getPersonalProgramId,
   getProgramDayNames,
+  getSharedProgramId,
 } from "@/lib/queries/programs";
 import type { MuscleGroup, SeanceDraftExercise } from "@/lib/utils/seances";
-import SeanceBuilder from "../../SeanceBuilder";
+import SeanceBuilder, { type OwnerChoice } from "../../SeanceBuilder";
 
 /**
  * Édition d'une séance type (CM-81) : le MÊME écran que la création,
@@ -39,7 +42,10 @@ export default async function EditSeancePage({
     notFound();
   }
 
-  const duoId = await getDuoId(supabase, profileId);
+  const { duoId, profiles } = await getMemberProfiles(supabase, profileId);
+  const members = toMembers(profiles, profileId);
+  const partner = members.find((m) => !m.isMe);
+  const me = members.find((m) => m.isMe);
   const { data: catalogData } = await getCatalogExercises(supabase, duoId, profileId);
   const catalog: SystemExercise[] = catalogData ?? [];
 
@@ -55,10 +61,40 @@ export default async function EditSeancePage({
       restSeconds: pe.rest_seconds,
     }));
 
-  const siblings = await getProgramDayNames(supabase, day.program_id);
-  const otherNames = siblings.ok
-    ? siblings.days.filter((d) => d.id !== day.id).map((d) => d.name)
-    : [];
+  const namesOf = async (programId: string | null) => {
+    if (!programId) return [];
+    const siblings = await getProgramDayNames(supabase, programId);
+    return siblings.ok
+      ? siblings.days.filter((d) => d.id !== day.id).map((d) => d.name)
+      : [];
+  };
+  const otherNames = await namesOf(day.program_id);
+
+  // CM-87 : en duo, « Partager avec … » / « Garder pour moi ».
+  let owner: OwnerChoice | undefined;
+  if (duoId && partner && me) {
+    const { data: prog, error: progError } = await supabase
+      .from("programs")
+      .select("duo_id")
+      .eq("id", day.program_id)
+      .returns<{ duo_id: string | null }[]>()
+      .maybeSingle();
+    // C2 : état illisible => pas de choix affiché (rien ne sera basculé).
+    if (!progError && prog) {
+      const shared = Boolean(prog.duo_id);
+      const otherSide = shared
+        ? await namesOf(await getPersonalProgramId(supabase, profileId))
+        : await namesOf(await getSharedProgramId(supabase, duoId));
+      owner = {
+        partnerName: partner.name,
+        myColor: me.color,
+        initial: shared ? "duo" : "perso",
+        otherNamesByTarget: shared
+          ? { duo: otherNames, perso: otherSide }
+          : { duo: otherSide, perso: otherNames },
+      };
+    }
+  }
 
   return (
     <SeanceBuilder
@@ -67,8 +103,9 @@ export default async function EditSeancePage({
       initialName={day.name}
       initialExercises={initialExercises}
       otherNames={otherNames}
+      owner={owner}
       catalog={catalog}
-      canCreateExercise={Boolean(duoId)}
+      canCreateExercise
       backHref="/seances"
     />
   );

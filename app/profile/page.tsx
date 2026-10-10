@@ -1,16 +1,14 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import {
-  requireProfileId,
-  getProfile,
-  getDuoId,
-  getDuoProfileIds,
-} from "@/lib/profile";
+import { requireProfileId, getProfile } from "@/lib/profile";
 import IdentitySection from "@/components/profile/IdentitySection";
 import { getIdentity } from "@/lib/queries/identity";
 import SignOutButton from "@/components/SignOutButton";
 import BottomNav from "@/components/BottomNav";
-import OnboardingPhoto from "@/components/OnboardingPhoto";
+import MemberAvatar from "@/components/onboarding/MemberAvatar";
+import DuoSection from "@/components/profile/DuoSection";
+import { getDuoState } from "@/lib/queries/duo";
+import { memberAccent } from "@/lib/members";
 import { getBadges } from "@/lib/badges";
 
 function Row({ href, title, sub }: { href: string; title: string; sub: string }) {
@@ -35,43 +33,57 @@ export default async function ProfilePage() {
   const supabase = await createClient();
   const profile = await getProfile(supabase, profileId);
   const identity = await getIdentity(supabase, profileId);
-  const isElle = profile?.color_role === "elle";
   const { badges, earnedCount } = await getBadges(
     supabase,
     profileId,
     profile?.weekly_goal ?? 4,
   );
 
-  const duoId = await getDuoId(supabase, profileId);
-  let partnerName: string | null = null;
-  if (duoId) {
-    const ids = await getDuoProfileIds(supabase, duoId);
-    const partnerId = ids.find((id) => id !== profileId);
-    if (partnerId) partnerName = (await getProfile(supabase, partnerId))?.display_name ?? null;
-  }
+  // CM-87 : prénom et couleur de membre, état du duo (solo, invitation en
+  // attente, en duo).
+  const me = {
+    id: profileId,
+    name: identity?.display_name ?? profile?.display_name ?? "",
+    color: memberAccent(identity ?? profile ?? {}),
+  };
+  const duo = await getDuoState(supabase, profileId);
+  const since =
+    duo.kind === "duo"
+      ? new Intl.DateTimeFormat("fr-FR", {
+          timeZone: "Europe/Paris",
+          day: "numeric",
+          month: "long",
+        })
+          .format(new Date(duo.since))
+          .replace(" ", "\u00a0")
+      : null;
 
   return (
     <main className="min-h-[100dvh] px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
       <h1 className="text-[30px] font-black tracking-tight text-fg">Profil</h1>
 
-      <div className="mt-5 flex items-center gap-4 rounded-3xl border border-line bg-surface p-5">
-        <span
-          className={`flex h-14 w-14 items-center justify-center rounded-2xl border font-oswald text-2xl font-bold ${
-            isElle ? "border-elle/40 bg-elle/10 text-elle" : "border-toi/40 bg-toi/10 text-toi"
-          }`}
-          aria-hidden
-        >
-          {isElle ? "E" : "L"}
-        </span>
-        <div>
-          <div className="text-xl font-black text-fg">{profile?.display_name}</div>
-          {partnerName && (
-            <div className="mt-0.5 text-sm text-fg-muted">En binôme avec {partnerName}</div>
-          )}
+      <div className="mt-5 flex items-center gap-3.5 rounded-3xl border border-line bg-surface p-[18px]">
+        <MemberAvatar name={me.name} color={me.color} size={56} />
+        <div className="min-w-0">
+          <div className="truncate text-[21px] font-black text-fg">{me.name}</div>
+          <div className="mt-0.5 text-[15px] text-fg-muted">
+            {duo.kind === "duo" ? (
+              <>
+                En duo avec{" "}
+                <span className="font-bold" style={{ color: memberAccent(duo.partner) }}>
+                  {duo.partner.display_name}
+                </span>{" "}
+                depuis le {since}
+              </>
+            ) : duo.kind === "error" ? null : (
+              "Tu t'entraînes en solo"
+            )}
+          </div>
         </div>
       </div>
 
-      <OnboardingPhoto />
+      {/* CM-87 : s'entraîner à deux (inviter, rejoindre, quitter). */}
+      <DuoSection state={duo} me={me} />
 
       {/* CM-86 : prénom, couleur et objectif (remplace l'ancien bloc
           « Objectif hebdomadaire » 3 à 6, l'objectif va désormais de 1 à 7). */}

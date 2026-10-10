@@ -58,7 +58,7 @@ export default function ProgressView({ series, color }: Props) {
             onClick={() => setSelected(s.exercise_id)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               s.exercise_id === current.exercise_id
-                ? "bg-toi text-ink"
+                ? "bg-member text-ink"
                 : "bg-surface2 text-fg-muted"
             }`}
           >
@@ -81,7 +81,7 @@ export default function ProgressView({ series, color }: Props) {
               type="button"
               onClick={() => setMetric("weight")}
               className={`px-3 py-1.5 font-medium ${
-                metric === "weight" ? "bg-toi text-ink" : "text-fg-muted"
+                metric === "weight" ? "bg-member text-ink" : "text-fg-muted"
               }`}
             >
               Poids max
@@ -90,7 +90,7 @@ export default function ProgressView({ series, color }: Props) {
               type="button"
               onClick={() => setMetric("e1rm")}
               className={`px-3 py-1.5 font-medium ${
-                metric === "e1rm" ? "bg-toi text-ink" : "text-fg-muted"
+                metric === "e1rm" ? "bg-member text-ink" : "text-fg-muted"
               }`}
             >
               1RM est.

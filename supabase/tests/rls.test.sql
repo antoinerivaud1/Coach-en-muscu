@@ -171,7 +171,7 @@ select lives_ok(
      where id = '22222222-2222-2222-2222-222222222222' $$,
   '13. update du profil d''Elle sans erreur');
 select is((select display_name from public.profiles where id = '22222222-2222-2222-2222-222222222222'),
-          'Elle', '13. profil d''Elle inchangé (0 ligne)');
+          'Lina', '13. profil d''Elle inchangé (0 ligne, prénom du seed : Lina)');
 select lives_ok(
   $$ update public.profiles set display_name = 'Toi bis', weekly_goal = 5
      where id = '11111111-1111-1111-1111-111111111111' $$,

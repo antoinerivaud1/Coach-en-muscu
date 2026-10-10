@@ -18,6 +18,21 @@ import { EXTRA_EXERCISE_DEFAULTS } from "@/lib/utils/sessionExercises";
 import { moveItemByKey, type MoveDirection } from "@/lib/utils/reorder";
 import AddExerciseSheet from "@/components/AddExerciseSheet";
 import { saveSeance } from "./actions";
+import type { SeanceTarget } from "@/lib/duo";
+
+/**
+ * CM-87 : choix « Pour nous deux » / « Pour moi » (création) ou « Partager
+ * avec … » / « Garder pour moi » (édition). Absent pour un utilisateur sans
+ * partenaire : le choix n'existe qu'en duo.
+ */
+export type OwnerChoice = {
+  partnerName: string;
+  myColor: string;
+  /** Création : `duo` par défaut. Édition : bibliothèque actuelle. */
+  initial: SeanceTarget;
+  /** Noms déjà pris de chaque côté (la séance éditée exclue). */
+  otherNamesByTarget: Record<SeanceTarget, string[]>;
+};
 
 /** Réglage déplié sous une ligne d'exercice. Un seul à la fois sur l'écran. */
 type DraftField = "sets" | "reps" | "rest";
@@ -37,6 +52,8 @@ type Props = {
   canCreateExercise: boolean;
   /** Retour à la bibliothèque (✕ et après enregistrement). */
   backHref: string;
+  /** CM-87 : en duo seulement. */
+  owner?: OwnerChoice;
 };
 
 /**
@@ -55,13 +72,21 @@ export default function SeanceBuilder({
   dayId,
   initialName,
   initialExercises,
-  otherNames,
+  otherNames: baseOtherNames,
   catalog,
   canCreateExercise,
   backHref,
+  owner,
 }: Props) {
   const router = useRouter();
   const [isSaving, startSaving] = useTransition();
+
+  const [target, setTarget] = useState<SeanceTarget | null>(owner?.initial ?? null);
+  /** Noms déjà pris dans la bibliothèque d'arrivée. */
+  const otherNames = useMemo(
+    () => (owner && target ? owner.otherNamesByTarget[target] : baseOtherNames),
+    [owner, target, baseOtherNames],
+  );
 
   const [exercises, setExercises] =
     useState<SeanceDraftExercise[]>(initialExercises);
@@ -270,13 +295,20 @@ export default function SeanceBuilder({
         dayId,
         name: check.name,
         exercises,
+        target: target ?? undefined,
+        // C2 : en édition, le serveur ne bascule que si le choix a changé.
+        initialTarget: mode === "edit" ? owner?.initial : undefined,
       });
       if (!result.success) {
         setError(result.error);
         return;
       }
       setDirty(false);
-      router.push(backHref);
+      router.push(
+        result.notice
+          ? `${backHref}${backHref.includes("?") ? "&" : "?"}info=${encodeURIComponent(result.notice)}`
+          : backHref,
+      );
       router.refresh();
     });
   }
@@ -382,6 +414,20 @@ export default function SeanceBuilder({
             </p>
           ) : null}
         </div>
+
+        {/* ----- Pour qui ? (CM-87, en duo seulement) ----- */}
+        {owner && target && (
+          <OwnerPicker
+            owner={owner}
+            mode={mode}
+            value={target}
+            onChange={(t) => {
+              setTarget(t);
+              setNameError(null);
+              touch();
+            }}
+          />
+        )}
 
         {/* ----- En-tête de liste ----- */}
         <div className="mt-6 flex items-baseline justify-between gap-3">
@@ -813,5 +859,75 @@ function DirectValueInput({
       aria-label={`Saisir ${label.toLowerCase()}`}
       className="h-11 w-16 flex-none rounded-xl border border-energy bg-ink text-center font-oswald text-[22px] font-bold text-fg outline-none"
     />
+  );
+}
+
+/**
+ * CM-87 : « Pour qui ? » (maquette 13). Deux options, une seule active,
+ * annoncées par `aria-checked`.
+ */
+function OwnerPicker({
+  owner,
+  mode,
+  value,
+  onChange,
+}: {
+  owner: OwnerChoice;
+  mode: "create" | "edit";
+  value: SeanceTarget;
+  onChange: (target: SeanceTarget) => void;
+}) {
+  const options: { target: SeanceTarget; label: string; dot: string }[] =
+    mode === "create"
+      ? [
+          { target: "duo", label: "Pour nous deux", dot: "#CCFF02" },
+          { target: "perso", label: "Pour moi", dot: owner.myColor },
+        ]
+      : [
+          { target: "duo", label: `Partager avec ${owner.partnerName}`, dot: "#CCFF02" },
+          { target: "perso", label: "Garder pour moi", dot: owner.myColor },
+        ];
+  const hint =
+    value === "duo"
+      ? `${mode === "create" ? "Ajoutée à" : "Dans"} «\u00a0Nos séances\u00a0»\u00a0: ${owner.partnerName} peut la voir, la lancer et la modifier.`
+      : mode === "create"
+        ? "Ajoutée à «\u00a0Mes séances\u00a0»\u00a0: visible par toi uniquement. Tu pourras la partager plus tard."
+        : `Dans «\u00a0Mes séances\u00a0»\u00a0: ${owner.partnerName} ne la voit pas.`;
+
+  return (
+    <div className="mt-5">
+      <span id="pour-qui" className="text-[15px] font-semibold text-fg-muted">
+        Pour qui&nbsp;?
+      </span>
+      <div
+        role="radiogroup"
+        aria-labelledby="pour-qui"
+        className="mt-2 grid grid-cols-2 gap-1 rounded-2xl border border-line bg-surface p-1"
+      >
+        {options.map((o) => {
+          const selected = o.target === value;
+          return (
+            <button
+              key={o.target}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(o.target)}
+              className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 py-1.5 text-center text-base font-bold leading-tight ${
+                selected ? "bg-fg text-ink" : "text-fg-muted"
+              }`}
+            >
+              <span
+                aria-hidden
+                className="h-2.5 w-2.5 flex-none rounded-full"
+                style={{ background: o.dot }}
+              />
+              <span className="min-w-0 text-balance">{o.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-balance text-[15px] leading-snug text-fg-muted">{hint}</p>
+    </div>
   );
 }

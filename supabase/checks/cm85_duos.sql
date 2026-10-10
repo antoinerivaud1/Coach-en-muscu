@@ -31,8 +31,8 @@ begin
                    and owner_profile_id is null) then
     raise exception 'ÉCHEC : le programme « Nos séances » doit appartenir au duo 3333…';
   end if;
-  if (select count(*) from public.profiles) <> 5 then
-    raise exception 'ÉCHEC : le trigger aurait dû créer 2 profils de test (total 5 : Toi, Elle, Solo CM-59 + 2)';
+  if (select count(*) from public.profiles) <> 6 then
+    raise exception 'ÉCHEC : le trigger aurait dû créer 2 profils de test (total 6 : Toi, Elle, Solo CM-59, Duo2 CM-87 + 2)';
   end if;
 
   -- 1. Deux membres max par duo.
