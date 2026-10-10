@@ -27,7 +27,7 @@ export default async function ProgressPage({
   searchParams: Promise<{ profile?: string }>;
 }) {
   const { profile: profileParam } = await searchParams;
-  const profileId = await requireProfileId();
+  const profileId = await requireProfileId("/progress");
   const supabase = await createClient();
 
   // Profils du couple (moi + partenaire).

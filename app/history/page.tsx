@@ -20,7 +20,7 @@ const FEEDBACK_LABELS: Record<string, string> = {
 };
 
 export default async function HistoryPage() {
-  const profileId = await requireProfileId();
+  const profileId = await requireProfileId("/history");
   const supabase = await createClient();
 
   const duoId = await getDuoId(supabase, profileId);

@@ -52,7 +52,7 @@ export default async function DashboardPage({
   // `startSession` redirige ici en cas d'échec : le message voyage en query
   // string et doit être affiché (CM-70).
   const { error: actionError } = await searchParams;
-  const profileId = await requireProfileId();
+  const profileId = await requireProfileId("/dashboard");
   const supabase = await createClient();
 
   const profile = await getProfile(supabase, profileId);

@@ -26,7 +26,7 @@ export default async function EditSeancePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const profileId = await requireProfileId();
+  const profileId = await requireProfileId(`/seances/${id}/edit`);
   const supabase = await createClient();
 
   const { data: day } = await getDayWithExercises(supabase, id);

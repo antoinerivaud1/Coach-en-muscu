@@ -9,6 +9,7 @@ import {
   parseQueueSnapshot,
   pendingIdsOf,
   queueStorageKey,
+  refusedStorageKey,
   serializeQueue,
   shiftQueue,
   type PendingSet,
@@ -32,6 +33,13 @@ export interface SetPersistence {
   hasPending: boolean;
   /** Vrai après 3 échecs consécutifs sur la même opération. */
   isStalled: boolean;
+  /**
+   * CM-59 B : séries refusées définitivement par le serveur, mises de côté
+   * sous `cm:refusedSets:<id>` (jamais jetées en silence).
+   */
+  refusedCount: number;
+  /** CM-59 B : le serveur a répondu « Session expirée » ; la file attend. */
+  sessionExpired: boolean;
   enqueueUpsert: (set: PendingSet) => void;
   enqueueDelete: (id: string) => void;
   /** Tente de vider la file, au plus `timeoutMs`. Rend `true` si elle est vide. */
@@ -65,6 +73,8 @@ export function useSetPersistence(sessionId: string): SetPersistence {
   const [queue, setQueue] = useState<QueuedOp[]>([]);
   const [failures, setFailures] = useState(0);
   const [restored, setRestored] = useState<QueuedOp[] | null>(null);
+  const [refusedCount, setRefusedCount] = useState(0);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const runningRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,6 +83,28 @@ export function useSetPersistence(sessionId: string): SetPersistence {
   const wakeUpRef = useRef(false);
 
   const storageKey = queueStorageKey(sessionId);
+  const refusedKey = refusedStorageKey(sessionId);
+
+  /**
+   * CM-59 B : met de côté une série refusée définitivement. Une suppression
+   * refusée n'est pas gardée : la ligne n'existe plus (ou n'est pas à toi),
+   * aucune saisie n'est perdue.
+   */
+  const setAside = useCallback(
+    (op: QueuedOp) => {
+      if (op.kind !== "upsert" || typeof window === "undefined") return;
+      try {
+        const kept = parseQueueSnapshot(window.localStorage.getItem(refusedKey));
+        const next = [...kept, { ...op, attempts: 0 }];
+        window.localStorage.setItem(refusedKey, serializeQueue(next));
+        setRefusedCount(next.length);
+      } catch {
+        // Stockage indisponible : on garde au moins le compteur à l'écran.
+        setRefusedCount((n) => n + 1);
+      }
+    },
+    [refusedKey],
+  );
 
   const persist = useCallback(
     (next: readonly QueuedOp[]) => {
@@ -122,6 +154,7 @@ export function useSetPersistence(sessionId: string): SetPersistence {
           const op = queueRef.current[0]!;
           let ok = false;
           let refused = false;
+          let expired = false;
           try {
             const result =
               op.kind === "upsert"
@@ -129,15 +162,24 @@ export function useSetPersistence(sessionId: string): SetPersistence {
                 : await deleteSet({ id: op.id, sessionId: op.sessionId });
             ok = result.ok;
             refused = !result.ok && result.refused === true;
+            expired = !result.ok && result.expired === true;
           } catch {
             // Hors-ligne, ou server action injoignable : on réessaiera.
             ok = false;
           }
           if (!aliveRef.current) return;
+          setSessionExpired(expired);
 
-          // CM-59 B : un refus définitif (RLS 42501, séance pas à toi) est
-          // abandonné au lieu d'être rejoué en boucle toutes les 30 s.
-          if (ok || refused) {
+          if (ok) {
+            commit(shiftQueue(queueRef.current));
+            setFailures(0);
+            continue;
+          }
+          // CM-59 B : refus définitif (séance introuvable ou pas à toi) : mis
+          // de côté au lieu d'être rejoué en boucle toutes les 30 s. Tout le
+          // reste (42501, session expirée, réseau) est rejoué.
+          if (refused) {
+            setAside(op);
             commit(shiftQueue(queueRef.current));
             setFailures(0);
             continue;
@@ -157,7 +199,7 @@ export function useSetPersistence(sessionId: string): SetPersistence {
     } finally {
       runningRef.current = false;
     }
-  }, [clearTimer, commit]);
+  }, [clearTimer, commit, setAside]);
 
   // Reprise de la file laissée par une session précédente de la page, puis
   // envoi immédiat. C'est ce qui rattrape une série validée hors réseau avant
@@ -171,6 +213,11 @@ export function useSetPersistence(sessionId: string): SetPersistence {
       snapshot = null;
     }
     const pending = parseQueueSnapshot(snapshot);
+    try {
+      setRefusedCount(parseQueueSnapshot(window.localStorage.getItem(refusedKey)).length);
+    } catch {
+      setRefusedCount(0);
+    }
     if (pending.length > 0) {
       queueRef.current = pending;
       setQueue(pending);
@@ -193,7 +240,7 @@ export function useSetPersistence(sessionId: string): SetPersistence {
       window.removeEventListener("online", wake);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [storageKey, pump, clearTimer]);
+  }, [storageKey, refusedKey, pump, clearTimer]);
 
   const push = useCallback(
     (op: QueuedOp) => {
@@ -256,6 +303,8 @@ export function useSetPersistence(sessionId: string): SetPersistence {
     pendingIds,
     hasPending: queue.length > 0,
     isStalled: failures >= FAILURE_NOTICE_THRESHOLD,
+    refusedCount,
+    sessionExpired,
     enqueueUpsert,
     enqueueDelete,
     flush,

@@ -116,4 +116,29 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await expect(page.getByRole("button", { name: "Quitter la séance" })).toHaveCount(0);
     await expect(page.getByText("Volume total")).toBeVisible();
   });
+  test("corriger une série dans le récap, recharger, la valeur est gardée (CM-59 B)", async ({ page }) => {
+    const id = await startSession(page);
+    created.push(id);
+    await logSet(page, { weight: "20", reps: "8" });
+
+    const sheet = await openExitSheet(page);
+    await sheet.getByRole("button", { name: "Terminer la séance" }).click();
+    await page.getByRole("link", { name: "Corriger les séries" }).click();
+    await expect(page).toHaveURL(new RegExp(`/sessions/${id}\\?editsets=1$`));
+
+    // Correction par le formulaire du récap (server action `updateSet`, sous
+    // RLS) : on attend la réponse du POST avant de recharger.
+    await page.locator('input[name="weight"]').first().fill("23.5");
+    const saved = page.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().includes(`/sessions/${id}`),
+    );
+    await page.getByRole("button", { name: "Enregistrer" }).first().click();
+    await saved;
+
+    await page.reload();
+    await expect(page.locator('input[name="weight"]').first()).toHaveValue("23.5");
+    await page.getByRole("link", { name: "Terminer", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
+    await expect(page.getByText("23.5", { exact: true }).first()).toBeVisible();
+  });
 });

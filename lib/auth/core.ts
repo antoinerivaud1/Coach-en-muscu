@@ -39,6 +39,17 @@ export function safeNextPath(raw: string | null | undefined, fallback = "/dashbo
   return v;
 }
 
+/**
+ * CM-59 B : URL de connexion qui ramène au chemin demandé après coup
+ * (`/login?next=<chemin>`). Un chemin absent ou refusé par `safeNextPath`
+ * donne `/login` tout court.
+ */
+export function loginPath(next?: string | null): string {
+  if (!next) return "/login";
+  const safe = safeNextPath(next, "");
+  return safe && safe === next.trim() ? `/login?next=${encodeURIComponent(safe)}` : "/login";
+}
+
 export const PASSWORD_MIN_LENGTH = 8;
 // Limite bcrypt de Supabase Auth (72 octets) : au-delà, le reste est ignoré.
 export const PASSWORD_MAX_LENGTH = 72;

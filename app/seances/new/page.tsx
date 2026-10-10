@@ -17,7 +17,7 @@ import SeanceBuilder from "../SeanceBuilder";
  * d'exercices et les noms déjà pris s'il existe déjà une bibliothèque.
  */
 export default async function NewSeancePage() {
-  const profileId = await requireProfileId();
+  const profileId = await requireProfileId("/seances/new");
   const supabase = await createClient();
 
   const duoId = await getDuoId(supabase, profileId);

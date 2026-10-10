@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getDuoId } from "@/lib/profile";
+import { requireProfileId, getDuoId, getDuoProfileIds } from "@/lib/profile";
 import { getDayWithExercises } from "@/lib/queries/programs";
 import type { ProgramDayFull } from "@/lib/queries/programs";
 import { getCatalogExercises } from "@/lib/queries/exercises";
@@ -53,7 +53,7 @@ export default async function SessionPage({
   const { id } = await params;
   const { edit, editsets } = await searchParams;
 
-  const profileId = await requireProfileId();
+  const profileId = await requireProfileId(`/sessions/${id}`);
   const supabase = await createClient();
 
   const { data: sessionData } = await getSession(supabase, id);
@@ -63,6 +63,17 @@ export default async function SessionPage({
   }
 
   const isMine = session.profile_id === profileId;
+  // CM-59 B : la RLS ne laisse voir que mes séances et celles de mon
+  // partenaire de duo. Vérifié aussi en code (ceinture et bretelles), pour que
+  // le filet `DATA_CLIENT=service`, qui contourne la RLS, n'ouvre pas la
+  // séance d'un autre compte : 404, comme une séance inexistante.
+  if (!isMine) {
+    const duoId = await getDuoId(supabase, profileId);
+    const visibleIds = duoId ? await getDuoProfileIds(supabase, duoId) : [];
+    if (!visibleIds.includes(session.profile_id)) {
+      notFound();
+    }
+  }
   const editSets = isMine && edit !== "1" && editsets === "1";
 
   const { data: setsData } = await getSessionSets(supabase, id);

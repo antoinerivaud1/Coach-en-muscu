@@ -7,7 +7,7 @@ import {
   getDuoProfileIds,
 } from "@/lib/profile";
 import { updateWeeklyGoal } from "@/app/actions";
-import { signOut } from "@/lib/actions/auth";
+import SignOutButton from "@/components/SignOutButton";
 import BottomNav from "@/components/BottomNav";
 import OnboardingPhoto from "@/components/OnboardingPhoto";
 import { getBadges } from "@/lib/badges";
@@ -30,7 +30,7 @@ function Row({ href, title, sub }: { href: string; title: string; sub: string })
 }
 
 export default async function ProfilePage() {
-  const profileId = await requireProfileId();
+  const profileId = await requireProfileId("/profile");
   const supabase = await createClient();
   const profile = await getProfile(supabase, profileId);
   const isElle = profile?.color_role === "elle";
@@ -151,15 +151,9 @@ export default async function ProfilePage() {
         </div>
       </section>
 
-      {/* CM-58 : déconnexion (CM-59 B : remplace « Changer de profil »). */}
-      <form action={signOut} className="mt-6">
-        <button
-          type="submit"
-          className="w-full rounded-2xl border border-line bg-surface2 py-3.5 text-sm font-bold text-fg active:bg-white/10"
-        >
-          Se déconnecter
-        </button>
-      </form>
+      {/* CM-58 : déconnexion (CM-59 B : remplace « Changer de profil », et
+          purge les files locales avant de partir). */}
+      <SignOutButton />
 
       <BottomNav />
     </main>

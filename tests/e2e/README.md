@@ -50,6 +50,11 @@ sur `main`, sans aucun secret :
    `E2E_SEANCE_NAME=Haut du corps` (données du seed) ; les parcours se
    connectent avec le compte « Toi » du seed.
 
+6. CM-59 B : l'app redémarre avec `DATA_CLIENT=service` (filet de
+   déploiement : client service-role, RLS contournée) et **toute la suite e2e
+   est rejouée**, isolation comprise ; la CI vérifie dans `next-service.log`
+   que le client service-role a bien servi.
+
 En cas d'échec, l'artefact `playwright-report` contient le rapport HTML, les
 traces (`test-results/`), `next.log` et les logs PostgREST. Le job e2e tourne
 en parallèle du job « Typecheck, lint, unit, build ».

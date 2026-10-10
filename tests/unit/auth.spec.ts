@@ -3,6 +3,7 @@ import {
   authErrorMessage,
   LEGACY_PROFILE_COOKIE,
   isUuid,
+  loginPath,
   resolveProfileId,
   safeNextPath,
   validateLoginInput,
@@ -28,6 +29,32 @@ test.describe("resolveProfileId (CM-59 B : session seule)", () => {
 
   test("chaîne vide traitée comme absente", () => {
     expect(resolveProfileId("")).toBeNull();
+  });
+});
+
+test.describe("loginPath (CM-59 B)", () => {
+  test("chemin interne : /login?next=<chemin encodé>", () => {
+    expect(loginPath("/dashboard")).toBe("/login?next=%2Fdashboard");
+    expect(loginPath("/sessions/abc")).toBe("/login?next=%2Fsessions%2Fabc");
+    expect(loginPath("/seances/abc/edit")).toBe("/login?next=%2Fseances%2Fabc%2Fedit");
+  });
+
+  test("absent : /login tout court", () => {
+    expect(loginPath()).toBe("/login");
+    expect(loginPath(null)).toBe("/login");
+    expect(loginPath("")).toBe("/login");
+  });
+
+  test("chemin refusé par safeNextPath : /login tout court", () => {
+    expect(loginPath("//evil.example")).toBe("/login");
+    expect(loginPath("https://evil.example")).toBe("/login");
+    expect(loginPath("/login")).toBe("/login");
+    expect(loginPath("/\\evil")).toBe("/login");
+  });
+
+  test("le next produit est relu tel quel par safeNextPath", () => {
+    const next = decodeURIComponent(loginPath("/sessions/abc").split("next=")[1]!);
+    expect(safeNextPath(next)).toBe("/sessions/abc");
   });
 });
 

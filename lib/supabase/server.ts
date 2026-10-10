@@ -20,8 +20,24 @@ import { AUTH_COOKIE_OPTIONS, authEnv } from "./auth-config";
  * seul `getClaims()` valide le JWT.
  */
 export async function createClient() {
-  if (process.env.DATA_CLIENT === "service") return createServiceRoleClient();
+  if (process.env.DATA_CLIENT === "service") {
+    warnServiceFallback();
+    return createServiceRoleClient();
+  }
   return createUserClient();
+}
+
+let serviceFallbackWarned = false;
+
+/**
+ * Une ligne dans les logs (Vercel, CI) quand le filet est actif : on sait
+ * toujours si la RLS est contournée. La CI s'en sert pour prouver que les e2e
+ * du filet passent bien par ce client.
+ */
+function warnServiceFallback() {
+  if (serviceFallbackWarned) return;
+  serviceFallbackWarned = true;
+  console.warn("[CM-59] DATA_CLIENT=service : client service-role actif, RLS contournée.");
 }
 
 /**

@@ -59,7 +59,7 @@ export default async function SeancesPage({
   // Les actions de la bibliothèque qui redirigent font voyager leur message
   // d'erreur en query string (CM-70).
   const { error: actionError } = await searchParams;
-  const profileId = await requireProfileId();
+  const profileId = await requireProfileId("/seances");
   const supabase = await createClient();
 
   const duoId = await getDuoId(supabase, profileId);
