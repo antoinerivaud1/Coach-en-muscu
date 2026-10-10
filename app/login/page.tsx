@@ -53,6 +53,22 @@ export default async function LoginPage({
             Pas encore de mot de passe ? Choisir mon profil
           </Link>
         )}
+
+        {/* CM-93 : liens légaux, accessibles sans compte. */}
+        <nav
+          aria-label="Informations légales"
+          className="mt-auto flex flex-wrap justify-center gap-x-5 gap-y-1 pt-8 text-xs font-medium text-fg-muted"
+        >
+          <Link href="/legal/confidentialite" className="py-1.5 underline-offset-4 hover:text-fg hover:underline">
+            Confidentialité
+          </Link>
+          <Link href="/legal/cgu" className="py-1.5 underline-offset-4 hover:text-fg hover:underline">
+            CGU
+          </Link>
+          <Link href="/support" className="py-1.5 underline-offset-4 hover:text-fg hover:underline">
+            Support
+          </Link>
+        </nav>
       </div>
     </main>
   );

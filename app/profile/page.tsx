@@ -172,6 +172,23 @@ export default async function ProfilePage() {
         </form>
       )}
 
+      {/* CM-93 : liens légaux, support et crédits (pages publiques). */}
+      <section aria-labelledby="a-propos" className="mt-8">
+        <h2
+          id="a-propos"
+          className="mb-2.5 text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted"
+        >
+          À propos
+        </h2>
+        <div className="flex flex-col gap-2.5">
+          <Row href="/support" title="Support" sub="Questions fréquentes et contact" />
+          <Row href="/legal/confidentialite" title="Confidentialité" sub="Tes données et tes droits" />
+          <Row href="/legal/cgu" title="CGU et abonnement" sub="Conditions d’utilisation, Premium" />
+          <Row href="/legal/mentions" title="Mentions légales" sub="Éditeur et hébergeurs" />
+          <Row href="/credits" title="Crédits et licences" sub="Bibliothèques et polices" />
+        </div>
+      </section>
+
       {/* CM-58 : déconnexion, modes `hybrid` et `required` avec session. */}
       {source === "session" && (
         <form action={signOut} className="mt-6">
