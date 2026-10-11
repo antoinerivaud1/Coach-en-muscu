@@ -10,13 +10,13 @@ import type {
 } from "@/lib/export/accountExport";
 
 /**
- * CM-60 : lecture des données à exporter, avec le client des pages
- * (`createClient`, sous RLS ; service-role avec le filet DATA_CLIENT=service).
+ * CM-60 : lecture des données à exporter. CM-88 : appelée depuis le
+ * navigateur (client anon, sous RLS ; lib/data/accountExport.ts).
  *
  * Seulement les données de `profileId`, filtrées EXPLICITEMENT dans chaque
  * requête : la RLS laisse voir les séances du partenaire de duo, qui ne lui
- * appartiennent pas (et le filet contourne la RLS). Les séances et séries du
- * partenaire n'apparaissent jamais dans l'export.
+ * appartiennent pas. Les séances et séries du partenaire n'apparaissent
+ * jamais dans l'export.
  *
  * En duo, la bibliothèque COMMUNE (« Nos séances » : séances types et
  * exercices du duo) est exportée aussi, marquée « partagée » : c'est là que

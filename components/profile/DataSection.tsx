@@ -5,13 +5,21 @@ import DeleteAccountSheet, { type DeleteAccountDuo } from "@/components/profile/
  * CM-60 : section « Mes données » du Profil : export (ZIP : CSV des séances
  * et séries, JSON complet) et suppression du compte (exigence App Store,
  * guideline 5.1.1(v)).
+ *
+ * CM-88 : l'export est construit dans le navigateur ; un échec s'affiche sous
+ * le bouton (`EXPORT_ERROR_MESSAGE`), comme avant quand le bouton appelait la
+ * route serveur. Le message de `?export=echec` (route ouverte directement)
+ * n'a plus de raison d'être.
  */
 export default function DataSection({
+  profileId,
   duo,
-  exportFailed,
+  onAccountDeleted,
 }: {
+  profileId: string;
   duo: DeleteAccountDuo;
-  exportFailed: boolean;
+  /** Compte supprimé : l'écran cesse d'afficher les données (voir ProfileScreen). */
+  onAccountDeleted: () => void;
 }) {
   return (
     <section id="mes-donnees" aria-labelledby="mes-donnees-titre" className="mt-8 scroll-mt-4">
@@ -21,17 +29,9 @@ export default function DataSection({
       >
         Mes données
       </h2>
-      {exportFailed && (
-        <p
-          role="alert"
-          className="mb-2.5 rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2.5 text-base text-red-300"
-        >
-          L&apos;export n&apos;a pas pu être préparé. Réessaie dans un instant.
-        </p>
-      )}
       <div className="flex flex-col gap-2.5">
-        <ExportButton variant="row" />
-        <DeleteAccountSheet duo={duo} />
+        <ExportButton variant="row" profileId={profileId} />
+        <DeleteAccountSheet duo={duo} profileId={profileId} onDeleted={onAccountDeleted} />
       </div>
     </section>
   );

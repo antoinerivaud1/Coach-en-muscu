@@ -1,8 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useId, useRef, useState } from "react";
-import { deleteMyAccount, type DeleteAccountState } from "@/lib/actions/account";
-import { DELETE_CONFIRMATION_WORD, isDeleteConfirmation } from "@/lib/accountDeletion";
+import { useEffect, useId, useRef, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { closeDeletedAccountSession, deleteMyAccount } from "@/lib/data/account";
+import {
+  ACCOUNT_DELETED_PATH,
+  DELETE_CONFIRMATION_WORD,
+  isDeleteConfirmation,
+} from "@/lib/accountDeletion";
 import { unsyncedLocalCount } from "@/lib/localQueues";
 import ExportButton from "@/components/profile/ExportButton";
 
@@ -56,18 +61,47 @@ function ItemList({ items, label }: { items: Item[]; label: string }) {
  * temps (pas de `window.confirm`, inerte en PWA iOS, CM-70) :
  * 1. ce qui est supprimé, ce que garde le partenaire, lien vers l'export ;
  * 2. saisie de « SUPPRIMER » pour activer le bouton.
- * La server action redirige vers « Compte supprimé » ; en cas d'échec, le
- * message s'affiche ici et rien n'est présenté comme supprimé.
+ * En cas d'échec, le message s'affiche ici et rien n'est présenté comme
+ * supprimé.
+ *
+ * CM-88 : suppression depuis le navigateur (RPC `delete_my_account` sous la
+ * session de l'utilisateur), puis session fermée sur cet appareil et page
+ * « Compte supprimé » par rechargement complet (cache du navigateur vidé).
+ * `onDeleted` est appelé AVANT la fermeture de session : l'écran Profil cesse
+ * alors de suivre la session, sinon il renverrait vers /login.
  */
-export default function DeleteAccountSheet({ duo }: { duo: DeleteAccountDuo }) {
+export default function DeleteAccountSheet({
+  duo,
+  profileId,
+  onDeleted,
+}: {
+  duo: DeleteAccountDuo;
+  profileId: string;
+  onDeleted?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [word, setWord] = useState("");
   const [unsynced, setUnsynced] = useState(0);
-  const [state, action, pending] = useActionState<DeleteAccountState, FormData>(
-    deleteMyAccount,
-    {},
-  );
+  const [state, setState] = useState<{ error?: string }>({});
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (pending) return;
+    const confirmation = String(new FormData(e.currentTarget).get("confirmation") ?? "");
+    setPending(true);
+    const supabase = getSupabaseBrowserClient();
+    const result = await deleteMyAccount(supabase, confirmation);
+    if (!result.ok) {
+      setState({ error: result.error });
+      setPending(false);
+      return;
+    }
+    onDeleted?.();
+    await closeDeletedAccountSession(supabase);
+    window.location.assign(ACCOUNT_DELETED_PATH);
+  }
   const titleId = useId();
   const descId = useId();
   const inputId = useId();
@@ -203,7 +237,7 @@ export default function DeleteAccountSheet({ duo }: { duo: DeleteAccountDuo }) {
                   <p className="text-balance text-base leading-snug text-fg">
                     Garde une copie de tes séances et de tes séries avant de partir.
                   </p>
-                  <ExportButton variant="sheet" />
+                  <ExportButton variant="sheet" profileId={profileId} />
                 </div>
 
                 <p className="mt-4 text-balance text-sm leading-snug text-fg-muted">
@@ -227,7 +261,7 @@ export default function DeleteAccountSheet({ duo }: { duo: DeleteAccountDuo }) {
                 </button>
               </>
             ) : (
-              <form action={action} className="flex flex-col">
+              <form onSubmit={onSubmit} className="flex flex-col">
                 <h2 id={titleId} className="mt-1.5 text-balance text-2xl font-black leading-tight tracking-tight text-fg">
                   Confirme la suppression
                 </h2>

@@ -22,3 +22,9 @@ test("CM-88 : un écran client sans session renvoie à la connexion, avec retour
   await expect(page).toHaveURL(/\/login\?next=%2Fguide$/);
   await expect(page.getByLabel("Email")).toBeVisible();
 });
+
+test("CM-88 : le Profil sans session renvoie à la connexion, avec retour prévu", async ({ page }) => {
+  await page.goto("/profile");
+  await expect(page).toHaveURL(/\/login\?next=%2Fprofile$/);
+  await expect(page.getByLabel("Email")).toBeVisible();
+});

@@ -1,7 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { updateIdentity, type IdentityFormState } from "@/lib/actions/identity";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/data/queryKeys";
+import { updateIdentity, type IdentityWriteResult } from "@/lib/data/profile";
 import {
   deName,
   initialPickerColor,
@@ -16,31 +19,61 @@ import { DEFAULT_WEEKLY_GOAL, FIRST_NAME_MAX_LENGTH, parseWeeklyGoal } from "@/l
 import ColorPicker from "@/components/onboarding/ColorPicker";
 import GoalStepper from "@/components/onboarding/GoalStepper";
 
+type FormState = {
+  error?: string;
+  fieldErrors?: Extract<IdentityWriteResult, { ok: false }>["fieldErrors"];
+  /** Vrai après un enregistrement réussi. */
+  saved?: boolean;
+};
+
+/** Résultat du dernier envoi, sous la forme qu'affiche le formulaire. */
+function formState(result: IdentityWriteResult | undefined, error: Error | null): FormState {
+  if (error) return { error: error.message };
+  if (!result) return {};
+  return result.ok ? { saved: true } : { error: result.error, fieldErrors: result.fieldErrors };
+}
+
 /**
  * CM-86 : section « Mon profil » de la page Profil : prénom, couleur de
  * membre et objectif hebdo. Lecture en lignes (maquette 6), « Modifier »
  * ouvre l'édition sur place (même action que l'onboarding).
  *
  * CM-103 : en duo, la couleur du partenaire est grisée et non sélectionnable
- * (« Couleur de Lina ») ; l'action serveur la refuse aussi. Solo : aucune
+ * (« Couleur de Lina ») ; l'écriture la refuse aussi. Solo : aucune
  * restriction.
+ *
+ * CM-88 : écriture depuis le navigateur (`updateIdentity`, lib/data/profile.ts),
+ * sous RLS. Le formulaire est relu tel quel à l'envoi (champs cachés compris).
+ * Après succès, les données du profil sont relues avant de refermer
+ * l'édition : prénom, couleur et objectif s'affichent à jour partout.
  */
 export default function IdentitySection({
+  profileId,
   displayName,
   accentColor,
   weeklyGoal,
   partner = null,
 }: {
+  profileId: string;
   displayName: string;
   accentColor: string;
   weeklyGoal: number;
   /** Partenaire de duo actif (prénom, couleur), null en solo. */
   partner?: PartnerColor | null;
 }) {
-  const [state, action, pending] = useActionState<IdentityFormState, FormData>(
-    updateIdentity,
-    {},
-  );
+  const queryClient = useQueryClient();
+  const save = useMutation({
+    mutationFn: (values: { displayName: string; accentColor: string; weeklyGoal: string }) =>
+      updateIdentity(getSupabaseBrowserClient(), profileId, values),
+    onSuccess: async (result) => {
+      if (!result.ok) return;
+      // Remplace `revalidatePath` : relecture avant de refermer l'édition.
+      await queryClient.invalidateQueries({ queryKey: queryKeys.all(profileId) });
+      setEditing(false);
+    },
+  });
+  const pending = save.isPending;
+  const state = formState(save.data, save.error);
   const savedColor: MemberColor = isMemberColor(accentColor) ? accentColor : DEFAULT_MEMBER_COLOR;
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(displayName);
@@ -51,9 +84,16 @@ export default function IdentitySection({
   const [color, setColor] = useState<MemberColor>(initialPickerColor(accentColor, partner));
   const [goal, setGoal] = useState(parseWeeklyGoal(weeklyGoal) ?? DEFAULT_WEEKLY_GOAL);
 
-  useEffect(() => {
-    if (state.saved) setEditing(false);
-  }, [state]);
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (pending) return;
+    const form = new FormData(e.currentTarget);
+    save.mutate({
+      displayName: String(form.get("display_name") ?? ""),
+      accentColor: String(form.get("accent_color") ?? ""),
+      weeklyGoal: String(form.get("weekly_goal") ?? ""),
+    });
+  }
 
   const colorLabel = memberColorLabel(savedColor);
   const nameError = state.fieldErrors?.displayName;
@@ -116,7 +156,7 @@ export default function IdentitySection({
           )}
         </div>
       ) : (
-        <form action={action} className="flex flex-col gap-5 rounded-[20px] border border-line bg-surface p-4" noValidate>
+        <form onSubmit={onSubmit} className="flex flex-col gap-5 rounded-[20px] border border-line bg-surface p-4" noValidate>
           <input type="hidden" name="accent_color" value={color} />
           <input type="hidden" name="weekly_goal" value={goal} />
 

@@ -268,9 +268,6 @@ export function buildExportJson(data: AccountExportData, generatedAt: Date): str
 
 // ---- Archive ----------------------------------------------------------------------
 
-/** `/profile?export=echec` : l'export a échoué, message dans « Mes données ». */
-export const EXPORT_FAILED = "echec";
-
 export const EXPORT_CSV_NAME = "seances-et-series.csv";
 export const EXPORT_JSON_NAME = "donnees-completes.json";
 

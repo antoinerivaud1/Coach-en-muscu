@@ -25,12 +25,7 @@ import {
   isDeleteConfirmation,
   isExplicitRefusal,
 } from "@/lib/accountDeletion";
-import {
-  EXPORT_URL,
-  deliverExport,
-  exportFileName,
-  type ExportDeps,
-} from "@/lib/export/deliverExport";
+import { deliverExport, exportFileName, type ExportDeps } from "@/lib/export/deliverExport";
 import { isPublicPath } from "@/lib/auth/publicPaths";
 
 // CM-60 : export des données (CSV, JSON, ZIP) et garde de confirmation de la
@@ -446,23 +441,18 @@ test.describe("Suppression du compte : garde de confirmation (CM-60)", () => {
 
 // ---- Remise du fichier : partage système ou téléchargement --------------------
 
-type Calls = { fetched: string[]; shared: ShareData[]; links: { href: string; name: string }[] };
+type Calls = { built: Date[]; shared: ShareData[]; links: { href: string; name: string }[] };
 
-function zipResponse(body = "PK\u0003\u0004contenu", headers: Record<string, string> = {}): Response {
-  return new Response(body, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": 'attachment; filename="coach-en-muscu-export-2026-10-11.zip"',
-      ...headers,
-    },
-  });
-}
+const ZIP_BYTES = new TextEncoder().encode("PK\u0003\u0004contenu");
 
 function deps(
-  over: { response?: Response | Error; canShare?: boolean; share?: (d: ShareData) => Promise<void> } = {},
+  over: {
+    zip?: Uint8Array<ArrayBuffer> | Error;
+    canShare?: boolean;
+    share?: (d: ShareData) => Promise<void>;
+  } = {},
 ): { deps: ExportDeps; calls: Calls } {
-  const calls: Calls = { fetched: [], shared: [], links: [] };
+  const calls: Calls = { built: [], shared: [], links: [] };
   const share =
     over.share ??
     (async (d: ShareData) => {
@@ -471,10 +461,10 @@ function deps(
   return {
     calls,
     deps: {
-      fetch: async (url) => {
-        calls.fetched.push(url);
-        if (over.response instanceof Error) throw over.response;
-        return over.response ?? zipResponse();
+      buildZip: async (now) => {
+        calls.built.push(now);
+        if (over.zip instanceof Error) throw over.zip;
+        return over.zip ?? ZIP_BYTES;
       },
       navigator:
         over.canShare === undefined
@@ -498,7 +488,8 @@ test.describe("Remise de l'export (CM-60)", () => {
   test("partage de fichiers possible : feuille de partage avec le ZIP, aucun téléchargement", async () => {
     const { deps: d, calls } = deps({ canShare: true });
     expect(await deliverExport(d)).toBe("shared");
-    expect(calls.fetched).toEqual([EXPORT_URL]);
+    // CM-88 : archive construite dans le navigateur, datée du même instant.
+    expect(calls.built).toEqual([new Date("2026-10-11T08:00:00Z")]);
     expect(calls.links).toEqual([]);
     const file = calls.shared[0].files![0];
     expect(file.name).toBe("coach-en-muscu-export-2026-10-11.zip");
@@ -533,27 +524,21 @@ test.describe("Remise de l'export (CM-60)", () => {
     expect(calls.links).toHaveLength(1);
   });
 
-  test("échecs : réseau, statut HTTP, page HTML (redirection), fichier vide", async () => {
-    for (const response of [
-      new Error("offline"),
-      new Response("erreur", { status: 500, headers: { "Content-Type": "application/zip" } }),
-      new Response("<html>Profil</html>", { status: 200, headers: { "Content-Type": "text/html" } }),
-      zipResponse(""),
-    ]) {
-      const { deps: d, calls } = deps({ canShare: true, response });
+  test("échecs : lecture impossible, archive vide", async () => {
+    for (const zip of [new Error("offline"), new Uint8Array(new ArrayBuffer(0))]) {
+      const { deps: d, calls } = deps({ canShare: true, zip });
       await expect(deliverExport(d)).rejects.toThrow();
       expect(calls.shared).toEqual([]);
       expect(calls.links).toEqual([]);
     }
   });
 
-  test("nom du fichier : en-tête, sinon date du jour", () => {
-    const now = new Date("2026-10-11T08:00:00Z");
-    expect(exportFileName('attachment; filename="coach-en-muscu-export-2026-10-09.zip"', now)).toBe(
-      "coach-en-muscu-export-2026-10-09.zip",
+  test("nom du fichier : date du jour (Paris)", () => {
+    expect(exportFileName(new Date("2026-10-11T08:00:00Z"))).toBe(
+      "coach-en-muscu-export-2026-10-11.zip",
     );
-    expect(exportFileName(null, now)).toBe("coach-en-muscu-export-2026-10-11.zip");
-    expect(exportFileName('attachment; filename="../../etc/passwd"', now)).toBe(
+    // 23 h 30 UTC le 10 : déjà le 11 à Paris.
+    expect(exportFileName(new Date("2026-10-10T23:30:00Z"))).toBe(
       "coach-en-muscu-export-2026-10-11.zip",
     );
   });

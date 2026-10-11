@@ -1,18 +1,19 @@
 // CM-60 : remise du fichier d'export au téléphone. Un simple <a download>
 // vers un ZIP ne fait rien de fiable en PWA iOS (mode « écran d'accueil ») ni
-// dans un WKWebView (coque Capacitor) : on télécharge le fichier nous-mêmes,
+// dans un WKWebView (coque Capacitor) : on prépare le fichier nous-mêmes,
 // puis on ouvre la feuille de partage du système (« Enregistrer dans
 // Fichiers », AirDrop, Mail…) quand elle accepte les fichiers, sinon on
 // déclenche un téléchargement classique depuis un lien temporaire.
+// CM-88 : l'archive est construite DANS LE NAVIGATEUR (lecture sous RLS, puis
+// `buildExportZip`, lib/data/accountExport.ts) : plus de route serveur.
 // Dépendances injectées : testé avec des doublures dans
 // tests/unit/accountExport.spec.ts.
 
 import { exportFileBaseName } from "./accountExport";
 
-export const EXPORT_URL = "/profile/export";
-
 export type ExportDeps = {
-  fetch: (url: string, init?: RequestInit) => Promise<Response>;
+  /** Lit les données du compte et renvoie l'archive ZIP, datée de `now`. */
+  buildZip: (now: Date) => Promise<Uint8Array<ArrayBuffer>>;
   navigator: {
     canShare?: (data: ShareData) => boolean;
     share?: (data: ShareData) => Promise<void>;
@@ -29,11 +30,9 @@ export type ExportOutcome = "shared" | "downloaded" | "cancelled";
 
 export class ExportError extends Error {}
 
-/** Nom du fichier : celui de Content-Disposition, sinon celui du jour. */
-export function exportFileName(contentDisposition: string | null, now: Date): string {
-  const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(contentDisposition ?? "");
-  const name = m?.[1] ? decodeURIComponent(m[1].trim()) : "";
-  return /^[\w.-]+\.zip$/.test(name) ? name : `${exportFileBaseName(now)}.zip`;
+/** Nom du fichier : coach-en-muscu-export-AAAA-MM-JJ.zip (date de Paris). */
+export function exportFileName(now: Date): string {
+  return `${exportFileBaseName(now)}.zip`;
 }
 
 function isAbort(e: unknown): boolean {
@@ -41,24 +40,16 @@ function isAbort(e: unknown): boolean {
 }
 
 export async function deliverExport(deps: ExportDeps): Promise<ExportOutcome> {
-  let res: Response;
+  const now = deps.now?.() ?? new Date();
+  let zip: Uint8Array<ArrayBuffer>;
   try {
-    res = await deps.fetch(EXPORT_URL, {
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: { Accept: "application/zip" },
-    });
-  } catch {
-    throw new ExportError("network");
+    zip = await deps.buildZip(now);
+  } catch (e) {
+    throw new ExportError(e instanceof Error ? e.message : "lecture");
   }
-  // Échec côté serveur : redirection vers le Profil ou la connexion (HTML).
-  if (!res.ok || !(res.headers.get("Content-Type") ?? "").includes("application/zip")) {
-    throw new ExportError(`http ${res.status}`);
-  }
-  const blob = await res.blob();
-  if (blob.size === 0) throw new ExportError("empty");
-  const name = exportFileName(res.headers.get("Content-Disposition"), deps.now?.() ?? new Date());
-  const file = new File([blob], name, { type: "application/zip" });
+  if (zip.byteLength === 0) throw new ExportError("empty");
+  const name = exportFileName(now);
+  const file = new File([zip], name, { type: "application/zip" });
 
   const nav = deps.navigator;
   if (nav.share && nav.canShare?.({ files: [file] })) {

@@ -141,7 +141,8 @@ test.describe("Couleur unique dans le duo (CM-103)", () => {
       await expect(colors.getByRole("radio", { name, exact: true })).toBeEnabled();
     }
 
-    // L'action serveur la refuse aussi (formulaire forcé à la main).
+    // L'écriture la refuse aussi (formulaire forcé à la main ; CM-88 : écrite
+    // depuis le navigateur, contrôle dans lib/data/profile.ts).
     await section.locator('input[name="accent_color"]').evaluate((el) => {
       (el as HTMLInputElement).value = "#FF4F7E";
     });

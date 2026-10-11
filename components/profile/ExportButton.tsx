@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { deliverExport } from "@/lib/export/deliverExport";
+import { buildAccountExportZip } from "@/lib/data/accountExport";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export const EXPORT_ERROR_MESSAGE =
   "L'export n'a pas pu être préparé. Vérifie ta connexion, puis réessaie.";
@@ -18,11 +20,18 @@ function clickDownloadLink(href: string, fileName: string) {
 }
 
 /**
- * CM-60 : « Exporter mes données ». Le fichier est récupéré puis remis par la
+ * CM-60 : « Exporter mes données ». Le fichier est préparé puis remis par la
  * feuille de partage du système, ou téléchargé (lib/export/deliverExport.ts).
+ * CM-88 : le ZIP est construit dans le navigateur, sous RLS.
  * `variant` : ligne du Profil, ou bouton de la feuille de suppression.
  */
-export default function ExportButton({ variant }: { variant: "row" | "sheet" }) {
+export default function ExportButton({
+  variant,
+  profileId,
+}: {
+  variant: "row" | "sheet";
+  profileId: string;
+}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +41,7 @@ export default function ExportButton({ variant }: { variant: "row" | "sheet" }) 
     setError(null);
     try {
       await deliverExport({
-        fetch: (url, init) => window.fetch(url, init),
+        buildZip: (now) => buildAccountExportZip(getSupabaseBrowserClient(), profileId, now),
         navigator: window.navigator,
         createObjectURL: (blob) => URL.createObjectURL(blob),
         revokeObjectURL: (url) => URL.revokeObjectURL(url),
