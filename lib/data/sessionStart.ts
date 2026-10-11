@@ -1,6 +1,6 @@
 import type { BrowserSupabase } from "@/lib/supabase/client";
-import { canAccessProgram } from "@/lib/queries/programs";
 import { writeErrorMessage } from "@/lib/supabase/rlsErrors";
+import { SEANCE_NOT_FOUND, checkSeanceAccess } from "@/lib/data/seances";
 
 /**
  * CM-88 : écritures des séances côté client.
@@ -15,17 +15,10 @@ export type StartSessionResult =
   | { ok: false; error: string };
 
 /**
- * Message unique d'une séance inexistante OU inaccessible : distinguer les
- * deux révélerait l'existence de la séance d'un autre couple (CM-80). Même
- * texte que `NOT_FOUND` de app/seances/actions.ts.
- */
-const NOT_FOUND = "Séance introuvable";
-
-/**
- * Démarre une séance à partir d'une séance type : équivalent client de la
- * server action `startSession` (app/seances/actions.ts), mêmes vérifications
- * et mêmes messages. L'appelant navigue vers `/sessions/<id>` en cas de
- * succès, ou vers `/dashboard?error=…` sinon (comme `redirectWithError`).
+ * Démarre une séance à partir d'une séance type (accueil et bibliothèque).
+ * Remplace la server action `startSession` (supprimée en PR 5) : mêmes
+ * vérifications et mêmes messages. L'appelant navigue vers `/sessions/<id>`
+ * en cas de succès, ou vers `/dashboard?error=…` sinon.
  *
  * La RLS (CM-59 B) refuse déjà de démarrer la séance type d'un autre duo ; le
  * contrôle d'accès reste en place (ceinture et bretelles), et refuse l'action
@@ -53,19 +46,12 @@ export async function startSessionFromDay(
       return { ok: false, error: `Impossible de démarrer la séance : ${dayError.message}` };
     }
     if (!day) {
-      return { ok: false, error: `${NOT_FOUND} : impossible de démarrer.` };
+      return { ok: false, error: `${SEANCE_NOT_FOUND} : impossible de démarrer.` };
     }
 
-    const access = await canAccessProgram(supabase, day.program_id, profileId);
-    if (!access.ok) {
-      return {
-        ok: false,
-        error: `Impossible de vérifier l'accès à cette séance (${access.error}). Démarrage annulé.`,
-      };
-    }
-    if (!access.allowed) {
-      return { ok: false, error: NOT_FOUND };
-    }
+    // Contrôle d'accès commun à la suppression (lib/data/seances.ts).
+    const access = await checkSeanceAccess(supabase, day.program_id, profileId, "Démarrage annulé.");
+    if (!access.ok) return access;
 
     const { data: session, error } = await supabase
       .from("sessions")

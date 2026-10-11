@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
@@ -17,22 +17,11 @@ import {
 import { EXTRA_EXERCISE_DEFAULTS } from "@/lib/utils/sessionExercises";
 import { moveItemByKey, type MoveDirection } from "@/lib/utils/reorder";
 import AddExerciseSheet from "@/components/AddExerciseSheet";
-import { saveSeance } from "./actions";
+import { useSaveSeance } from "@/hooks/data/useSeances";
+import type { OwnerChoice } from "@/lib/data/seances";
 import type { SeanceTarget } from "@/lib/duo";
 
-/**
- * CM-87 : choix « Pour nous deux » / « Pour moi » (création) ou « Partager
- * avec … » / « Garder pour moi » (édition). Absent pour un utilisateur sans
- * partenaire : le choix n'existe qu'en duo.
- */
-export type OwnerChoice = {
-  partnerName: string;
-  myColor: string;
-  /** Création : `duo` par défaut. Édition : bibliothèque actuelle. */
-  initial: SeanceTarget;
-  /** Noms déjà pris de chaque côté (la séance éditée exclue). */
-  otherNamesByTarget: Record<SeanceTarget, string[]>;
-};
+export type { OwnerChoice } from "@/lib/data/seances";
 
 /** Réglage déplié sous une ligne d'exercice. Un seul à la fois sur l'écran. */
 type DraftField = "sets" | "reps" | "rest";
@@ -41,6 +30,8 @@ type DraftField = "sets" | "reps" | "rest";
 type DirectTarget = "sets" | "repsMin" | "repsMax" | "rest";
 
 type Props = {
+  /** Profil connecté (invalidation du cache après enregistrement). */
+  profileId: string;
   mode: "create" | "edit";
   dayId?: string;
   /** "" en création. */
@@ -65,9 +56,11 @@ type Props = {
  * (`window.confirm` est supprimé en PWA iOS standalone).
  *
  * Le mot « programme » n'apparaît nulle part : le programme partagé du couple
- * est un détail de schéma que la server action gère seule.
+ * est un détail de schéma que la RPC `save_seance` gère seule (CM-88 :
+ * enregistrement atomique depuis le navigateur).
  */
 export default function SeanceBuilder({
+  profileId,
   mode,
   dayId,
   initialName,
@@ -79,7 +72,8 @@ export default function SeanceBuilder({
   owner,
 }: Props) {
   const router = useRouter();
-  const [isSaving, startSaving] = useTransition();
+  const saveMutation = useSaveSeance(profileId);
+  const isSaving = saveMutation.isPending;
 
   const [target, setTarget] = useState<SeanceTarget | null>(owner?.initial ?? null);
   /** Noms déjà pris dans la bibliothèque d'arrivée. */
@@ -290,27 +284,34 @@ export default function SeanceBuilder({
     setNameError(null);
     setError(null);
 
-    startSaving(async () => {
-      const result = await saveSeance({
+    if (isSaving) return;
+    saveMutation.mutate(
+      {
         dayId,
         name: check.name,
         exercises,
         target: target ?? undefined,
-        // C2 : en édition, le serveur ne bascule que si le choix a changé.
+        // C2 : en édition, la base ne bascule que si le choix a changé.
         initialTarget: mode === "edit" ? owner?.initial : undefined,
-      });
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-      setDirty(false);
-      router.push(
-        result.notice
-          ? `${backHref}${backHref.includes("?") ? "&" : "?"}info=${encodeURIComponent(result.notice)}`
-          : backHref,
-      );
-      router.refresh();
-    });
+      },
+      {
+        // Appelé une fois le cache invalidé : la bibliothèque est à jour.
+        onSuccess: (result) => {
+          if (!result.ok) {
+            setError(result.error);
+            return;
+          }
+          setDirty(false);
+          router.push(
+            result.notice
+              ? `${backHref}${backHref.includes("?") ? "&" : "?"}info=${encodeURIComponent(result.notice)}`
+              : backHref,
+          );
+        },
+        onError: (e) =>
+          setError(e instanceof Error ? e.message : "Impossible d'enregistrer la séance"),
+      },
+    );
   }
 
   const canSave = exercises.length > 0 && !isSaving;

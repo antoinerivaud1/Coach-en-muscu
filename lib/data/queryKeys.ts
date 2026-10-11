@@ -49,4 +49,19 @@ export const queryKeys = {
   dashboard: {
     all: (profileId: string) => [profileId, "sessions", "dashboard"] as const,
   },
+
+  // ---- CM-88 PR 5 : séances types (bibliothèque et éditeur) ----
+  /**
+   * Rangées sous `[profileId, "sessions"]` : une écriture sur une séance type
+   * invalide cette tête, qui relit d'un coup l'accueil, la bibliothèque et
+   * l'éditeur ; une écriture de séance réalisée (« Dernière fois ») aussi.
+   */
+  seances: {
+    all: (profileId: string) => [profileId, "sessions", "seances"] as const,
+    library: (profileId: string) => [profileId, "sessions", "seances", "library"] as const,
+    /** `dayId` null : création. */
+    editor: (profileId: string, dayId: string | null) =>
+      [profileId, "sessions", "seances", "editor", dayId ?? "new"] as const,
+  },
+  // ---- fin CM-88 PR 5 ----
 } as const;
