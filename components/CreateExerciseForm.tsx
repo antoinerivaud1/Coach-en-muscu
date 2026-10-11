@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { createCustomExercise } from "@/lib/actions/exercises";
+import { useState } from "react";
+import { useCreateExercise } from "@/hooks/data/useCatalogExercises";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
 
@@ -9,9 +9,10 @@ import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
  * Formulaire de création d'un exercice perso du couple (CM-13).
  *
  * Extrait du builder de programme pour être partagé tel quel avec l'ajout
- * d'exercice en cours de séance (CM-62) : un seul formulaire, une seule action
- * serveur (`createCustomExercise`), aucun duplicata à maintenir en double.
- * Le parent décide seulement de ce qu'il fait de l'exercice créé.
+ * d'exercice en cours de séance (CM-62) : un seul formulaire, une seule
+ * écriture (`createCustomExercise`, lib/data/exercises.ts, dans le navigateur
+ * depuis CM-88), aucun duplicata à maintenir en double. Le parent décide
+ * seulement de ce qu'il fait de l'exercice créé.
  */
 export default function CreateExerciseForm({
   submitLabel = "Créer l'exercice",
@@ -22,7 +23,8 @@ export default function CreateExerciseForm({
   onCreated: (exercise: SystemExercise) => void;
   onCancel: () => void;
 }) {
-  const [isCreating, startCreate] = useTransition();
+  const create = useCreateExercise();
+  const isCreating = create.isPending;
   const [name, setName] = useState("");
   const [group, setGroup] = useState<SystemExercise["muscle_group"]>("chest");
   const [error, setError] = useState<string | null>(null);
@@ -34,18 +36,20 @@ export default function CreateExerciseForm({
       setError("Le nom est requis");
       return;
     }
-    startCreate(async () => {
-      const result = await createCustomExercise({
-        name: trimmed,
-        muscle_group: group,
-      });
-      if (!result.success) {
-        setError(result.error);
-        return;
-      }
-      setName("");
-      onCreated(result.exercise);
-    });
+    create.mutate(
+      { name: trimmed, muscle_group: group },
+      {
+        onSuccess: (result) => {
+          if (!result.ok) {
+            setError(result.error);
+            return;
+          }
+          setName("");
+          onCreated(result.exercise);
+        },
+        onError: (e) => setError(e instanceof Error ? e.message : "Erreur lors de la création de l'exercice"),
+      },
+    );
   }
 
   return (

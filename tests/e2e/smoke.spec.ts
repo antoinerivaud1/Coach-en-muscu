@@ -42,6 +42,20 @@ test("CM-88 : le Profil sans session renvoie à la connexion, avec retour prévu
   await expect(page.getByLabel("Email")).toBeVisible();
 });
 
+test("CM-88 : la bibliothèque et l'éditeur de séances sans session renvoient à la connexion", async ({ page }) => {
+  await page.goto("/seances");
+  await expect(page).toHaveURL(/\/login\?next=%2Fseances$/);
+  await expect(page.getByLabel("Email")).toBeVisible();
+
+  await page.goto("/seances/new");
+  await expect(page).toHaveURL(/\/login\?next=%2Fseances%2Fnew$/);
+
+  await page.goto("/seances/55555555-5555-5555-5555-000000000001/edit");
+  await expect(page).toHaveURL(
+    /\/login\?next=%2Fseances%2F55555555-5555-5555-5555-000000000001%2Fedit$/,
+  );
+});
+
 test("CM-88 (PR 7) : un lien d'invitation sans session passe par la connexion, code conservé", async ({ page }) => {
   await page.goto("/duo/rejoindre?code=K7QM4P");
   await expect(page).toHaveURL(/\/login\?next=%2Fduo%2Frejoindre%3Fcode%3DK7QM4P$/);

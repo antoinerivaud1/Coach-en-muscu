@@ -9,8 +9,8 @@ import { startSessionFromDay } from "@/lib/data/sessionStart";
 
 /**
  * CM-88 (PR 4) : « Démarrer une séance » depuis l'accueil (grille, suggestion,
- * accueil du premier jour). Remplace la server action `startSession` sur ces
- * écrans : succès → `/sessions/<id>` ; échec → `/dashboard?error=…`, le
+ * accueil du premier jour) et, depuis la PR 5, depuis la bibliothèque
+ * `/seances`. Remplace la server action `startSession` (supprimée) : succès → `/sessions/<id>` ; échec → `/dashboard?error=…`, le
  * message s'affiche en haut de l'accueil (même parcours que `redirectWithError`,
  * CM-70).
  *

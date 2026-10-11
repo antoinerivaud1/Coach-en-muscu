@@ -506,6 +506,20 @@ export type Database = {
         Args: { p_day_id: string; p_shared: boolean }
         Returns: { status: "moved" | "copied" | "unchanged"; day_id: string }[]
       }
+      // CM-88 (PR 5) : séances types (supabase/migrations/20261011200000_cm88_seances_types.sql).
+      save_seance: {
+        Args: {
+          p_day_id: string | null
+          p_name: string
+          p_exercises: Json
+          p_target?: "duo" | "perso" | null
+          p_initial_target?: "duo" | "perso" | null
+        }
+        Returns: { day_id: string; program_id: string; copied: boolean }[]
+      }
+      duplicate_seance: { Args: { p_day_id: string }; Returns: string }
+      move_seance: { Args: { p_day_id: string; p_direction: "up" | "down" }; Returns: undefined }
+      delete_seance: { Args: { p_day_id: string }; Returns: undefined }
       can_access_program: { Args: { p_program_id: string }; Returns: boolean }
       is_duo_member: { Args: { p_duo_id: string }; Returns: boolean }
       my_duo_id: { Args: never; Returns: string }
