@@ -66,8 +66,8 @@ export type LegalConfig = {
 
 export const LEGAL: LegalConfig = {
   appName: "Coach en Muscu",
-  lastUpdated: "10 octobre 2026",
-  lastUpdatedIso: "2026-10-10",
+  lastUpdated: "11 octobre 2026",
+  lastUpdatedIso: "2026-10-11",
   siteUrl: todo("URL publique du site (domaine de production)"),
   editor: {
     name: "Antoine Rivaud",

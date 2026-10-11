@@ -181,19 +181,35 @@ export default function ConfidentialitePage() {
 
       <Section id="suppression" n={7} title={TOC[6].title}>
         <P>
-          Bientôt, tu pourras supprimer ton compte directement depuis l’app, dans Profil. La
-          suppression efface ton compte et tes données personnelles : profil, séances,
-          séries, exercices personnalisés et appartenance à un duo. Un export de tes données
-          est également prévu.
+          Tu peux supprimer ton compte à tout moment depuis l’app : <B>Profil</B>, section{" "}
+          <B>Mes données</B>, puis <B>Supprimer mon compte</B>. L’app rappelle d’abord ce qui
+          sera effacé, puis te demande d’écrire « SUPPRIMER » pour confirmer. La suppression
+          est alors immédiate et définitive : ton compte, ton profil, tes séances, tes séries,
+          tes séances types et tes exercices personnalisés sont effacés, et la session est
+          fermée sur ton téléphone.
         </P>
         <P>
-          En attendant, écris au support depuis l’adresse email de ton compte : nous
+          Si tu es en duo, le duo prend fin. Ton partenaire garde ses propres séances et
+          séries, ainsi que la bibliothèque commune (« Nos séances » et les exercices du duo),
+          qui devient la sienne. Tes séances et tes séries ne lui restent pas.
+        </P>
+        <P>
+          Pour récupérer tes données, <B>Exporter mes données</B>, dans la même section,
+          télécharge un fichier ZIP qui contient tes séances et tes séries au format CSV
+          (lisible dans un tableur) et l’ensemble de tes données au format JSON : profil,
+          séances types, séances, séries et exercices personnalisés. En duo, la bibliothèque
+          commune (« Nos séances » et les exercices du duo) y figure aussi, marquée comme
+          partagée. Les séances et les séries de ton partenaire n’y figurent jamais.
+        </P>
+        <P>
+          Tu peux aussi écrire au support depuis l’adresse email de ton compte : nous
           supprimons le compte et ses données, ou t’envoyons une copie de tes données.
         </P>
         <Muted>
           Supprimer le compte ne résilie pas un abonnement souscrit sur l’App Store : la
           résiliation se fait dans les réglages de ton identifiant Apple (voir le{" "}
-          <A href="/support#abonnement">support</A>).
+          <A href="/support#abonnement">support</A>). Une donnée supprimée peut subsister dans
+          les sauvegardes techniques, le temps indiqué plus haut (durée de conservation).
         </Muted>
       </Section>
 

@@ -10,6 +10,9 @@ import DuoSection from "@/components/profile/DuoSection";
 import { getDuoState } from "@/lib/queries/duo";
 import { memberAccent } from "@/lib/members";
 import { getBadges } from "@/lib/badges";
+import DataSection from "@/components/profile/DataSection";
+import type { DeleteAccountDuo } from "@/components/profile/DeleteAccountSheet";
+import { EXPORT_FAILED } from "@/lib/export/accountExport";
 
 function Row({ href, title, sub }: { href: string; title: string; sub: string }) {
   return (
@@ -28,8 +31,13 @@ function Row({ href, title, sub }: { href: string; title: string; sub: string })
   );
 }
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ export?: string | string[] }>;
+}) {
   const profileId = await requireProfileId("/profile");
+  const exportFailed = (await searchParams).export === EXPORT_FAILED;
   const supabase = await createClient();
   const profile = await getProfile(supabase, profileId);
   const identity = await getIdentity(supabase, profileId);
@@ -57,6 +65,20 @@ export default async function ProfilePage() {
           .format(new Date(duo.since))
           .replace(" ", "\u00a0")
       : null;
+
+  // CM-60 : ce que la feuille de suppression annonce (partenaire nommé).
+  const deleteDuo: DeleteAccountDuo =
+    duo.kind === "duo"
+      ? {
+          kind: "duo",
+          partnerName: duo.partner.display_name,
+          partnerColor: memberAccent(duo.partner),
+        }
+      : duo.kind === "pending"
+        ? { kind: "pending" }
+        : duo.kind === "error"
+          ? { kind: "unknown" }
+          : { kind: "solo" };
 
   return (
     <main className="min-h-[100dvh] px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -130,6 +152,9 @@ export default async function ProfilePage() {
           sub="Voir et modifier mes séances types"
         />
       </div>
+
+      {/* CM-60 : export des données et suppression du compte. */}
+      <DataSection duo={deleteDuo} exportFailed={exportFailed} />
 
       {/* CM-93 : liens légaux, support et crédits (pages publiques). */}
       <section aria-labelledby="a-propos" className="mt-8">
