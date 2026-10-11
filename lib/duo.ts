@@ -89,7 +89,8 @@ const DUO_ERROR_MESSAGES: Record<DuoErrorCode, string> = {
   no_partner: "Ton partenaire n'a pas encore rejoint le duo.",
   seance_not_found: "Séance introuvable",
   name_taken: "Une séance porte déjà ce nom de l'autre côté : renomme-la d'abord.",
-  too_many_attempts: "Trop d'essais. Réessaie dans une heure.",
+  // Neutre : le blocage peut venir du plafond horaire ou du plafond sur 24 h.
+  too_many_attempts: "Trop d'essais. Réessaie plus tard.",
 };
 
 /**

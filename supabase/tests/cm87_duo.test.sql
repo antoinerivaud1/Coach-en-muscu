@@ -17,7 +17,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(97);
+select plan(98);
 
 -- ---------------------------------------------------------------------------
 -- Données de test (postgres)
@@ -260,6 +260,14 @@ select results_eq(
 select throws_ok(
   $$ select public.accept_duo_invitation((select code from t_codes where k = 'tiersA')) $$,
   'P0001', 'cm87:already_in_duo', '5. Toi, déjà en duo, ne rejoint pas Tiers A');
+reset role;
+
+-- CM-102 : Tiers B voit l'aperçu avant l'expiration (exigé pour rejoindre).
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-8787-0000-0000-0000000000b1","role":"authenticated"}';
+select isnt_empty(
+  $$ select * from public.get_duo_invitation((select code from t_codes where k = 'tiersA')) $$,
+  '5. Tiers B voit l''aperçu de Tiers A');
 reset role;
 
 -- Expiration simulée (postgres).

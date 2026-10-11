@@ -7,14 +7,14 @@
 -- Comptes du seed : Toi 1111… et Elle 2222… (duo 3333…), Solo 4444… (hors
 -- duo, invite ici). Comptes créés ici, hors duo : Tiers C (essaie 10 mauvais
 -- codes), Tiers D (autre utilisateur, non affecté), Tiers E (rejoint sans
--- aperçu). RLS jouée sous `authenticated` (jeton simulé par
+-- aperçu), Tiers F (une autre invitation). RLS jouée sous `authenticated` (jeton simulé par
 -- request.jwt.claims), `reset role` entre les cas. Transaction annulée.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(48);
+select plan(53);
 
 -- ---------------------------------------------------------------------------
 -- Données de test (postgres)
@@ -186,8 +186,60 @@ set local request.jwt.claims = '{"sub":"aaaaaaaa-0102-0000-0000-0000000000e1","r
 select throws_ok(
   $$ select public.accept_duo_invitation((select code from t_codes where k = 'bon')) $$,
   'P0001', 'cm87:invitation_invalid', '6. sans aperçu : même refus qu''un code inconnu');
-select is((select count(*)::int from public.duo_members), 0, '6. Tiers E toujours hors duo');
+-- Code expiré non révoqué, jamais vu : même erreur générique (pas
+-- invitation_expired, qui révélerait que le code a existé).
+select throws_ok(
+  $$ select public.accept_duo_invitation('EXPRD2') $$,
+  'P0001', 'cm87:invitation_invalid', '6. code expiré sans aperçu : erreur générique');
+select throws_ok(
+  $$ select public.accept_duo_invitation('ZZZZY3') $$,
+  'P0001', 'cm87:invitation_invalid', '6. code inconnu : même erreur');
 reset role;
+
+-- Tiers D a vu l'aperçu du bon code de Solo (cas 5) : il ne lui permet pas
+-- d'accepter une AUTRE invitation (celle de Tiers F).
+insert into auth.users (instance_id, id, aud, role, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-000000000000', 'aaaaaaaa-0102-0000-0000-0000000000f1',
+   'authenticated', 'authenticated', 'tiers-f@coach-en-muscu.test', '{"display_name":"Tiers F"}');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0102-0000-0000-0000000000f1","role":"authenticated"}';
+select lives_ok($$ select * from public.create_duo_invitation() $$, '6. Tiers F invite');
+reset role;
+update public.duo_invitations set code = 'FFFFF2'
+  where created_by = 'aaaaaaaa-0102-0000-0000-0000000000f1'
+    and accepted_at is null and revoked_at is null;
+-- Tiers D repasse sous le seuil (ses échecs du cas 5 vieillis).
+update public.duo_invitation_attempts set attempted_at = now() - interval '25 hours'
+  where profile_id = 'aaaaaaaa-0102-0000-0000-0000000000d1' and not success;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0102-0000-0000-0000000000d1","role":"authenticated"}';
+select throws_ok(
+  $$ select public.accept_duo_invitation('FFFFF2', '#5B8CFF') $$,
+  'P0001', 'cm87:invitation_invalid', '6. aperçu d''une autre invitation : refus');
+reset role;
+select is((select count(*)::int from public.duo_members
+           where profile_id in ('aaaaaaaa-0102-0000-0000-0000000000d1',
+                                'aaaaaaaa-0102-0000-0000-0000000000e1')),
+          0, '6. Tiers D et Tiers E toujours hors duo');
+
+-- Une ancienne invitation au même code, vue autrefois, ne suffit pas : le
+-- code de Solo passe à Tiers F (invitation de Solo révoquée).
+update public.duo_invitations set revoked_at = now()
+  where created_by = '44444444-4444-4444-4444-444444444444' and code = 'K7QM4P';
+update public.duo_invitations set code = 'K7QM4P'
+  where created_by = 'aaaaaaaa-0102-0000-0000-0000000000f1' and code = 'FFFFF2';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0102-0000-0000-0000000000d1","role":"authenticated"}';
+select throws_ok(
+  $$ select public.accept_duo_invitation('K7QM4P', '#5B8CFF') $$,
+  'P0001', 'cm87:invitation_invalid', '6. même code, autre invitation : refus');
+reset role;
+-- Retour à l'état précédent pour la suite (Solo réinvite avec le même code).
+update public.duo_invitations set code = 'FFFFF2'
+  where created_by = 'aaaaaaaa-0102-0000-0000-0000000000f1' and code = 'K7QM4P';
+update public.duo_invitations set revoked_at = null
+  where created_by = '44444444-4444-4444-4444-444444444444' and code = 'K7QM4P';
 
 -- ---------------------------------------------------------------------------
 -- 7. Le blocage expire (lignes vieillies).

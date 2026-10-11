@@ -24,7 +24,9 @@
 --
 -- À appliquer AVANT de merger la PR : l'app actuelle (CM-87) reste
 -- compatible (elle traite déjà « aucune ligne » comme un code invalide et
--- passe toujours par l'aperçu avant de rejoindre).
+-- passe toujours par l'aperçu avant de rejoindre ; son message « trop
+-- d'essais » n'existe qu'après le merge : avant, l'erreur s'affiche comme
+-- une erreur générique).
 --
 -- La dernière requête renvoie UNE ligne : `ok` (dernière colonne) doit valoir
 -- true. Les colonnes précédentes disent quel contrôle a échoué le cas échéant.
@@ -72,10 +74,13 @@ begin;
 -- raison, ses refus ne peuvent pas être comptés. Sans garde, elle servirait
 -- d'oracle illimité (code inconnu = invitation_invalid, code valide = succès
 -- ou color_conflict / already_in_duo). Elle n'accepte donc qu'un code dont
--- l'appelant a déjà vu l'aperçu (ligne de succès sur cette invitation, ce
--- que fait toujours l'écran de confirmation). Sinon : `cm87:invitation_invalid`,
--- le même message qu'un code inconnu. Les contrôles de CM-87 (code inconnu,
--- expiré, révoqué, le sien) restent faits avant, à l'identique.
+-- l'appelant a déjà vu l'aperçu (ligne de succès sur une invitation de ce
+-- code, ce que fait toujours l'écran de confirmation). Ce contrôle passe
+-- AVANT toute validation du code : sans aperçu, la réponse est toujours
+-- `cm87:invitation_invalid` (le même message qu'un code inconnu), que le code
+-- soit inconnu, expiré, révoqué ou valide. Ensuite seulement, les contrôles
+-- de CM-87 (expiré, révoqué, le sien...) à l'identique, puis l'aperçu doit
+-- porter sur CETTE invitation (pas une ancienne au même code).
 --
 -- Concurrence : verrou consultatif par appelant (pg_advisory_xact_lock) le
 -- temps de la transaction : des appels parallèles du même compte passent
@@ -227,10 +232,21 @@ declare
 begin
   if v_me is null then raise exception 'cm87:not_authenticated'; end if;
   perform public.cm102_check_invitation_attempts(v_me);
+
+  -- CM-102 : seulement un code dont l'appelant a vu l'aperçu, vérifié AVANT
+  -- toute validation du code. Même erreur qu'un code inconnu : rien n'est
+  -- révélé (ni inconnu, ni expiré, ni révoqué, ni valide).
+  if not exists (select 1 from public.duo_invitation_attempts a
+                 join public.duo_invitations i on i.id = a.invitation_id
+                 where a.profile_id = v_me and a.success
+                   and i.code = upper(btrim(coalesce(p_code, '')))) then
+    raise exception 'cm87:invitation_invalid';
+  end if;
+
   v_inv := public.cm87_valid_invitation(p_code, v_me, true);
 
-  -- CM-102 : seulement un code dont l'appelant a vu l'aperçu. Même erreur
-  -- qu'un code inconnu : rien n'est révélé sur le code.
+  -- L'aperçu doit porter sur CETTE invitation (une ancienne invitation au
+  -- même code, vue autrefois, ne suffit pas).
   if not exists (select 1 from public.duo_invitation_attempts a
                  where a.profile_id = v_me and a.invitation_id = v_inv.id
                    and a.success) then

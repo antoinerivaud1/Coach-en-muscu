@@ -80,13 +80,15 @@ test.describe("erreurs des RPC (CM-87)", () => {
 });
 
 test.describe("limite d'essais des codes (CM-102)", () => {
-  const TOO_MANY = "Trop d'essais. Réessaie dans une heure.";
+  // Message neutre : vrai pour le plafond horaire comme pour celui de 24 h.
+  const TOO_MANY = "Trop d'essais. Réessaie plus tard.";
 
   test("cm102:too_many_attempts reconnu et traduit", () => {
     expect(duoErrorCode("cm102:too_many_attempts")).toBe("too_many_attempts");
     expect(duoErrorCode("ERROR: cm102:too_many_attempts (P0001)")).toBe("too_many_attempts");
     expect(duoErrorMessage("cm102:too_many_attempts")).toBe(TOO_MANY);
     expect(duoErrorCode("cm102:inconnu")).toBeNull();
+    expect(duoErrorMessage("cm102:too_many_attempts")).not.toMatch(/heure|minute|24/);
   });
 
   test("aller-retour confirmer -> rejoindre (?erreur=too_many_attempts)", () => {
