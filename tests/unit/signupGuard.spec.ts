@@ -1,36 +1,110 @@
 import { test, expect } from "@playwright/test";
-import { signUpWithPassword } from "@/lib/actions/signup";
+import { SIGNUP_CLOSED_MESSAGE, signOutLocal, signUpWithEmail, signupOpen } from "@/lib/data/auth";
 
-// CM-86 : sans SIGNUP_ENABLED, l'action d'inscription refuse AVANT tout appel
-// à Supabase (un POST direct ne crée aucun compte). La CI e2e met
-// SIGNUP_ENABLED=1 : cette garde n'est vérifiée qu'ici.
+// CM-86 / CM-88 (PR 7) : inscription fermée, l'écran refuse AVANT tout appel
+// à Supabase. Depuis CM-88, ce n'est qu'un affichage
+// (`NEXT_PUBLIC_SIGNUP_ENABLED`, gravée au build) : la vraie barrière est le
+// réglage Supabase « Allow new users to sign up ». La CI e2e build avec
+// NEXT_PUBLIC_SIGNUP_ENABLED=1 : cette garde n'est vérifiée qu'ici.
 
-function form(): FormData {
-  const f = new FormData();
-  f.set("email", "camille@exemple.test");
-  f.set("password", "motdepasse-solide");
-  return f;
-}
+/** Client factice : tout appel à l'auth fait échouer le test. */
+const forbidden = {
+  auth: new Proxy(
+    {},
+    {
+      get() {
+        throw new Error("Supabase ne doit pas être appelé quand l'inscription est fermée");
+      },
+    },
+  ),
+} as unknown as Parameters<typeof signUpWithEmail>[0];
 
-test.describe("Garde SIGNUP_ENABLED de signUpWithPassword", () => {
-  let saved: string | undefined;
-  test.beforeEach(() => {
-    saved = process.env.SIGNUP_ENABLED;
-  });
-  test.afterEach(() => {
-    if (saved === undefined) delete process.env.SIGNUP_ENABLED;
-    else process.env.SIGNUP_ENABLED = saved;
-  });
+const input = { email: "camille@exemple.test", password: "motdepasse-solide", next: "" };
 
-  for (const value of [undefined, "", "0", "false", "non"]) {
-    test(`refuse avec SIGNUP_ENABLED=${JSON.stringify(value)}`, async () => {
-      if (value === undefined) delete process.env.SIGNUP_ENABLED;
-      else process.env.SIGNUP_ENABLED = value;
-      // Sans variables Supabase dans l'environnement de test : si la garde
-      // laissait passer, createAuthClient lèverait (requête hors contexte).
-      await expect(signUpWithPassword({}, form())).resolves.toEqual({
-        error: "Les inscriptions ouvriront bientôt.",
-      });
-    });
+// CM-88 (PR 7) : la déconnexion aboutit toujours, même si Supabase échoue.
+test.describe("signOutLocal", () => {
+  /** Faux `document.cookie` : lecture de la liste, écriture = effacement. */
+  function fakeDoc(names: string[]) {
+    const jar = new Set(names);
+    const written: string[] = [];
+    return {
+      jar,
+      written,
+      get cookie() {
+        return [...jar].map((n) => `${n}=v`).join("; ");
+      },
+      set cookie(value: string) {
+        written.push(value);
+        const name = value.split("=")[0]!;
+        if (/max-age=0/i.test(value)) jar.delete(name);
+      },
+    };
   }
+  const session = ["sb-127-auth-token.0", "sb-127-auth-token.1", "cm_onboarded", "autre"];
+  type Client = Parameters<typeof signOutLocal>[0];
+  const client = (signOut: () => Promise<{ error: unknown }>) =>
+    ({ auth: { signOut } }) as unknown as Client;
+
+  test("succès : Supabase a fermé la session, aucun cookie touché ici", async () => {
+    const doc = fakeDoc(session);
+    expect(await signOutLocal(client(async () => ({ error: null })), doc)).toBe(false);
+    expect(doc.written).toEqual([]);
+  });
+
+  test("erreur renvoyée (réseau) : cookies de session effacés, les autres gardés", async () => {
+    const doc = fakeDoc(session);
+    const failing = client(async () => ({ error: { name: "AuthRetryableFetchError" } }));
+    expect(await signOutLocal(failing, doc)).toBe(true);
+    expect([...doc.jar].sort()).toEqual(["autre", "cm_onboarded"]);
+  });
+
+  test("exception : cookies de session effacés", async () => {
+    const doc = fakeDoc(session);
+    const throwing = client(async () => {
+      throw new Error("réseau");
+    });
+    expect(await signOutLocal(throwing, doc)).toBe(true);
+    expect(doc.jar.has("sb-127-auth-token.0")).toBe(false);
+  });
+
+  test("pas de réponse : cookies effacés après le délai", async () => {
+    const doc = fakeDoc(session);
+    const hanging = client(() => new Promise(() => {}));
+    expect(await signOutLocal(hanging, doc, 20)).toBe(true);
+    expect(doc.jar.has("sb-127-auth-token.1")).toBe(false);
+  });
+});
+
+test.describe("Garde d'inscription de signUpWithEmail", () => {
+  test("fermée : refus sans appel à Supabase", async () => {
+    await expect(signUpWithEmail(forbidden, input, false)).resolves.toEqual({
+      error: SIGNUP_CLOSED_MESSAGE,
+    });
+  });
+
+  test("fermée par défaut (variable absente)", () => {
+    // Les tests unitaires ne définissent pas NEXT_PUBLIC_SIGNUP_ENABLED.
+    expect(process.env.NEXT_PUBLIC_SIGNUP_ENABLED ?? "").not.toMatch(/^\s*(1|true)\s*$/i);
+    expect(signupOpen()).toBe(false);
+  });
+
+  test("ouverte : validation avant tout appel (email invalide, rien n'est envoyé)", async () => {
+    await expect(
+      signUpWithEmail(forbidden, { ...input, email: "pas-un-email" }, true),
+    ).resolves.toEqual({
+      fieldErrors: { email: "Cet email n'a pas l'air valide." },
+      email: "pas-un-email",
+    });
+  });
+
+  test("ouverte : succès vers l'onboarding, `next` conservé", async () => {
+    const client = {
+      auth: { signUp: async () => ({ data: { session: {} }, error: null }) },
+    } as unknown as Parameters<typeof signUpWithEmail>[0];
+    await expect(
+      signUpWithEmail(client, { ...input, next: "/duo/rejoindre?code=K7QM4P" }, true),
+    ).resolves.toEqual({
+      redirectTo: "/onboarding?next=%2Fduo%2Frejoindre%3Fcode%3DK7QM4P",
+    });
+  });
 });

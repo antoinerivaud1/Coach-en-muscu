@@ -1,23 +1,47 @@
 "use client";
 
-import { useActionState } from "react";
-import { signInWithPassword, type AuthFormState } from "@/lib/actions/auth";
+import { useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { signInWithEmail, type AuthFormState } from "@/lib/data/auth";
 import AuthField from "@/components/AuthField";
-import { useFullPageRedirect } from "@/hooks/useFullPageRedirect";
 
-// CM-58 : formulaire de connexion email + mot de passe.
-export default function LoginForm({ next }: { next: string }) {
-  const [state, action, actionPending] = useActionState<AuthFormState, FormData>(
-    signInWithPassword,
-    {},
-  );
-  useFullPageRedirect(state.redirectTo);
+/**
+ * CM-58 : formulaire de connexion email + mot de passe. CM-88 (PR 7) :
+ * connexion depuis le navigateur (lib/data/auth.ts), puis destination par
+ * RECHARGEMENT COMPLET (cache du navigateur neuf). `onStart` : prévient
+ * l'écran qu'une connexion part (il cesse alors de rediriger lui-même).
+ */
+export default function LoginForm({ next, onStart }: { next: string; onStart?: () => void }) {
+  const [state, setState] = useState<AuthFormState>({});
+  const [busy, setBusy] = useState(false);
   // Le rechargement prend un instant : le bouton reste occupé jusque-là.
-  const pending = actionPending || Boolean(state.redirectTo);
+  const pending = busy || Boolean(state.redirectTo);
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (pending) return;
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    setBusy(true);
+    onStart?.();
+    const result = await signInWithEmail(getSupabaseBrowserClient(), {
+      email: String(data.get("email") ?? ""),
+      password: String(data.get("password") ?? ""),
+      next,
+    });
+    setState(result);
+    if (result.redirectTo) {
+      window.location.assign(result.redirectTo);
+      return;
+    }
+    // Échec : mot de passe vidé, email gardé (comme l'ancien formulaire).
+    const password = form.elements.namedItem("password");
+    if (password instanceof HTMLInputElement) password.value = "";
+    setBusy(false);
+  }
 
   return (
-    <form action={action} className="flex flex-col gap-4" noValidate>
-      <input type="hidden" name="next" value={next} />
+    <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
       <AuthField
         label="Email"
         name="email"

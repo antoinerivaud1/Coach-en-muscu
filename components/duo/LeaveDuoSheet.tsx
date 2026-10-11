@@ -1,20 +1,17 @@
 "use client";
 
-import { useActionState, useEffect, useId, useState } from "react";
-import { leaveDuo, type DuoActionState } from "@/lib/actions/duo";
-import { useDuoAction } from "@/hooks/data/useDuoState";
+import { useEffect, useId, useState } from "react";
+import { useLeaveDuo } from "@/hooks/data/useDuoActions";
 
 /**
  * CM-87 : « Quitter le duo » et sa feuille de confirmation (maquette 11).
  * Pas de `window.confirm` (inerte en PWA iOS, CM-70).
- * CM-88 : le cache du navigateur est rafraîchi après coup (`useDuoAction`).
+ * CM-88 (PR 7) : action lancée depuis le navigateur, puis rechargement
+ * complet du Profil (`useLeaveDuo`).
  */
 export default function LeaveDuoSheet({ partnerName }: { partnerName: string }) {
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState<DuoActionState, FormData>(
-    useDuoAction(leaveDuo),
-    {},
-  );
+  const { run, pending, error } = useLeaveDuo();
   const titleId = useId();
 
   useEffect(() => {
@@ -86,12 +83,18 @@ export default function LeaveDuoSheet({ partnerName }: { partnerName: string }) 
                 </li>
               ))}
             </ul>
-            {state.error && (
+            {error && (
               <p role="alert" className="mt-4 text-sm text-red-400">
-                {state.error}
+                {error}
               </p>
             )}
-            <form action={action} className="mt-6">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!pending) run();
+              }}
+              className="mt-6"
+            >
               <button
                 type="submit"
                 disabled={pending}

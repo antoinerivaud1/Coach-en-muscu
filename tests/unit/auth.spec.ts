@@ -15,8 +15,33 @@ import {
   authCookieFingerprint,
   authCookieMarker,
   hasSupabaseAuthCookie,
+  invitationCodePage,
+  isCodeVerifierCookie,
   needsAuthCookieRewrite,
 } from "@/lib/supabase/auth-config";
+
+// CM-88 (PR 7) : seul le « code verifier » PKCE est effacé, jamais la session.
+test("isCodeVerifierCookie : verifier PKCE seulement, pas la session", () => {
+  expect(isCodeVerifierCookie("sb-127-auth-token-code-verifier")).toBe(true);
+  expect(isCodeVerifierCookie("sb-drmmgwchoowggpsppilo-auth-token-code-verifier")).toBe(true);
+  expect(isCodeVerifierCookie("sb-127-auth-token-code-verifier.0")).toBe(true);
+  expect(isCodeVerifierCookie("sb-127-auth-token")).toBe(false);
+  expect(isCodeVerifierCookie("sb-127-auth-token.0")).toBe(false);
+  expect(isCodeVerifierCookie("cm_onboarded")).toBe(false);
+  expect(isCodeVerifierCookie("code-verifier")).toBe(false);
+});
+
+// CM-88 (PR 7) : purge limitée aux écrans d'invitation (un futur flux PKCE
+// ailleurs garde son verifier).
+test("invitationCodePage : seulement /duo/rejoindre et ses sous-chemins", () => {
+  expect(invitationCodePage("/duo/rejoindre")).toBe(true);
+  expect(invitationCodePage("/duo/rejoindre/confirmer")).toBe(true);
+  expect(invitationCodePage("/duo/rejoindrexyz")).toBe(false);
+  expect(invitationCodePage("/duo/inviter")).toBe(false);
+  expect(invitationCodePage("/login")).toBe(false);
+  expect(invitationCodePage("/auth/callback")).toBe(false);
+  expect(invitationCodePage("/")).toBe(false);
+});
 
 // Tests unitaires purs (CM-58) : aucun navigateur, aucun appel Supabase.
 

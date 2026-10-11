@@ -4,9 +4,8 @@ import { readDuoMembership } from "@/lib/queries/profiles";
 
 /**
  * CM-87 : état du duo (carte du Profil, écran d'invitation). CM-88 : logique
- * sans import serveur, partagée par les pages serveur (`lib/queries/duo.ts`,
- * qui passe le client utilisateur pour les RPC) et les écrans client (le
- * client navigateur sert aux deux).
+ * sans import serveur, lue par les écrans client (`fetchDuoState`,
+ * lib/data/profile.ts : le client navigateur sert aux lectures et aux RPC).
  *
  * Les RPC du duo (security definer) lisent l'appelant dans `auth.uid()` :
  * `rpc` doit TOUJOURS être un client porteur de la session de l'utilisateur.

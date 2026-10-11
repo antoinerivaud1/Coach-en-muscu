@@ -15,7 +15,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
  *   `revalidatePath` des server actions).
  *
  * Changement de compte : connexion, inscription, déconnexion et suppression
- * rechargent la page entière (`useFullPageRedirect`), donc un cache neuf. Si
+ * rechargent la page entière (`window.location.assign`), donc un cache neuf. Si
  * la session change autrement (autre onglet, jeton révoqué), l'écouteur
  * ci-dessous efface les données et relance les écrans affichés.
  */

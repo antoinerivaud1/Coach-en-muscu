@@ -1,21 +1,31 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { signOut } from "@/lib/actions/auth";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { signOutLocal } from "@/lib/data/auth";
 import { purgeLocalQueues, unsyncedLocalCount } from "@/lib/localQueues";
 
 /**
- * Déconnexion (CM-59 B). Avant la server action, les files locales du compte
+ * Déconnexion (CM-59 B). Avant la déconnexion, les files locales du compte
  * (séries et clôtures hors ligne, et leurs refus) sont effacées : un autre
  * compte sur le même téléphone ne doit pas en hériter.
  *
  * S'il reste des données jamais enregistrées, on prévient d'abord, par une
  * feuille de confirmation (`window.confirm` est inerte en PWA iOS, CM-70).
  */
-/** CM-88 : `/login` par rechargement complet, le cache du navigateur repart de zéro. */
+/**
+ * CM-88 (PR 7) : déconnexion de cet appareil depuis le navigateur, puis
+ * `/login` par rechargement complet, le cache du navigateur repart de zéro.
+ * Toujours jusqu'au bout : réseau coupé ou erreur Auth, `signOutLocal`
+ * efface lui-même les cookies de session, et `/login` est ouvert quoi qu'il
+ * arrive.
+ */
 async function signOutAndReload() {
-  const { redirectTo } = await signOut();
-  window.location.assign(redirectTo);
+  try {
+    await signOutLocal(getSupabaseBrowserClient());
+  } finally {
+    window.location.assign("/login");
+  }
 }
 
 export default function SignOutButton() {

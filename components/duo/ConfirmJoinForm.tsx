@@ -1,16 +1,17 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { acceptInvitation, type DuoActionState } from "@/lib/actions/duo";
 import { MEMBER_COLORS, isMemberColor, DEFAULT_MEMBER_COLOR, type MemberColor } from "@/lib/members";
 import ColorPicker from "@/components/onboarding/ColorPicker";
 import DuoAvatars from "@/components/duo/DuoAvatars";
-import { useDuoAction } from "@/hooks/data/useDuoState";
+import { useAcceptInvitation } from "@/hooks/data/useDuoActions";
 
 /**
  * CM-87 : confirmation avant de rejoindre (maquette 9). En cas de conflit de
  * couleur, l'invité en choisit une autre avant d'accepter.
+ * CM-88 (PR 7) : RPC lancée depuis le navigateur, puis accueil par
+ * rechargement complet (`useAcceptInvitation`).
  */
 export default function ConfirmJoinForm({
   code,
@@ -27,11 +28,7 @@ export default function ConfirmJoinForm({
   myColor: string;
   colorConflict: boolean;
 }) {
-  // CM-88 : rejoindre change le duo : cache du navigateur rafraîchi.
-  const [state, action, pending] = useActionState<DuoActionState, FormData>(
-    useDuoAction(acceptInvitation),
-    {},
-  );
+  const { run, pending, error } = useAcceptInvitation();
   const initial: MemberColor = colorConflict
     ? (MEMBER_COLORS.find((c) => c.value !== inviterColor)?.value ?? DEFAULT_MEMBER_COLOR)
     : isMemberColor(myColor)
@@ -52,9 +49,14 @@ export default function ConfirmJoinForm({
   ];
 
   return (
-    <form action={action} className="flex flex-1 flex-col">
-      <input type="hidden" name="code" value={code} />
-      {colorConflict && <input type="hidden" name="accent_color" value={color} />}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        // Couleur envoyée seulement en cas de conflit (sinon la sienne est gardée).
+        if (!pending && !sameAsInviter) run(code, colorConflict ? color : null);
+      }}
+      className="flex flex-1 flex-col"
+    >
 
       <div className="mt-7 flex justify-center">
         <DuoAvatars
@@ -108,9 +110,9 @@ export default function ConfirmJoinForm({
         </div>
       )}
 
-      {state.error && (
+      {error && (
         <p role="alert" className="mt-3 rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2.5 text-base text-red-300">
-          {state.error}
+          {error}
         </p>
       )}
 
