@@ -210,4 +210,9 @@ test.describe("Cookies de session lisibles par le navigateur (CM-88)", () => {
     expect(needsAuthCookieRewrite(["cm_profile"], undefined)).toBe(false);
     expect(needsAuthCookieRewrite([], null)).toBe(false);
   });
+
+  test("needsAuthCookieRewrite : forcé (sur /login) même avec le marqueur, jamais sans session", () => {
+    expect(needsAuthCookieRewrite(["sb-abc-auth-token"], AUTH_COOKIE_VERSION, { force: true })).toBe(true);
+    expect(needsAuthCookieRewrite(["cm_profile"], AUTH_COOKIE_VERSION, { force: true })).toBe(false);
+  });
 });

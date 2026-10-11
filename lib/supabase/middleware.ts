@@ -12,6 +12,7 @@ import {
 } from "@/lib/onboarding";
 import {
   AUTH_COOKIE_OPTIONS,
+  AUTH_COOKIE_REWRITE_MAX_AGE,
   AUTH_COOKIE_VERSION,
   AUTH_COOKIE_VERSION_COOKIE,
   authEnv,
@@ -68,15 +69,16 @@ export async function updateSession(request: NextRequest) {
   // si besoin, via setAll ci-dessus.
   const { data: claimsData } = await supabase.auth.getClaims();
 
-  // CM-88 : anciens cookies `httpOnly` réécrits une fois, lisibles par le
-  // client navigateur dès cette réponse (sinon les écrans client se croiraient
-  // déconnectés jusqu'au prochain rafraîchissement du jeton).
+  // CM-88 : cookies de session réécrits avec les options actuelles (lisibles
+  // par le navigateur, 400 jours), au plus une fois par jour et toujours sur
+  // `/login` (voir AUTH_COOKIE_VERSION dans auth-config.ts).
   const requestCookies = request.cookies.getAll();
   if (
     claimsData &&
     needsAuthCookieRewrite(
       requestCookies.map((c) => c.name),
       request.cookies.get(AUTH_COOKIE_VERSION_COOKIE)?.value,
+      { force: request.nextUrl.pathname === "/login" },
     )
   ) {
     for (const c of requestCookies) {
@@ -88,7 +90,7 @@ export async function updateSession(request: NextRequest) {
       sameSite: "lax",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: 400 * 24 * 60 * 60,
+      maxAge: AUTH_COOKIE_REWRITE_MAX_AGE,
     });
   }
 

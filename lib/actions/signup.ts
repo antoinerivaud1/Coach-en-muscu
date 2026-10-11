@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { LEGACY_PROFILE_COOKIE, authErrorMessage, withNext } from "@/lib/auth/core";
 import {
@@ -16,6 +15,8 @@ export type SignupFormState = {
   error?: string;
   fieldErrors?: SignupFieldErrors;
   email?: string;
+  /** CM-88 : destination ouverte par rechargement complet (`useFullPageRedirect`). */
+  redirectTo?: string;
 };
 
 /**
@@ -62,5 +63,5 @@ export async function signUpWithPassword(
   store.delete(ONBOARDED_COOKIE);
   revalidatePath("/", "layout");
   // CM-103 : `next` (lien d'invitation) conservé pour la fin de l'onboarding.
-  redirect(withNext("/onboarding", String(formData.get("next") ?? "")));
+  return { redirectTo: withNext("/onboarding", String(formData.get("next") ?? "")) };
 }

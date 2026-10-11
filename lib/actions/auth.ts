@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
   LEGACY_PROFILE_COOKIE,
@@ -17,6 +16,12 @@ export type AuthFormState = {
   fieldErrors?: FieldErrors;
   /** Email resaisi, pour ne pas vider le champ après une erreur. */
   email?: string;
+  /**
+   * CM-88 : destination après connexion, ouverte par RECHARGEMENT COMPLET
+   * côté client (`useFullPageRedirect`) : le cache du navigateur repart de
+   * zéro. Jamais `redirect()` ici (navigation client, cache conservé).
+   */
+  redirectTo?: string;
 };
 
 /**
@@ -46,11 +51,14 @@ export async function signInWithPassword(
   store.delete(LEGACY_PROFILE_COOKIE);
   revalidatePath("/", "layout");
   // Chemin interne uniquement (pas d'open redirect).
-  redirect(safeNextPath(String(formData.get("next") ?? "")));
+  return { redirectTo: safeNextPath(String(formData.get("next") ?? "")) };
 }
 
-/** CM-58 : déconnexion (cet appareil seulement), puis retour à `/login`. */
-export async function signOut(): Promise<void> {
+/**
+ * CM-58 : déconnexion (cet appareil seulement). CM-88 : renvoie `/login`, que
+ * le bouton ouvre par rechargement complet (cache du navigateur vidé).
+ */
+export async function signOut(): Promise<{ redirectTo: string }> {
   try {
     const supabase = await createAuthClient();
     await supabase.auth.signOut({ scope: "local" });
@@ -60,5 +68,5 @@ export async function signOut(): Promise<void> {
   const store = await cookies();
   store.delete(LEGACY_PROFILE_COOKIE);
   revalidatePath("/", "layout");
-  redirect("/login");
+  return { redirectTo: "/login" };
 }

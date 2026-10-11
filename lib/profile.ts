@@ -14,7 +14,7 @@ export {
 } from "@/lib/duoMembership";
 export type { DuoMembership } from "@/lib/duo";
 
-// CM-88 : lectures déplacées dans lib/queries/members.ts (sans import serveur),
+// CM-88 : lectures déplacées dans lib/queries/profiles.ts (sans import serveur),
 // réexportées ici pour les pages et actions serveur existantes.
 export {
   getProfile,
@@ -28,7 +28,7 @@ export {
   type Profile,
   type DuoMembershipRead,
   type MemberProfilesRead,
-} from "@/lib/queries/members";
+} from "@/lib/queries/profiles";
 
 export type AuthState = {
   /** Id du profil courant (= id Auth de la session), null si personne. */

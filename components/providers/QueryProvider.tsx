@@ -3,7 +3,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { queryKeys } from "@/lib/data/queryKeys";
 
 /**
  * CM-88 : cache des données côté client (TanStack Query), partagé par tous les
@@ -15,8 +14,10 @@ import { queryKeys } from "@/lib/data/queryKeys";
  * - Les écritures invalident elles-mêmes les clés concernées (remplace
  *   `revalidatePath` des server actions).
  *
- * Changement de session (connexion, déconnexion, autre compte) : tout le cache
- * est vidé, jamais de données d'un compte affichées à un autre.
+ * Changement de compte : connexion, inscription, déconnexion et suppression
+ * rechargent la page entière (`useFullPageRedirect`), donc un cache neuf. Si
+ * la session change autrement (autre onglet, jeton révoqué), l'écouteur
+ * ci-dessous efface les données et relance les écrans affichés.
  */
 export default function QueryProvider({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -52,9 +53,8 @@ export default function QueryProvider({ children }: { children: ReactNode }) {
         // données et relance les requêtes affichées ; les autres sont retirées.
         client.removeQueries({ type: "inactive" });
         void client.resetQueries();
-      } else {
-        void client.invalidateQueries({ queryKey: queryKeys.auth() });
       }
+      // Même compte (jeton rafraîchi, retour au premier plan) : rien à faire.
     });
     return () => data.subscription.unsubscribe();
   }, [client]);

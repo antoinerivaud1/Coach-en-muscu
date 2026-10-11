@@ -1,6 +1,6 @@
 import type { BrowserSupabase } from "@/lib/supabase/client";
 import { getCatalogExercises, type SystemExercise } from "@/lib/queries/exercises";
-import { getDuoId } from "@/lib/queries/members";
+import { getDuoId } from "@/lib/queries/profiles";
 
 /**
  * CM-88 : lectures et écritures des exercices côté client.

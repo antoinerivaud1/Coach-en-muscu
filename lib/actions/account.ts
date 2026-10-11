@@ -74,5 +74,10 @@ export async function deleteMyAccount(
   }
   store.delete(ONBOARDED_COOKIE);
   store.delete(LEGACY_PROFILE_COOKIE);
+  // CM-88 : ici `redirect()` serveur, pas de rechargement complet côté client.
+  // Les cookies effacés ci-dessus font réafficher le Profil par Next, qui
+  // renverrait vers /login avant que le client ne lise un résultat. Le cache du
+  // navigateur ne contient que les données du compte supprimé, et la
+  // connexion suivante recharge la page entière (useFullPageRedirect).
   redirect(ACCOUNT_DELETED_PATH);
 }
