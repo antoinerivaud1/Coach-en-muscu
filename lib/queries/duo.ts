@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { createAuthClient } from "@/lib/supabase/server";
-import { readDuoMembership } from "@/lib/queries/profiles";
+import { readDuoState, type DuoState } from "@/lib/queries/duoState";
 
 /**
  * CM-87 : lectures du duo optionnel.
@@ -15,56 +15,16 @@ export async function duoRpcClient() {
   return createAuthClient();
 }
 
-export type PendingInvitation = { code: string; expiresAt: string };
+// CM-88 : état du duo déplacé dans lib/queries/duoState.ts (sans import
+// serveur), réexporté ici pour les pages serveur.
+export type { DuoState, PendingInvitation } from "@/lib/queries/duoState";
 
-export type DuoState =
-  | { kind: "error" }
-  | { kind: "solo" }
-  | { kind: "pending"; invitation: PendingInvitation }
-  | {
-      kind: "duo";
-      duoId: string;
-      since: string;
-      partner: { id: string; display_name: string; accent_color: string };
-    };
-
-/** Invitation en attente de mon duo (non expirée), null sinon. */
-export async function getMyPendingInvitation(): Promise<PendingInvitation | null> {
-  const rpc = await duoRpcClient();
-  const { data, error } = await rpc.rpc("get_my_duo_invitation");
-  const row = !error ? data?.[0] : undefined;
-  return row ? { code: row.code, expiresAt: row.expires_at } : null;
-}
-
-/** État du duo pour la carte du Profil : solo, invitation en attente, en duo. */
+/** État du duo pour les pages serveur : RPC avec le client utilisateur. */
 export async function getDuoState(
   supabase: SupabaseClient<Database>,
   profileId: string,
 ): Promise<DuoState> {
-  const read = await readDuoMembership(supabase, profileId);
-  // Lecture en échec : jamais présentée comme « solo » (C3).
-  if (!read.ok) return { kind: "error" };
-  const membership = read.membership;
-  if (membership) {
-    const { data: partner } = await supabase
-      .from("profiles")
-      .select("id, display_name, accent_color")
-      .eq("id", membership.partnerId)
-      .returns<{ id: string; display_name: string; accent_color: string }[]>()
-      .maybeSingle();
-    return {
-      kind: "duo",
-      duoId: membership.duoId,
-      since: membership.since,
-      partner: partner ?? {
-        id: membership.partnerId,
-        display_name: "Partenaire",
-        accent_color: "",
-      },
-    };
-  }
-  const invitation = await getMyPendingInvitation();
-  return invitation ? { kind: "pending", invitation } : { kind: "solo" };
+  return readDuoState(supabase, await duoRpcClient(), profileId);
 }
 
 export type InvitationPreview = {

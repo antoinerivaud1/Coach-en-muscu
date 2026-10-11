@@ -35,3 +35,9 @@ test("CM-88 : les Stats sans session renvoient à la connexion, avec retour pré
   await expect(page).toHaveURL(/\/login\?next=%2Fprogress$/);
   await expect(page.getByLabel("Email")).toBeVisible();
 });
+
+test("CM-88 : le Profil sans session renvoie à la connexion, avec retour prévu", async ({ page }) => {
+  await page.goto("/profile");
+  await expect(page).toHaveURL(/\/login\?next=%2Fprofile$/);
+  await expect(page.getByLabel("Email")).toBeVisible();
+});

@@ -22,4 +22,33 @@ test.describe("Connexion et profil (CM-59 B)", () => {
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
   });
+
+  test("CM-88 : le Profil est lu et enregistré depuis le navigateur", async ({ page }) => {
+    await login(page, E2E_ACCOUNT.email, E2E_ACCOUNT.password);
+    // Les lectures et l'écriture partent du navigateur (requêtes PostgREST
+    // émises par la page elle-même), sous RLS.
+    const supabaseCalls: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/rest/v1/")) supabaseCalls.push(`${r.method()} ${new URL(r.url()).pathname}`);
+    });
+    await page.goto("/profile");
+    const section = page.getByRole("region", { name: "Mon profil" });
+    await expect(section).toContainText("Prénom");
+    await expect(page.getByRole("region", { name: "Mes données" })).toBeVisible();
+    await expect(page.getByText("Badges", { exact: true })).toBeVisible();
+    expect(supabaseCalls.some((c) => c.startsWith("GET /rest/v1/profiles"))).toBe(true);
+
+    // Enregistrer sans rien changer : écriture refaite à l'identique (aucune
+    // donnée du seed modifiée), confirmation, puis lecture à jour.
+    await section.getByRole("button", { name: "Modifier" }).click();
+    // Objectif courant, lu dans le compteur (`<output>`, nommé « N séances par semaine »).
+    const stepper = section.getByRole("status", { name: /par semaine$/ });
+    const goal = Number(await stepper.textContent());
+    expect(goal).toBeGreaterThan(0);
+    await section.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(section.getByRole("status")).toHaveText("Profil enregistré.");
+    await expect(section.getByRole("button", { name: "Modifier" })).toBeVisible();
+    await expect(section).toContainText(new RegExp(`Objectif par semaine${goal}\\sséances?`));
+    expect(supabaseCalls).toContain("PATCH /rest/v1/profiles");
+  });
 });

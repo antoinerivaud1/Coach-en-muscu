@@ -152,6 +152,34 @@ test.describe("Duo optionnel (CM-87)", () => {
     await expect(page.getByRole("button", { name: "+ Ajouter un exercice" }).first()).toBeVisible();
     await expect(page.getByRole("radiogroup", { name: "Pour qui ?" })).toHaveCount(0);
   });
+
+  test("CM-88 : le Profil suit les actions du duo sans rechargement", async ({ page }) => {
+    await ensureSolo(page, SEED_ACCOUNTS.solo);
+    // Marqueur posé dans la page : il disparaîtrait à un rechargement complet.
+    await page.evaluate(() => ((window as unknown as { cm88: number }).cm88 = 1));
+    const marker = () => page.evaluate(() => (window as unknown as { cm88?: number }).cm88);
+
+    // Invitation créée depuis le Profil, retour par la croix (navigation de
+    // l'app) : le Profil la montre, sans ancien état « solo » en cache.
+    await page
+      .getByRole("region", { name: "S'entraîner à deux" })
+      .getByRole("button", { name: "Inviter mon partenaire" })
+      .click();
+    await expect(page).toHaveURL(/\/duo\/inviter$/);
+    await page.getByRole("link", { name: "Fermer" }).click();
+    await expect(page).toHaveURL(/\/profile$/);
+    await expect(page.getByRole("region", { name: "Invitation en attente" })).toBeVisible();
+
+    // Annulée depuis l'écran d'invitation (page serveur) : le Profil revient
+    // à « solo », sans ancien état « en attente » en cache.
+    await page.getByRole("link", { name: "Partager l'invitation" }).click();
+    await expect(page).toHaveURL(/\/duo\/inviter$/);
+    await page.getByRole("button", { name: "Annuler l'invitation" }).click();
+    await expect(page).toHaveURL(/\/profile$/);
+    await expect(page.getByRole("region", { name: "S'entraîner à deux" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Invitation en attente" })).toHaveCount(0);
+    expect(await marker()).toBe(1);
+  });
 });
 
 /** « Bas du corps », séance type du duo Théo / Lina (seed). */

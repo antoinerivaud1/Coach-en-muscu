@@ -6,6 +6,7 @@ import { acceptInvitation, type DuoActionState } from "@/lib/actions/duo";
 import { MEMBER_COLORS, isMemberColor, DEFAULT_MEMBER_COLOR, type MemberColor } from "@/lib/members";
 import ColorPicker from "@/components/onboarding/ColorPicker";
 import DuoAvatars from "@/components/duo/DuoAvatars";
+import { useDuoAction } from "@/hooks/data/useDuoState";
 
 /**
  * CM-87 : confirmation avant de rejoindre (maquette 9). En cas de conflit de
@@ -26,7 +27,11 @@ export default function ConfirmJoinForm({
   myColor: string;
   colorConflict: boolean;
 }) {
-  const [state, action, pending] = useActionState<DuoActionState, FormData>(acceptInvitation, {});
+  // CM-88 : rejoindre change le duo : cache du navigateur rafraîchi.
+  const [state, action, pending] = useActionState<DuoActionState, FormData>(
+    useDuoAction(acceptInvitation),
+    {},
+  );
   const initial: MemberColor = colorConflict
     ? (MEMBER_COLORS.find((c) => c.value !== inviterColor)?.value ?? DEFAULT_MEMBER_COLOR)
     : isMemberColor(myColor)

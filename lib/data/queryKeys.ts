@@ -16,6 +16,19 @@ export const queryKeys = {
     catalog: (profileId: string) => [profileId, "exercises", "catalog"] as const,
   },
 
+  // ---- CM-88 PR 2 : Profil ---------------------------------------------------
+  /** Toutes les données d'un profil : à invalider après un changement d'identité ou de duo. */
+  all: (profileId: string) => [profileId] as const,
+  profile: {
+    identity: (profileId: string) => [profileId, "profile", "identity"] as const,
+    badges: (profileId: string, weeklyGoal: number) =>
+      [profileId, "profile", "badges", weeklyGoal] as const,
+  },
+  duo: {
+    state: (profileId: string) => [profileId, "duo", "state"] as const,
+  },
+  // ---- fin CM-88 PR 2 ----------------------------------------------------------
+
   // ---- CM-88 PR 3 : Carnet (historique) et Stats (progression) ----
   // Clé de tête `[profileId, "sessions"]` : une écriture de séance (fin,
   // suppression, édition d'une série) n'aura qu'elle à invalider (PR 6).

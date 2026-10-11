@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { DuoState } from "@/lib/queries/duo";
+import type { DuoState } from "@/lib/queries/duoState";
 import { formatInviteExpiry } from "@/lib/duo";
 import { memberAccent } from "@/lib/members";
 import { DUO_READ_ERROR_MESSAGE } from "@/lib/duoMembership";
@@ -12,6 +12,10 @@ import LeaveDuoSheet from "@/components/duo/LeaveDuoSheet";
  * - solo : inviter son partenaire, ou saisir un code reçu ;
  * - invitation en attente : code, lien vers l'écran de partage, annulation ;
  * - en duo : partenaire, puis « Quitter le duo » (feuille de confirmation).
+ *
+ * CM-88 : l'état est lu dans le navigateur (ProfileScreen). Les actions
+ * restent des server actions (PR 7) ; chacune rafraîchit le cache du
+ * navigateur quand elle aboutit (`useDuoAction`).
  */
 export default function DuoSection({
   state,

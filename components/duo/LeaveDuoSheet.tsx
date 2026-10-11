@@ -2,14 +2,19 @@
 
 import { useActionState, useEffect, useId, useState } from "react";
 import { leaveDuo, type DuoActionState } from "@/lib/actions/duo";
+import { useDuoAction } from "@/hooks/data/useDuoState";
 
 /**
  * CM-87 : « Quitter le duo » et sa feuille de confirmation (maquette 11).
  * Pas de `window.confirm` (inerte en PWA iOS, CM-70).
+ * CM-88 : le cache du navigateur est rafraîchi après coup (`useDuoAction`).
  */
 export default function LeaveDuoSheet({ partnerName }: { partnerName: string }) {
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState<DuoActionState, FormData>(leaveDuo, {});
+  const [state, action, pending] = useActionState<DuoActionState, FormData>(
+    useDuoAction(leaveDuo),
+    {},
+  );
   const titleId = useId();
 
   useEffect(() => {

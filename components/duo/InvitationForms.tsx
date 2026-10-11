@@ -6,11 +6,13 @@ import {
   revokeInvitation,
   type DuoActionState,
 } from "@/lib/actions/duo";
+// CM-88 : chaque action rafraîchit le cache du navigateur quand elle aboutit.
+import { useDuoAction } from "@/hooks/data/useDuoState";
 
 /** CM-87 : « Inviter mon partenaire » (crée l'invitation puis l'affiche). */
 export function InviteButton() {
   const [state, action, pending] = useActionState<DuoActionState, FormData>(
-    createInvitation,
+    useDuoAction(createInvitation),
     {},
   );
   return (
@@ -34,7 +36,7 @@ export function InviteButton() {
 /** CM-87 : « Annuler l'invitation ». */
 export function RevokeInvitationButton() {
   const [state, action, pending] = useActionState<DuoActionState, FormData>(
-    revokeInvitation,
+    useDuoAction(revokeInvitation),
     {},
   );
   return (
