@@ -81,7 +81,7 @@ test.describe("Guide des exercices lu côté client (CM-88)", () => {
     await page.goto("/guide");
     await expect(page.getByText(PERSO_SOLO)).toBeVisible();
     const after = await context.cookies();
-    expect(after.find((c) => c.name === "cm_auth_cookie_v")?.value).toBe("2");
+    expect(after.find((c) => c.name === "cm_auth_cookie_v")?.value).toMatch(/^2\./);
     expect(
       after.filter((c) => session.some((s) => s.name === c.name)).every((c) => !c.httpOnly),
     ).toBe(true);
@@ -91,7 +91,7 @@ test.describe("Guide des exercices lu côté client (CM-88)", () => {
     await login(page, SEED_ACCOUNTS.solo.email, SEED_ACCOUNTS.solo.password);
     const context = page.context();
     const all = await context.cookies();
-    expect(all.find((c) => c.name === "cm_auth_cookie_v")?.value).toBe("2");
+    expect(all.find((c) => c.name === "cm_auth_cookie_v")?.value).toMatch(/^2\./);
     // Marqueur conservé, cookies de session redevenus httpOnly.
     await context.clearCookies();
     await context.addCookies(

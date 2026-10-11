@@ -25,30 +25,51 @@ export const AUTH_COOKIE_OPTIONS: CookieOptionsWithName = {
 
 /**
  * CM-88 : le middleware réécrit les cookies de session avec les options
- * actuelles (valeur inchangée), au plus une fois par jour (marqueur ci-dessous,
- * valable 24 h). Trois raisons :
+ * actuelles (valeur inchangée) dès qu'ils ont pu être écrits par quelqu'un
+ * d'autre que lui. Trois cas :
  * - les cookies posés avant CM-88 sont `httpOnly`, invisibles pour le client
  *   navigateur jusqu'au prochain rafraîchissement du jeton ;
  * - après un retour arrière Vercel sur une version d'avant CM-88, ils le
  *   redeviennent ;
  * - Safari (ITP) limite à 7 jours les cookies écrits par le navigateur quand
- *   il rafraîchit lui-même le jeton : la réécriture serveur leur rend 400 jours.
- * Sur `/login` avec une session valide, la réécriture est forcée : c'est là
- * qu'aboutit un écran client qui ne voit pas la session, et sans elle on
- * tournerait entre cet écran et `/login`.
+ *   il rafraîchit lui-même le jeton (séance de plus d'une heure, app ouverte) :
+ *   la réécriture serveur leur rend 400 jours.
+ *
+ * Le marqueur `cm_auth_cookie_v` (httpOnly, posé par le serveur seulement)
+ * retient la version et une empreinte de la session qu'il a écrite. Empreinte
+ * différente (le navigateur a rafraîchi le jeton) ou version différente : on
+ * réécrit à la requête suivante. Sur `/login` avec une session valide, la
+ * réécriture est forcée : c'est là qu'aboutit un écran client qui ne voit pas
+ * la session, et sans elle on tournerait entre cet écran et `/login`.
  */
 export const AUTH_COOKIE_VERSION_COOKIE = "cm_auth_cookie_v";
 export const AUTH_COOKIE_VERSION = "2";
-export const AUTH_COOKIE_REWRITE_MAX_AGE = 24 * 60 * 60;
+
+type NamedCookie = { name: string; value: string };
+
+/** Empreinte courte de la session (fin des valeurs des cookies `sb-…-auth-token*`). */
+export function authCookieFingerprint(cookies: NamedCookie[]): string {
+  const joined = cookies
+    .filter((c) => hasSupabaseAuthCookie([c.name]) && c.value)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((c) => c.value)
+    .join("");
+  return joined.slice(-16);
+}
+
+/** Valeur du marqueur pour ces cookies de session : `<version>.<empreinte>`. */
+export function authCookieMarker(cookies: NamedCookie[]): string {
+  return `${AUTH_COOKIE_VERSION}.${authCookieFingerprint(cookies)}`;
+}
 
 /** Faut-il réécrire les cookies de session avec les options actuelles ? */
 export function needsAuthCookieRewrite(
-  names: string[],
-  versionValue: string | null | undefined,
+  cookies: NamedCookie[],
+  markerValue: string | null | undefined,
   options: { force?: boolean } = {},
 ): boolean {
-  if (!hasSupabaseAuthCookie(names)) return false;
-  return options.force === true || versionValue !== AUTH_COOKIE_VERSION;
+  if (!hasSupabaseAuthCookie(cookies.map((c) => c.name))) return false;
+  return options.force === true || markerValue !== authCookieMarker(cookies);
 }
 
 export function authEnv(): { url: string; anonKey: string } {

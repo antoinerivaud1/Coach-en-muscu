@@ -12,6 +12,8 @@ import {
 import {
   AUTH_COOKIE_OPTIONS,
   AUTH_COOKIE_VERSION,
+  authCookieFingerprint,
+  authCookieMarker,
   hasSupabaseAuthCookie,
   needsAuthCookieRewrite,
 } from "@/lib/supabase/auth-config";
@@ -203,16 +205,30 @@ test.describe("Cookies de session lisibles par le navigateur (CM-88)", () => {
     expect(AUTH_COOKIE_OPTIONS.sameSite).toBe("lax");
   });
 
-  test("needsAuthCookieRewrite : seulement avec une session et sans marqueur à jour", () => {
-    expect(needsAuthCookieRewrite(["sb-abc-auth-token"], undefined)).toBe(true);
-    expect(needsAuthCookieRewrite(["sb-abc-auth-token.0"], "1")).toBe(true);
-    expect(needsAuthCookieRewrite(["sb-abc-auth-token"], AUTH_COOKIE_VERSION)).toBe(false);
-    expect(needsAuthCookieRewrite(["cm_profile"], undefined)).toBe(false);
-    expect(needsAuthCookieRewrite([], null)).toBe(false);
+  const session = [
+    { name: "sb-abc-auth-token.0", value: "base64-aaaaaaaaaaaaaaaaaaaa" },
+    { name: "sb-abc-auth-token.1", value: "bbbbbbbbbbbbbbbb1234" },
+  ];
+
+  test("authCookieMarker : version et fin des valeurs de session, dans l'ordre des noms", () => {
+    expect(authCookieMarker(session)).toBe(`${AUTH_COOKIE_VERSION}.bbbbbbbbbbbb1234`);
+    expect(authCookieMarker([...session].reverse())).toBe(authCookieMarker(session));
+    expect(authCookieFingerprint([{ name: "cm_profile", value: "x" }])).toBe("");
   });
 
-  test("needsAuthCookieRewrite : forcé (sur /login) même avec le marqueur, jamais sans session", () => {
-    expect(needsAuthCookieRewrite(["sb-abc-auth-token"], AUTH_COOKIE_VERSION, { force: true })).toBe(true);
-    expect(needsAuthCookieRewrite(["cm_profile"], AUTH_COOKIE_VERSION, { force: true })).toBe(false);
+  test("needsAuthCookieRewrite : sans marqueur, ou session changée par le navigateur", () => {
+    const marker = authCookieMarker(session);
+    expect(needsAuthCookieRewrite(session, undefined)).toBe(true);
+    expect(needsAuthCookieRewrite(session, "2")).toBe(true);
+    expect(needsAuthCookieRewrite(session, marker)).toBe(false);
+    // Jeton rafraîchi dans le navigateur (cookie plafonné à 7 jours par Safari).
+    const refreshed = [session[0]!, { ...session[1]!, value: "cccccccccccccccc9999" }];
+    expect(needsAuthCookieRewrite(refreshed, marker)).toBe(true);
+  });
+
+  test("needsAuthCookieRewrite : forcé (sur /login) même à jour, jamais sans session", () => {
+    expect(needsAuthCookieRewrite(session, authCookieMarker(session), { force: true })).toBe(true);
+    expect(needsAuthCookieRewrite([{ name: "cm_profile", value: "x" }], undefined, { force: true })).toBe(false);
+    expect(needsAuthCookieRewrite([], null)).toBe(false);
   });
 });
