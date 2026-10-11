@@ -49,7 +49,7 @@ export async function startSessionFromDay(
       return { ok: false, error: `${SEANCE_NOT_FOUND} : impossible de démarrer.` };
     }
 
-    // Contrôle d'accès commun à la suppression (lib/data/seances.ts).
+    // Contrôle d'accès des séances types (lib/data/seances.ts).
     const access = await checkSeanceAccess(supabase, day.program_id, profileId, "Démarrage annulé.");
     if (!access.ok) return access;
 

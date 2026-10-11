@@ -16,7 +16,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(65);
+select plan(84);
 
 -- ---------------------------------------------------------------------------
 -- Données de test (postgres)
@@ -74,18 +74,20 @@ grant execute on function pg_temp.cm88_exs(uuid) to authenticated;
 -- 1. Structure et droits
 -- ---------------------------------------------------------------------------
 
-select ok((select count(*) = 3 and bool_and(not p.prosecdef and p.proconfig @> array['search_path=""'])
+select ok((select count(*) = 4 and bool_and(not p.prosecdef and p.proconfig @> array['search_path=""'])
            from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public'
-             and p.proname in ('save_seance', 'duplicate_seance', 'move_seance')),
-          '1. trois RPC, security invoker, search_path vide');
+             and p.proname in ('save_seance', 'duplicate_seance', 'move_seance', 'delete_seance')),
+          '1. quatre RPC, security invoker, search_path vide');
 select ok(has_function_privilege('authenticated', 'public.save_seance(uuid, text, jsonb, text, text)', 'execute')
           and has_function_privilege('authenticated', 'public.duplicate_seance(uuid)', 'execute')
-          and has_function_privilege('authenticated', 'public.move_seance(uuid, text)', 'execute'),
+          and has_function_privilege('authenticated', 'public.move_seance(uuid, text)', 'execute')
+          and has_function_privilege('authenticated', 'public.delete_seance(uuid)', 'execute'),
           '1. authenticated exécute les RPC');
 select ok(not has_function_privilege('anon', 'public.save_seance(uuid, text, jsonb, text, text)', 'execute')
           and not has_function_privilege('anon', 'public.duplicate_seance(uuid)', 'execute')
-          and not has_function_privilege('anon', 'public.move_seance(uuid, text)', 'execute'),
+          and not has_function_privilege('anon', 'public.move_seance(uuid, text)', 'execute')
+          and not has_function_privilege('anon', 'public.delete_seance(uuid)', 'execute'),
           '1. anon n''exécute aucune RPC');
 select is((select count(*)::int from pg_policies where schemaname = 'public'), 22,
           '1. toujours 22 policies dans public');
@@ -329,6 +331,97 @@ select lives_ok($$
 select ok((select owner_profile_id = 'cccccccc-8888-0000-0000-0000000000f1' and duo_id is null
            from public.programs where id = (select program_id from t_res where k = 'p1')),
           '6. rangée dans sa bibliothèque perso');
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- 7. Duo : partager une séance perso, exercices du partenaire, actions de C
+-- ---------------------------------------------------------------------------
+
+insert into public.exercises (id, name, muscle_group, owner_profile_id) values
+  ('cccccccc-8888-0000-0000-000000000e23', 'CM-88 perso B 3', 'other', 'cccccccc-8888-0000-0000-0000000000b1'),
+  ('cccccccc-8888-0000-0000-000000000e41', 'CM-88 perso C', 'other', 'cccccccc-8888-0000-0000-0000000000c1');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"cccccccc-8888-0000-0000-0000000000b1","role":"authenticated"}';
+select lives_ok($$
+  insert into t_res select 'b4', * from public.save_seance(null, 'Perso quatre',
+    '[{"exercise_id":"cccccccc-8888-0000-0000-000000000e23","target_sets":3,"target_reps_min":8,"target_reps_max":12,"rest_seconds":90}]'::jsonb,
+    'perso') $$, '7. B crée « Perso quatre » pour lui, avec son exercice perso');
+select ok((select owner_profile_id = 'cccccccc-8888-0000-0000-0000000000b1' and duo_id is null
+           from public.exercises where id = 'cccccccc-8888-0000-0000-000000000e23'),
+          '7. son exercice reste perso tant que la séance est perso');
+select lives_ok($$
+  insert into t_res select 'b4d', * from public.save_seance((select day_id from t_res where k = 'b4'), 'Perso quatre',
+    '[{"exercise_id":"cccccccc-8888-0000-0000-000000000e23","target_sets":3,"target_reps_min":8,"target_reps_max":12,"rest_seconds":90}]'::jsonb,
+    'duo', 'perso') $$, '7. B la partage avec C');
+select ok((select program_id = (select program_id from t_res where k = 'b1') from t_res where k = 'b4d'),
+          '7. la séance est dans « Nos séances »');
+select ok((select owner_profile_id is null and duo_id = 'cccccccc-8888-0000-0000-0000000000d1'
+           from public.exercises where id = 'cccccccc-8888-0000-0000-000000000e23'),
+          '7. son exercice perso devient un exercice du duo');
+select throws_ok($$ select * from public.save_seance((select day_id from t_res where k = 'b1'), 'Duo un',
+                   '[{"exercise_id":"cccccccc-8888-0000-0000-000000000e41","target_sets":3,"target_reps_min":8,"target_reps_max":12,"rest_seconds":90}]') $$,
+                 'P0001', 'cm88:exercise_not_in_catalog', '7. exercice perso de C refusé dans une séance de B');
+select is(pg_temp.cm88_exs((select day_id from t_res where k = 'b1')),
+          array['e01:0:4:6:8:150', 'e21:1:3:8:12:90'], '7. « Duo un » intacte après le refus');
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"cccccccc-8888-0000-0000-0000000000c1","role":"authenticated"}';
+select lives_ok($$ insert into t_res (k, day_id) select 'c1', public.duplicate_seance((select day_id from t_res where k = 'b1')) $$,
+                '7. C duplique « Duo un » (séance du duo)');
+select is((select program_id from public.program_days where id = (select day_id from t_res where k = 'c1')),
+          (select program_id from t_res where k = 'b1'), '7. la copie reste dans « Nos séances »');
+select lives_ok($$ select public.move_seance((select day_id from t_res where k = 'c1'), 'up') $$,
+                '7. C monte la copie');
+select is((select array_agg(name order by order_index) from public.program_days
+           where program_id = (select program_id from t_res where k = 'b1')),
+          array['Duo un', 'Duo deux', 'Duo un (copie)', 'Perso quatre'], '7. ordre de « Nos séances » réécrit pour les deux');
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- 8. Suppression (delete_seance)
+-- ---------------------------------------------------------------------------
+
+-- C a TERMINÉ « Duo un » avec une série : historique.
+insert into public.sessions (id, profile_id, program_day_id, duration_seconds)
+  values ('cccccccc-8888-0000-0000-00000000c5e2', 'cccccccc-8888-0000-0000-0000000000c1',
+          (select day_id from t_res where k = 'b1'), 1800);
+insert into public.session_sets (session_id, exercise_id, set_index, weight_kg, reps)
+  values ('cccccccc-8888-0000-0000-00000000c5e2', 'cccccccc-8888-0000-0000-000000000e01', 1, 40, 8);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"cccccccc-8888-0000-0000-0000000000b1","role":"authenticated"}';
+select throws_ok($$ select public.delete_seance((select day_id from t_res where k = 'b1')) $$,
+                 'P0001', 'cm88:seance_has_history', '8. B : refus, C a déjà fait cette séance');
+select is((select count(*)::int from public.program_days where id = (select day_id from t_res where k = 'b1')),
+          1, '8. rien de supprimé');
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"cccccccc-8888-0000-0000-0000000000e1","role":"authenticated"}';
+select throws_ok($$ select public.delete_seance((select day_id from t_res where k = 'c1')) $$,
+                 'P0001', 'cm88:seance_not_found', '8. X : suppression d''une séance du duo refusée');
+reset role;
+select is((select count(*)::int from public.program_days where id = (select day_id from t_res where k = 'c1')),
+          1, '8. la copie de C est toujours là');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"cccccccc-8888-0000-0000-0000000000b1","role":"authenticated"}';
+select lives_ok($$ select public.delete_seance((select day_id from t_res where k = 'c1')) $$,
+                '8. B supprime la copie faite par C (aucun historique)');
+select is((select count(*)::int from public.program_days where id = (select day_id from t_res where k = 'c1')),
+          0, '8. supprimée');
+-- La séance de C en cours (cas 5, sans série ni fin) ne bloque pas : copie
+-- perso de B (« Duo un » du cas 5) supprimable.
+select lives_ok($$ select public.delete_seance((select day_id from t_res where k = 'b1c')) $$,
+                '8. B supprime sa copie perso (jamais faite)');
+reset role;
+
+set local role anon;
+set local request.jwt.claims = '{"role":"anon"}';
+select throws_ok($$ select public.delete_seance('cccccccc-8888-0000-0000-000000000000') $$, '42501', null,
+                 '8. anon : delete_seance refusé');
 reset role;
 
 select * from finish();

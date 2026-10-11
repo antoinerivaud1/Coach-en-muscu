@@ -2,7 +2,6 @@ import type { BrowserSupabase } from "@/lib/supabase/client";
 import { isUuid } from "@/lib/auth/core";
 import {
   canAccessProgram,
-  countLoggedSessionsForDay,
   getDayWithExercises,
   getPersonalProgramId,
   getProgramDayNames,
@@ -32,7 +31,7 @@ import {
   type MuscleGroup,
   type SeanceDraftExercise,
 } from "@/lib/utils/seances";
-import { REFUSED_MESSAGE, touchedRows, writeErrorMessage } from "@/lib/supabase/rlsErrors";
+import { REFUSED_MESSAGE, writeErrorMessage } from "@/lib/supabase/rlsErrors";
 
 /**
  * CM-88 (PR 5) : séances types côté client (bibliothèque `/seances` et
@@ -40,10 +39,10 @@ import { REFUSED_MESSAGE, touchedRows, writeErrorMessage } from "@/lib/supabase/
  *
  * - Lectures : `fetchSeanceLibrary`, `fetchSeanceEditor` (une lecture
  *   essentielle en échec LÈVE, l'écran propose « Réessayer »).
- * - Écritures : `saveSeance`, `duplicateSeance`, `moveSeance` passent par des
- *   RPC atomiques (supabase/migrations/20261011200000_cm88_seances_types.sql) :
- *   tout ou rien, même si le réseau coupe. `deleteSeance` reste une requête
- *   unique sous RLS. Convention de ce fichier : une écriture ne lève jamais,
+ * - Écritures : `saveSeance`, `duplicateSeance`, `moveSeance`, `deleteSeance`
+ *   passent par des RPC atomiques
+ *   (supabase/migrations/20261011200000_cm88_seances_types.sql) : tout ou
+ *   rien, même si le réseau coupe. Convention de ce fichier : une écriture ne lève jamais,
  *   elle renvoie `{ ok: true, … } | { ok: false, error }` avec un message en
  *   français prêt à être affiché (mêmes textes que les server actions
  *   qu'elles remplacent, ex-app/seances/actions.ts).
@@ -71,8 +70,8 @@ export const SEANCE_COPIED_NOTICE =
  * Les ids de séance arrivent de l'URL ou de l'écran. La RLS (CM-59 B) refuse
  * déjà d'agir sur la séance d'un autre duo ; cette vérification reste en
  * place (ceinture et bretelles). Une séance inaccessible renvoie le même
- * message qu'une séance inexistante (CM-80). Partagée par la suppression et
- * le démarrage d'une séance (lib/data/sessionStart.ts).
+ * message qu'une séance inexistante (CM-80). Utilisée par le démarrage d'une
+ * séance (lib/data/sessionStart.ts) ; les RPC font le même contrôle en base.
  *
  * `cancelled` complète le message quand la vérification elle-même échoue :
  * l'action est alors refusée, jamais autorisée par défaut.
@@ -413,6 +412,7 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
   name_too_long: `${SEANCE_NAME_MAX_LENGTH} caractères maximum`,
   name_taken: "Ce nom existe déjà dans tes séances",
   seance_not_in_library: "Séance introuvable dans la bibliothèque : réordonnancement annulé.",
+  seance_has_history: "Impossible de supprimer cette séance : elle a déjà été réalisée.",
   refused: REFUSED_MESSAGE,
 };
 
@@ -422,13 +422,18 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
  * sinon le message tel quel (comme les server actions remplacées).
  */
 export function seanceRpcErrorMessage(
-  error: { code?: string | null; message: string },
+  error: { code?: string | null; message: string; details?: string | null },
   context: { name?: string } = {},
 ): string {
   const code = /cm88:([a-z_]+)/.exec(error.message ?? "")?.[1];
   if (code) {
     if (code === "name_taken" && context.name) {
       return `« ${context.name} » existe déjà dans tes séances`;
+    }
+    if (code === "seance_has_history") {
+      // Le nombre de séances réalisées arrive dans le détail de l'erreur.
+      const n = Number.parseInt(error.details ?? "", 10);
+      return seanceHistoryMessage(context.name ?? "cette séance", Number.isFinite(n) && n > 0 ? n : 1);
     }
     const message = RPC_ERROR_MESSAGES[code];
     if (message) return message;
@@ -606,63 +611,35 @@ export async function moveSeance(
 }
 
 /**
- * Supprime une séance type (une seule écriture, sous RLS).
+ * Message du refus de suppression d'une séance type déjà réalisée (`n`
+ * séances terminées avec séries, partenaire compris).
+ */
+export function seanceHistoryMessage(name: string, n: number): string {
+  return (
+    `Impossible de supprimer « ${name} » : ${n} séance${n > 1 ? "s" : ""} ` +
+    `déjà réalisée${n > 1 ? "s" : ""} y ${n > 1 ? "sont rattachées" : "est rattachée"}. ` +
+    "La supprimer détacherait cet historique. Renomme-la ou vide-la de ses exercices."
+  );
+}
+
+/**
+ * Supprime une séance type (`delete_seance`, atomique).
  *
  * `sessions.program_day_id` est en ON DELETE SET NULL : supprimer une séance
  * déjà réalisée ne supprimerait pas l'historique mais le détacherait en
- * silence (les séances passées perdraient leur nom). On bloque donc la
- * suppression dès qu'au moins une séance a réellement été loggée dessus. Les
- * sessions vides (aucune série enregistrée) ne bloquent pas.
+ * silence (les séances passées perdraient leur nom). La RPC refuse donc la
+ * suppression dès qu'au moins une séance terminée avec des séries y est
+ * rattachée, dans la même transaction que la suppression. Les séances vides
+ * ou en cours ne bloquent pas. `name` : nom affiché, repris dans le message.
  */
 export async function deleteSeance(
   supabase: BrowserSupabase,
-  profileId: string,
   dayId: string,
+  name: string,
 ): Promise<SeanceWriteResult> {
   try {
-    const { data: day, error: dayError } = await supabase
-      .from("program_days")
-      .select("id, name, program_id")
-      .eq("id", dayId)
-      .returns<{ id: string; name: string; program_id: string }[]>()
-      .maybeSingle();
-    if (dayError) return { ok: false, error: dayError.message };
-    if (!day) return { ok: false, error: SEANCE_NOT_FOUND };
-
-    const access = await checkSeanceAccess(supabase, day.program_id, profileId, "Suppression annulée.");
-    if (!access.ok) return access;
-
-    const logged = await countLoggedSessionsForDay(supabase, dayId);
-    // Comptage impossible : on refuse la suppression plutôt que de détacher un
-    // historique par défaut (CM-70).
-    if (!logged.ok) {
-      return {
-        ok: false,
-        error:
-          `Impossible de vérifier l'historique de « ${day.name} » (${logged.error}). ` +
-          "Suppression annulée par sécurité.",
-      };
-    }
-    if (logged.count > 0) {
-      const n = logged.count;
-      return {
-        ok: false,
-        error:
-          `Impossible de supprimer « ${day.name} » : ${n} séance${n > 1 ? "s" : ""} ` +
-          `déjà réalisée${n > 1 ? "s" : ""} y ${n > 1 ? "sont rattachées" : "est rattachée"}. ` +
-          "La supprimer détacherait cet historique. Renomme-la ou vide-la de ses exercices.",
-      };
-    }
-
-    // CM-59 B : sous RLS, un delete refusé touche 0 ligne sans erreur.
-    const { data: deleted, error } = await supabase
-      .from("program_days")
-      .delete()
-      .eq("id", dayId)
-      .select("id");
-    if (error) return { ok: false, error: writeErrorMessage(error) };
-    if (!touchedRows(deleted)) return { ok: false, error: REFUSED_MESSAGE };
-    return { ok: true };
+    const { error } = await supabase.rpc("delete_seance", { p_day_id: dayId });
+    return error ? { ok: false, error: seanceRpcErrorMessage(error, { name }) } : { ok: true };
   } catch (e) {
     return { ok: false, error: thrownMessage(e) };
   }

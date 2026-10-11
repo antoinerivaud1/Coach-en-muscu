@@ -76,7 +76,7 @@ export default function SeanceLibrary({
    * confirmation est désormais rendue dans le DOM (voir `confirmingId`).
    */
   function handleDelete(seance: SeanceView) {
-    void run(seance.id, { kind: "delete", dayId: seance.id });
+    void run(seance.id, { kind: "delete", dayId: seance.id, name: seance.name });
   }
 
   return (

@@ -27,6 +27,18 @@ test.describe("seanceRpcErrorMessage", () => {
     );
   });
 
+  test("suppression refusée : nom et nombre de séances réalisées (détail de l'erreur)", () => {
+    expect(
+      seanceRpcErrorMessage({ message: "cm88:seance_has_history", details: "2" }, { name: "Push" }),
+    ).toBe(
+      "Impossible de supprimer « Push » : 2 séances déjà réalisées y sont rattachées. " +
+        "La supprimer détacherait cet historique. Renomme-la ou vide-la de ses exercices.",
+    );
+    expect(
+      seanceRpcErrorMessage({ message: "cm88:seance_has_history", details: "1" }, { name: "Push" }),
+    ).toContain("1 séance déjà réalisée y est rattachée");
+  });
+
   test("erreurs du duo (set_seance_shared) : messages de lib/duo", () => {
     expect(seanceRpcErrorMessage({ message: "cm87:name_taken" })).toBe(
       "Une séance porte déjà ce nom de l'autre côté : renomme-la d'abord.",

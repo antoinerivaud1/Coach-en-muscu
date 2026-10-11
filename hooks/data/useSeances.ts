@@ -23,7 +23,17 @@ import {
  */
 
 async function invalidateAfterSeanceWrite(queryClient: QueryClient, profileId: string) {
-  await queryClient.invalidateQueries({ queryKey: queryKeys.sessions.all(profileId) });
+  // L'éditeur encore ouvert n'est PAS relu : sa relecture ferait sauter le
+  // nom affiché (la séance enregistrée compterait parmi les noms pris, d'où
+  // « … 2 ») et retarderait le retour à la bibliothèque. Il n'est jamais
+  // servi depuis le cache (staleTime 0, gcTime 0) : il repart de la base à
+  // la prochaine ouverture.
+  const editorRoot = queryKeys.seances.editor(profileId, null).slice(0, 4);
+  await queryClient.invalidateQueries({
+    queryKey: queryKeys.sessions.all(profileId),
+    predicate: (query) =>
+      !editorRoot.every((part, i) => query.queryKey[i] === part),
+  });
 }
 
 /** Bibliothèque « Mes séances » / « Nos séances ». */
@@ -71,7 +81,7 @@ export function useSaveSeance(profileId: string | null) {
 
 export type SeanceLibraryAction =
   | { kind: "duplicate"; dayId: string }
-  | { kind: "delete"; dayId: string }
+  | { kind: "delete"; dayId: string; name: string }
   | { kind: "move"; dayId: string; direction: "up" | "down" };
 
 /**
@@ -88,7 +98,7 @@ export function useSeanceLibraryAction(profileId: string | null) {
         case "duplicate":
           return duplicateSeance(supabase, action.dayId);
         case "delete":
-          return deleteSeance(supabase, profileId!, action.dayId);
+          return deleteSeance(supabase, action.dayId, action.name);
         case "move":
           return moveSeance(supabase, action.dayId, action.direction);
       }

@@ -516,6 +516,7 @@ export type Database = {
       }
       duplicate_seance: { Args: { p_day_id: string }; Returns: string }
       move_seance: { Args: { p_day_id: string; p_direction: "up" | "down" }; Returns: undefined }
+      delete_seance: { Args: { p_day_id: string }; Returns: undefined }
       can_access_program: { Args: { p_program_id: string }; Returns: boolean }
       is_duo_member: { Args: { p_duo_id: string }; Returns: boolean }
       my_duo_id: { Args: never; Returns: string }

@@ -11,8 +11,7 @@
 --     -> (day_id, program_id, copied)    création / édition d'une séance type
 --   duplicate_seance(p_day_id) -> uuid   copie « <nom> (copie) » en fin de liste
 --   move_seance(p_day_id, p_direction)   monter / descendre dans la bibliothèque
---
--- La suppression reste une requête unique sous RLS (lib/data/seances.ts).
+--   delete_seance(p_day_id)              suppression, refusée si historique
 --
 -- SECURITY INVOKER (défaut) : la RLS de CM-59 s'applique à chaque lecture et
 -- écriture, exactement comme pour les server actions qu'elles remplacent
@@ -50,7 +49,7 @@
 -- invalid_input, stale_duo, no_exercises, exercise_invalid,
 -- exercise_duplicate, exercise_bounds, reps_order, exercise_not_in_catalog,
 -- seance_not_found, share_unreadable, name_required, name_too_long,
--- name_taken, seance_not_in_library, refused. Celles de set_seance_shared
+-- name_taken, seance_not_in_library, seance_has_history, refused. Celles de set_seance_shared
 -- (`cm87:<code>`) remontent telles quelles.
 --
 -- Fonctions NOUVELLES uniquement : aucune table, policy ni fonction
@@ -390,18 +389,70 @@ begin
 end;
 $function$;
 
--- 4. Droits --------------------------------------------------------------------------
+-- 4. Suppression ---------------------------------------------------------------------
+-- `sessions.program_day_id` est en ON DELETE SET NULL : supprimer une séance
+-- type déjà réalisée détacherait en silence l'historique (les séances passées
+-- perdraient leur nom). Refus dès qu'au moins une séance TERMINÉE
+-- (`duration_seconds` renseigné, CM-83) avec des séries y est rattachée,
+-- celles du partenaire comprises (lues sous RLS, comme l'ancien garde-fou).
+-- Le nombre de séances part dans le DETAIL de l'erreur (message côté app).
+-- Contrôle et suppression dans la même transaction, séance verrouillée :
+-- une séance démarrée entre-temps sur cette séance type attend la fin.
+
+create or replace function public.delete_seance(p_day_id uuid)
+ returns void
+ language plpgsql
+ security invoker
+ set search_path to ''
+as $function$
+declare
+  v_me uuid := auth.uid();
+  v_day public.program_days;
+  v_logged int;
+begin
+  if v_me is null then raise exception 'cm88:not_authenticated' using errcode = 'P0001'; end if;
+  select d.* into v_day from public.program_days d where d.id = p_day_id;
+  if v_day.id is null or not public.can_access_program(v_day.program_id) then
+    raise exception 'cm88:seance_not_found' using errcode = 'P0001';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('cm88:program:' || v_day.program_id::text, 0));
+  -- Verrou de la ligne : un insert de séance qui la référence (FOR KEY
+  -- SHARE) attend la fin de la suppression, puis échoue proprement.
+  perform 1 from public.program_days d where d.id = v_day.id for update;
+  if not found then
+    raise exception 'cm88:seance_not_found' using errcode = 'P0001';
+  end if;
+
+  select count(*)::int into v_logged
+    from public.sessions s
+    where s.program_day_id = v_day.id
+      and s.duration_seconds is not null
+      and exists (select 1 from public.session_sets ss where ss.session_id = s.id);
+  if v_logged > 0 then
+    raise exception 'cm88:seance_has_history'
+      using errcode = 'P0001', detail = v_logged::text;
+  end if;
+
+  -- Sous RLS, un delete refusé touche 0 ligne sans erreur.
+  delete from public.program_days d where d.id = v_day.id;
+  if not found then raise exception 'cm88:refused' using errcode = 'P0001'; end if;
+end;
+$function$;
+
+-- 5. Droits --------------------------------------------------------------------------
 -- EXECUTE à PUBLIC est un défaut global de PostgreSQL (voir CM-59) : revoke
 -- explicite, puis `authenticated` seulement.
 
 revoke all on function
   public.save_seance(uuid, text, jsonb, text, text),
   public.duplicate_seance(uuid),
-  public.move_seance(uuid, text)
+  public.move_seance(uuid, text),
+  public.delete_seance(uuid)
   from public, anon, service_role;
 
 grant execute on function
   public.save_seance(uuid, text, jsonb, text, text),
   public.duplicate_seance(uuid),
-  public.move_seance(uuid, text)
+  public.move_seance(uuid, text),
+  public.delete_seance(uuid)
   to authenticated;

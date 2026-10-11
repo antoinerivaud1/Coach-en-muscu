@@ -164,6 +164,52 @@ test.describe("Séances types depuis le navigateur (CM-88, PR 5)", () => {
     await expect(page.getByText(name)).toHaveCount(0);
   });
 
+  test("une séance type déjà réalisée ne se supprime pas", async ({ page }) => {
+    // « Haut du corps » (seed) : Théo l'a déjà terminée avec des séries.
+    await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
+    const rpc: string[] = [];
+    page.on("request", (req) => {
+      if (req.url().includes("/rest/v1/rpc/delete_seance")) rpc.push(req.url());
+    });
+    await page.goto("/seances");
+    const ours = page.getByRole("region", { name: "Nos séances" });
+    const card = ours.locator("section").filter({ hasText: "Haut du corps" });
+    await card.getByRole("button", { name: "Supprimer", exact: true }).click();
+    await card.getByRole("button", { name: "Oui, supprimer" }).click();
+    await expect(card.getByRole("alert")).toContainText(
+      /Impossible de supprimer « Haut du corps » : \d+ séances? déjà réalisées? y (est|sont) rattachées?/,
+    );
+    expect(rpc.length).toBe(1);
+    await page.reload();
+    await expect(ours.locator("section").filter({ hasText: "Haut du corps" })).toHaveCount(1);
+  });
+
+  test("duo : une séance « Pour nous deux » est visible et supprimable par le partenaire", async ({ page }) => {
+    const name = `E2E duo ${Date.now().toString(36)}`;
+    await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
+    await page.goto("/seances/new");
+    await expect(
+      page.getByRole("radiogroup", { name: "Pour qui ?" }).getByRole("radio", { name: "Pour nous deux" }),
+    ).toHaveAttribute("aria-checked", "true");
+    await addExercise(page, "Développé couché barre");
+    await setName(page, name);
+    await page.getByRole("button", { name: /Enregistrer la séance/ }).click();
+    await expect(page).toHaveURL(/\/seances$/);
+    await expect(page.getByRole("region", { name: "Nos séances" })).toContainText(name);
+    await expect(page.getByRole("region", { name: "Mes séances" })).not.toContainText(name);
+
+    // Lina la voit dans « Nos séances » et sur son accueil, puis la supprime.
+    await page.context().clearCookies();
+    await login(page, SEED_ACCOUNTS.elle.email, SEED_ACCOUNTS.elle.password);
+    await expect(page.getByRole("button").filter({ hasText: name }).first()).toBeVisible();
+    await page.goto("/seances");
+    const ours = page.getByRole("region", { name: "Nos séances" });
+    const card = ours.locator("section").filter({ hasText: name });
+    await card.getByRole("button", { name: "Supprimer", exact: true }).click();
+    await card.getByRole("button", { name: "Oui, supprimer" }).click();
+    await expect(ours.locator("section").filter({ hasText: name })).toHaveCount(0);
+  });
+
   test("une séance inaccessible ne s'ouvre pas dans l'éditeur", async ({ page }) => {
     // « Full body », séance perso de Solo (seed), ouverte par Théo.
     await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
