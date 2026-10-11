@@ -15,3 +15,10 @@ test("une page privée sans session renvoie à la connexion, avec retour prévu"
   await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
   await expect(page.getByLabel("Email")).toBeVisible();
 });
+
+test("CM-88 : un écran client sans session renvoie à la connexion, avec retour prévu", async ({ page }) => {
+  await page.goto("/guide");
+  // Redirection faite dans le navigateur (useRequireProfileId), même URL qu'avant.
+  await expect(page).toHaveURL(/\/login\?next=%2Fguide$/);
+  await expect(page.getByLabel("Email")).toBeVisible();
+});

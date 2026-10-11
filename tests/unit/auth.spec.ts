@@ -9,7 +9,12 @@ import {
   validateLoginInput,
   validatePasswordCreation,
 } from "@/lib/auth/core";
-import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-config";
+import {
+  AUTH_COOKIE_OPTIONS,
+  AUTH_COOKIE_VERSION,
+  hasSupabaseAuthCookie,
+  needsAuthCookieRewrite,
+} from "@/lib/supabase/auth-config";
 
 // Tests unitaires purs (CM-58) : aucun navigateur, aucun appel Supabase.
 
@@ -188,5 +193,21 @@ test.describe("divers (CM-58)", () => {
     expect(hasSupabaseAuthCookie(["cm_profile"])).toBe(false);
     expect(hasSupabaseAuthCookie(["sb-abc-auth-token"])).toBe(true);
     expect(hasSupabaseAuthCookie(["sb-abc-auth-token.0", "sb-abc-auth-token.1"])).toBe(true);
+  });
+});
+
+test.describe("Cookies de session lisibles par le navigateur (CM-88)", () => {
+  test("les options ne sont plus httpOnly, toujours path / et sameSite lax", () => {
+    expect(AUTH_COOKIE_OPTIONS.httpOnly).toBe(false);
+    expect(AUTH_COOKIE_OPTIONS.path).toBe("/");
+    expect(AUTH_COOKIE_OPTIONS.sameSite).toBe("lax");
+  });
+
+  test("needsAuthCookieRewrite : seulement avec une session et sans marqueur à jour", () => {
+    expect(needsAuthCookieRewrite(["sb-abc-auth-token"], undefined)).toBe(true);
+    expect(needsAuthCookieRewrite(["sb-abc-auth-token.0"], "1")).toBe(true);
+    expect(needsAuthCookieRewrite(["sb-abc-auth-token"], AUTH_COOKIE_VERSION)).toBe(false);
+    expect(needsAuthCookieRewrite(["cm_profile"], undefined)).toBe(false);
+    expect(needsAuthCookieRewrite([], null)).toBe(false);
   });
 });

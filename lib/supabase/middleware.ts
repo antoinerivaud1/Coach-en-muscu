@@ -10,7 +10,14 @@ import {
   onboardingRedirectTarget,
   type OnboardingState,
 } from "@/lib/onboarding";
-import { AUTH_COOKIE_OPTIONS, authEnv, hasSupabaseAuthCookie } from "./auth-config";
+import {
+  AUTH_COOKIE_OPTIONS,
+  AUTH_COOKIE_VERSION,
+  AUTH_COOKIE_VERSION_COOKIE,
+  authEnv,
+  hasSupabaseAuthCookie,
+  needsAuthCookieRewrite,
+} from "./auth-config";
 
 /**
  * CM-58 : rafraîchit la session Supabase à chaque requête (motif officiel
@@ -60,6 +67,30 @@ export async function updateSession(request: NextRequest) {
   // sinon déconnexions aléatoires). getClaims valide le JWT et le rafraîchit
   // si besoin, via setAll ci-dessus.
   const { data: claimsData } = await supabase.auth.getClaims();
+
+  // CM-88 : anciens cookies `httpOnly` réécrits une fois, lisibles par le
+  // client navigateur dès cette réponse (sinon les écrans client se croiraient
+  // déconnectés jusqu'au prochain rafraîchissement du jeton).
+  const requestCookies = request.cookies.getAll();
+  if (
+    claimsData &&
+    needsAuthCookieRewrite(
+      requestCookies.map((c) => c.name),
+      request.cookies.get(AUTH_COOKIE_VERSION_COOKIE)?.value,
+    )
+  ) {
+    for (const c of requestCookies) {
+      if (!hasSupabaseAuthCookie([c.name]) || supabaseResponse.cookies.get(c.name)) continue;
+      supabaseResponse.cookies.set(c.name, c.value, AUTH_COOKIE_OPTIONS);
+    }
+    supabaseResponse.cookies.set(AUTH_COOKIE_VERSION_COOKIE, AUTH_COOKIE_VERSION, {
+      path: "/",
+      sameSite: "lax",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 400 * 24 * 60 * 60,
+    });
+  }
 
   // CM-86 : onboarding pas terminé => /onboarding.
   const userId = claimsData?.claims?.sub;
