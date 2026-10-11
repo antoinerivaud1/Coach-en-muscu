@@ -60,6 +60,40 @@ test.describe("Mes données (CM-60)", () => {
     expect(file.text).toMatch(/"nom": "Haut du corps",\s+"bibliotheque": "Nos séances",\s+"partagee": true/);
   });
 
+  test("CM-88 : suppression refusée par la base : message, on reste sur le Profil, session intacte", async ({ page }) => {
+    await login(page, SEED_ACCOUNTS.solo.email, SEED_ACCOUNTS.solo.password);
+    // Refus simulé : la requête n'atteint jamais la base (compte du seed intact).
+    let rpcCalls = 0;
+    await page.route("**/rest/v1/rpc/delete_my_account", (route) => {
+      rpcCalls += 1;
+      return route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ code: "P0001", message: "refus simulé", details: null, hint: null }),
+      });
+    });
+    await page.goto("/profile");
+    const section = page.getByRole("region", { name: "Mes données" });
+    await section.getByRole("button", { name: /Supprimer mon compte/ }).click();
+    const sheet = page.getByRole("dialog");
+    await sheet.getByRole("button", { name: "Continuer" }).click();
+    await sheet.getByLabel("Mot de confirmation").fill("SUPPRIMER");
+    await sheet.getByRole("button", { name: "Supprimer définitivement" }).click();
+
+    await expect(sheet.getByRole("alert")).toContainText("Rien n'a été supprimé");
+    expect(rpcCalls).toBe(1);
+    await expect(page).toHaveURL(/\/profile$/);
+    // Le bouton redevient utilisable, la saisie est conservée.
+    await expect(sheet.getByRole("button", { name: "Supprimer définitivement" })).toBeEnabled();
+    await expect(sheet.getByLabel("Mot de confirmation")).toHaveValue("SUPPRIMER");
+
+    // Session intacte : le Profil se recharge, sans passer par /login.
+    await page.unroute("**/rest/v1/rpc/delete_my_account");
+    await page.reload();
+    await expect(page).toHaveURL(/\/profile$/);
+    await expect(page.getByRole("region", { name: "Mon profil" })).toBeVisible();
+  });
+
   test("un nouveau compte se supprime, puis ne peut plus se connecter", async ({ page }) => {
     const email = `cm60-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@coach-en-muscu.test`;
     const password = "motdepasse-cm60";

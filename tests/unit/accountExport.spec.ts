@@ -24,7 +24,11 @@ import {
   deleteAccountErrorMessage,
   isDeleteConfirmation,
   isExplicitRefusal,
+  sessionCookieNames,
 } from "@/lib/accountDeletion";
+import { AuthRetryableFetchError } from "@supabase/supabase-js";
+import type { BrowserSupabase } from "@/lib/supabase/client";
+import { closeDeletedAccountSession, deleteMyAccount } from "@/lib/data/account";
 import { deliverExport, exportFileName, type ExportDeps } from "@/lib/export/deliverExport";
 import { isPublicPath } from "@/lib/auth/publicPaths";
 
@@ -541,5 +545,103 @@ test.describe("Remise de l'export (CM-60)", () => {
     expect(exportFileName(new Date("2026-10-10T23:30:00Z"))).toBe(
       "coach-en-muscu-export-2026-10-11.zip",
     );
+  });
+});
+
+// ---- CM-88 : suppression depuis le navigateur ----------------------------------
+
+/** `document.cookie` simulé : lecture de la chaîne, écritures enregistrées. */
+function fakeDocument(cookie: string) {
+  const writes: string[] = [];
+  return {
+    writes,
+    doc: {
+      get cookie() {
+        return cookie;
+      },
+      set cookie(v: string) {
+        writes.push(v);
+      },
+    },
+  };
+}
+
+type FakeAuth = Pick<BrowserSupabase, "auth" | "rpc">;
+
+test.describe("Suppression du compte côté navigateur (CM-88)", () => {
+  test("cookies de session, morceaux .0 / .1 compris, et rien d'autre", () => {
+    expect(
+      sessionCookieNames(
+        "cm_onboarded=x; sb-abc-auth-token.0=aaa; theme=sombre; sb-abc-auth-token.1=bbb; sb-abc-auth-token-code-verifier=c",
+      ),
+    ).toEqual(["sb-abc-auth-token.0", "sb-abc-auth-token.1", "sb-abc-auth-token-code-verifier"]);
+    expect(sessionCookieNames("")).toEqual([]);
+  });
+
+  test("fermeture : cookies effacés d'abord, signOut bloqué borné", async () => {
+    const { doc, writes } = fakeDocument("sb-abc-auth-token.0=aaa; sb-abc-auth-token.1=bbb; theme=x");
+    let writesAtSignOut: number | null = null;
+    const supabase = {
+      auth: {
+        signOut: () => {
+          writesAtSignOut = writes.length;
+          return new Promise<never>(() => {}); // ne répond jamais
+        },
+      },
+    } as unknown as Pick<BrowserSupabase, "auth">;
+    const started = Date.now();
+    await closeDeletedAccountSession(supabase, doc, 50);
+    expect(Date.now() - started).toBeLessThan(1_000);
+    // signOut appelé APRÈS l'effacement des deux cookies.
+    expect(writesAtSignOut).toBe(2);
+    expect(writes).toEqual([
+      "sb-abc-auth-token.0=; Path=/; Max-Age=0; SameSite=Lax",
+      "sb-abc-auth-token.1=; Path=/; Max-Age=0; SameSite=Lax",
+    ]);
+  });
+
+  test("fermeture : un signOut en erreur ne fait pas échouer", async () => {
+    const { doc } = fakeDocument("sb-abc-auth-token=aaa");
+    const supabase = {
+      auth: { signOut: async () => Promise.reject(new Error("réseau")) },
+    } as unknown as Pick<BrowserSupabase, "auth">;
+    await closeDeletedAccountSession(supabase, doc, 50);
+  });
+
+  test("réseau coupé à la vérification de session : rien n'est supprimé, pas « session expirée »", async () => {
+    let rpcCalled = false;
+    const supabase = {
+      auth: {
+        getClaims: async () => ({
+          data: null,
+          error: new AuthRetryableFetchError("Failed to fetch", 0),
+        }),
+      },
+      rpc: async () => {
+        rpcCalled = true;
+        return { error: null };
+      },
+    } as unknown as FakeAuth;
+    const result = await deleteMyAccount(supabase as BrowserSupabase, "SUPPRIMER");
+    expect(result).toEqual({ ok: false, error: deleteAccountErrorMessage({ message: "cm60:offline" }) });
+    expect(result.ok === false && result.error).toContain("Rien n'a été supprimé");
+    expect(rpcCalled).toBe(false);
+  });
+
+  test("sans session : « session expirée », aucun appel", async () => {
+    let rpcCalled = false;
+    const supabase = {
+      auth: { getClaims: async () => ({ data: null, error: null }) },
+      rpc: async () => {
+        rpcCalled = true;
+        return { error: null };
+      },
+    } as unknown as FakeAuth;
+    const result = await deleteMyAccount(supabase as BrowserSupabase, "SUPPRIMER");
+    expect(result).toEqual({
+      ok: false,
+      error: deleteAccountErrorMessage({ message: "cm60:not_authenticated" }),
+    });
+    expect(rpcCalled).toBe(false);
   });
 });

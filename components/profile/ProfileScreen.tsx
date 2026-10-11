@@ -67,16 +67,30 @@ function ProfileContent({ onAccountDeleted }: { onAccountDeleted: () => void }) 
   const badges = useBadges(profileId, weeklyGoal);
   const duo = useDuoState(profileId);
 
-  const failed = [auth, identity, badges, duo].find((q) => q.error);
-  if (failed) {
+  // Seule une lecture SANS données affiche l'erreur : un rafraîchissement en
+  // arrière-plan qui échoue garde l'écran (feuille ouverte, saisie en cours).
+  const failedRead = [identity, badges, duo].find((q) => q.error && q.data === undefined);
+  const retry =
+    auth.error && !profileId
+      ? () => void auth.refetch()
+      : failedRead
+        ? () => void failedRead.refetch()
+        : null;
+  if (retry) {
     return (
       <div className="mt-5">
-        <ScreenError onRetry={() => void failed.refetch()} />
+        <ScreenError onRetry={retry} />
         <SignOutButton />
       </div>
     );
   }
-  if (auth.isPending || !profileId || !identity.isSuccess || !badges.isSuccess || !duo.isSuccess) {
+  if (
+    auth.isPending ||
+    !profileId ||
+    identity.data === undefined ||
+    badges.data === undefined ||
+    duo.data === undefined
+  ) {
     return (
       <div className="mt-5">
         <ScreenSkeleton label="Chargement du profil" />

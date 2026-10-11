@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useId, useState } from "react";
 import { leaveDuo, type DuoActionState } from "@/lib/actions/duo";
-import { useDuoAction } from "@/components/duo/InvitationForms";
+import { useDuoAction } from "@/hooks/data/useDuoState";
 
 /**
  * CM-87 : « Quitter le duo » et sa feuille de confirmation (maquette 11).

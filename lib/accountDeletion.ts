@@ -1,6 +1,8 @@
 // CM-60 : suppression du compte (règles pures, sans import Next ni Supabase).
 // Testé dans tests/unit/accountExport.spec.ts.
 
+import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-config";
+
 /** Mot à saisir pour activer le bouton, et seul mot accepté par la RPC. */
 export const DELETE_CONFIRMATION_WORD = "SUPPRIMER";
 
@@ -21,7 +23,23 @@ const DELETE_ERROR_MESSAGES: Record<string, string> = {
   not_authenticated: "Ta session a expiré. Reconnecte-toi, puis recommence.",
   confirmation_required: `Écris «\u00a0${DELETE_CONFIRMATION_WORD}\u00a0» pour confirmer.`,
   account_not_found: "Ce compte n'existe plus. Il a peut-être déjà été supprimé.",
+  // CM-88 : réseau coupé AVANT l'appel de suppression (vérification de la
+  // session dans le navigateur) : la base n'a rien reçu.
+  offline:
+    "Connexion impossible. Rien n'a été supprimé : vérifie ta connexion, puis réessaie.",
 };
+
+/**
+ * CM-88 : noms des cookies de session Supabase (`sb-<ref>-auth-token`, et ses
+ * morceaux `.0`, `.1`…) présents dans `document.cookie`, à effacer après la
+ * suppression du compte.
+ */
+export function sessionCookieNames(documentCookie: string): string[] {
+  return documentCookie
+    .split(";")
+    .map((pair) => pair.split("=")[0]?.trim() ?? "")
+    .filter((name) => hasSupabaseAuthCookie([name]));
+}
 
 /** La base a refusé l'appel : la transaction est annulée, rien n'est supprimé. */
 const REFUSED_DELETE_ERROR =

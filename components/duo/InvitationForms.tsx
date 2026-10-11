@@ -6,28 +6,8 @@ import {
   revokeInvitation,
   type DuoActionState,
 } from "@/lib/actions/duo";
-import { useRefreshAfterDuoAction } from "@/hooks/data/useDuoState";
-
-/**
- * CM-88 : une action du duo qui réussit se termine par `redirect()` : sa
- * promesse est alors rejetée avec l'erreur de redirection, que Next traite.
- * Le cache du navigateur est rafraîchi à ce moment-là
- * (`useRefreshAfterDuoAction`), puis l'erreur est relancée telle quelle. Une
- * erreur renvoyée (`{ error }`) ne touche à rien : le message reste affiché.
- */
-export function useDuoAction<A extends unknown[]>(
-  action: (...args: A) => Promise<DuoActionState>,
-): (...args: A) => Promise<DuoActionState> {
-  const refresh = useRefreshAfterDuoAction();
-  return async (...args: A) => {
-    try {
-      return await action(...args);
-    } catch (e) {
-      refresh();
-      throw e;
-    }
-  };
-}
+// CM-88 : chaque action rafraîchit le cache du navigateur quand elle aboutit.
+import { useDuoAction } from "@/hooks/data/useDuoState";
 
 /** CM-87 : « Inviter mon partenaire » (crée l'invitation puis l'affiche). */
 export function InviteButton() {

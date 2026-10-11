@@ -36,3 +36,25 @@ export function useRefreshAfterDuoAction() {
     void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "auth" });
   }, [queryClient]);
 }
+
+/**
+ * CM-88 : enveloppe une server action du duo. Quand elle réussit, elle se
+ * termine par `redirect()` : sa promesse est alors rejetée avec l'erreur de
+ * redirection, que Next traite. Le cache du navigateur est rafraîchi à ce
+ * moment-là (`useRefreshAfterDuoAction`), puis l'erreur est relancée telle
+ * quelle. Une erreur renvoyée (`{ error }`) ne touche à rien : le message
+ * reste affiché.
+ */
+export function useDuoAction<A extends unknown[], R>(
+  action: (...args: A) => Promise<R>,
+): (...args: A) => Promise<R> {
+  const refresh = useRefreshAfterDuoAction();
+  return async (...args: A) => {
+    try {
+      return await action(...args);
+    } catch (e) {
+      refresh();
+      throw e;
+    }
+  };
+}
