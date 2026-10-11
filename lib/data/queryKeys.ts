@@ -15,4 +15,15 @@ export const queryKeys = {
     all: (profileId: string) => [profileId, "exercises"] as const,
     catalog: (profileId: string) => [profileId, "exercises", "catalog"] as const,
   },
+
+  // ---- CM-88 PR 3 : Carnet (historique) et Stats (progression) ----
+  // Clé de tête `[profileId, "sessions"]` : une écriture de séance (fin,
+  // suppression, édition d'une série) n'aura qu'elle à invalider (PR 6).
+  sessions: {
+    all: (profileId: string) => [profileId, "sessions"] as const,
+    history: (profileId: string) => [profileId, "sessions", "history"] as const,
+    /** `requested` : `?profile=` de l'URL tel quel ("" si absent), validé par la lecture. */
+    progress: (profileId: string, requested: string) =>
+      [profileId, "sessions", "progress", requested] as const,
+  },
 } as const;

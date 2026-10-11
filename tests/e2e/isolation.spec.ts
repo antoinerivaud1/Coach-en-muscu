@@ -9,6 +9,8 @@ import { SEED_ACCOUNTS, SEED_NAMES, guardWrites, login } from "./helpers";
 const TOI_SESSION = "77777777-7777-7777-7777-000000000001";
 /** Séance terminée de « Solo » (hors duo), séance type « Full body ». */
 const SOLO_SESSION = "99999999-9999-9999-9999-000000000004";
+/** Profil de « Toi » (Théo) dans le seed. */
+const TOI_PROFILE = "11111111-1111-1111-1111-111111111111";
 
 guardWrites();
 
@@ -59,5 +61,31 @@ test.describe("Isolation des données (RLS, CM-59)", () => {
     await expect(toiSession).toContainText(SEED_NAMES.toi);
     await expect(toiSession).not.toContainText(/\bToi\b/);
     await expect(page.locator(`a[href="/sessions/${SOLO_SESSION}"]`)).toHaveCount(0);
+  });
+
+  // CM-88 : les Stats sont lues dans le navigateur ; `?profile=` n'est retenu
+  // que pour un membre de mon duo actif.
+  test("Solo ne lit pas les Stats de Théo en passant son id dans l'URL", async ({ page }) => {
+    await login(page, SEED_ACCOUNTS.solo.email, SEED_ACCOUNTS.solo.password);
+    await page.goto(`/progress?profile=${TOI_PROFILE}`);
+    await expect(page.getByRole("heading", { name: "Progression", level: 1 })).toBeVisible();
+    // Ses propres stats (séance du seed), sans onglet ni comparaison.
+    await expect(page.getByText("Meilleur 1RM estimé")).toBeVisible();
+    await expect(page.getByRole("link", { name: SEED_NAMES.toi, exact: true })).toHaveCount(0);
+    await expect(page.getByText("Duo · séries (semaine)")).toHaveCount(0);
+    // Charges de la séance de Théo (seed : 72,5 kg) : jamais affichées.
+    await expect(page.getByText(/72[.,]5/)).toHaveCount(0);
+  });
+
+  test("Lina passe aux Stats de Théo par l'onglet, sans rechargement", async ({ page }) => {
+    await login(page, SEED_ACCOUNTS.elle.email, SEED_ACCOUNTS.elle.password);
+    await page.goto("/progress");
+    const theo = page.getByRole("link", { name: SEED_NAMES.toi, exact: true });
+    const lina = page.getByRole("link", { name: SEED_NAMES.elle, exact: true });
+    await expect(lina).toHaveAttribute("aria-current", "page");
+    await theo.click();
+    await expect(page).toHaveURL(new RegExp(`/progress\\?profile=${TOI_PROFILE}$`));
+    await expect(theo).toHaveAttribute("aria-current", "page");
+    await expect(lina).not.toHaveAttribute("aria-current", "page");
   });
 });
