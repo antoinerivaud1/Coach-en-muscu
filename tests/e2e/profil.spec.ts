@@ -61,6 +61,21 @@ test.describe("Connexion et profil (CM-59 B)", () => {
     await expect(page.getByLabel("Email")).toHaveValue(E2E_ACCOUNT.email);
   });
 
+  test("CM-88 (PR 7) : la déconnexion aboutit même si Supabase Auth ne répond pas", async ({ page }) => {
+    await login(page, E2E_ACCOUNT.email, E2E_ACCOUNT.password);
+    // Réseau coupé vers Auth au moment de la déconnexion.
+    await page.route("**/auth/v1/logout**", (route) => route.abort("internetdisconnected"));
+    await page.goto("/profile");
+    await page.getByRole("button", { name: "Se déconnecter" }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: /Connexion/ })).toBeVisible();
+    // Cookies de session effacés sur cet appareil : plus de session.
+    const cookies = await page.context().cookies();
+    expect(cookies.filter((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"))).toEqual([]);
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
+  });
+
   test("CM-88 : le Profil est lu et enregistré depuis le navigateur", async ({ page }) => {
     await login(page, E2E_ACCOUNT.email, E2E_ACCOUNT.password);
     // Les lectures et l'écriture partent du navigateur (requêtes PostgREST

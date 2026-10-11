@@ -1,4 +1,5 @@
 import type { BrowserSupabase } from "@/lib/supabase/client";
+import { sessionCookieNames } from "@/lib/accountDeletion";
 import {
   authErrorMessage,
   safeNextPath,
@@ -111,15 +112,48 @@ export async function signUpWithEmail(
   return { redirectTo: withNext("/onboarding", input.next) };
 }
 
+/** Délai maximal laissé à `signOut` avant d'effacer la session nous-mêmes. */
+export const SIGN_OUT_TIMEOUT_MS = 3_000;
+
 /**
- * Déconnexion de CET appareil (`scope: "local"`). Une session déjà invalide
- * (jeton refusé) est effacée par supabase-js comme une déconnexion normale.
- * Comme avant (server action), l'écran recharge `/login` dans tous les cas.
+ * Déconnexion de CET appareil (`scope: "local"`). Elle doit TOUJOURS
+ * aboutir : l'écran recharge ensuite `/login`.
+ *
+ * `signOut` ne lève pas : en cas d'échec (réseau coupé, serveur Auth en
+ * erreur), il renvoie `{ error }` SANS effacer la session. Dans ce cas, ou
+ * s'il lève, ou s'il ne répond pas dans `timeoutMs`, les cookies de session
+ * (`sb-…-auth-token*`, lisibles en JS depuis CM-88, morceaux compris) sont
+ * effacés ici (`sessionCookieNames`, comme après une suppression de compte).
+ * Le jeton reste valable côté serveur jusqu'à son expiration, mais cet
+ * appareil n'a plus de session : c'est le sens de `scope: "local"`.
+ *
+ * Renvoie `true` si les cookies ont dû être effacés à la main.
+ * `doc` est injectable pour les tests (tests/unit/signupGuard.spec.ts).
  */
-export async function signOutLocal(supabase: AuthClient): Promise<void> {
+export async function signOutLocal(
+  supabase: AuthClient,
+  doc: { cookie: string } = document,
+  timeoutMs: number = SIGN_OUT_TIMEOUT_MS,
+): Promise<boolean> {
+  let failed = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await supabase.auth.signOut({ scope: "local" });
+    const result = await Promise.race([
+      supabase.auth.signOut({ scope: "local" }),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+    failed = result === null || Boolean(result.error);
   } catch {
-    // Session déjà invalide : rien de plus à faire.
+    failed = true;
+  } finally {
+    clearTimeout(timer);
   }
+  if (failed) {
+    for (const name of sessionCookieNames(doc.cookie)) {
+      doc.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+    }
+  }
+  return failed;
 }

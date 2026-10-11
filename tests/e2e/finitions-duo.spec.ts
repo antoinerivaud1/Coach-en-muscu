@@ -123,6 +123,54 @@ test.describe("Invitation conservée à l'inscription (CM-103)", () => {
   });
 });
 
+test.describe("Lien d'invitation après une inscription (CM-88, PR 7)", () => {
+  test("un compte tout juste inscrit ouvre la confirmation sans perdre sa session", async ({ page }) => {
+    await ensureSolo(page, SEED_ACCOUNTS.solo);
+    await page
+      .getByRole("region", { name: "S'entraîner à deux" })
+      .getByRole("button", { name: "Inviter mon partenaire" })
+      .click();
+    await expect(page).toHaveURL(/\/duo\/inviter$/);
+    const code = await page.getByTestId("invite-code").getAttribute("data-code");
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
+
+    try {
+      // Inscription SANS lien d'invitation, puis onboarding.
+      await signOut(page);
+      await page.goto("/signup");
+      await page.getByLabel("Email").fill(uniqueEmail());
+      await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+      await page.getByRole("button", { name: "Continuer" }).click();
+      await expect(page).toHaveURL(/\/onboarding$/);
+      await page.getByLabel("Prénom").fill("Noé");
+      await page.getByRole("radio", { name: "Violet" }).click();
+      await page.getByRole("button", { name: "Continuer" }).click();
+      await expect(page).toHaveURL(/\/onboarding\/seances$/);
+      await page.getByRole("button", { name: "Passer pour l'instant" }).click();
+      await expect(page).toHaveURL(/\/dashboard$/);
+
+      // Le « code verifier » PKCE laissé par l'inscription est bien là : sans
+      // le correctif, le `?code=` ci-dessous fermerait la session.
+      const before = await page.context().cookies();
+      expect(before.some((c) => c.name.endsWith("-auth-token-code-verifier"))).toBe(true);
+
+      // Lien de confirmation ouvert directement (premier chargement).
+      await page.goto(`/duo/rejoindre/confirmer?code=${code}`);
+      await expect(
+        page.getByRole("heading", { name: `${SEED_NAMES.solo} t'invite à s'entraîner en duo` }),
+      ).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`/duo/rejoindre/confirmer\\?code=${code}$`));
+      // Session toujours là : une page privée s'ouvre sans passer par /login.
+      await page.goto("/profile");
+      await expect(page).toHaveURL(/\/profile$/);
+      await expect(page.getByRole("region", { name: "Mon profil" })).toContainText("Noé");
+    } finally {
+      // Solo annule son invitation : retour à l'état du seed.
+      await ensureSolo(page, SEED_ACCOUNTS.solo);
+    }
+  });
+});
+
 test.describe("Couleur unique dans le duo (CM-103)", () => {
   test("Théo ne peut pas choisir la couleur de Lina", async ({ page }) => {
     await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);

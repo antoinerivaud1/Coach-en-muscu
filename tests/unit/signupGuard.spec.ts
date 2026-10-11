@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { SIGNUP_CLOSED_MESSAGE, signUpWithEmail, signupOpen } from "@/lib/data/auth";
+import { SIGNUP_CLOSED_MESSAGE, signOutLocal, signUpWithEmail, signupOpen } from "@/lib/data/auth";
 
 // CM-86 / CM-88 (PR 7) : inscription fermée, l'écran refuse AVANT tout appel
 // à Supabase. Depuis CM-88, ce n'est qu'un affichage
@@ -20,6 +20,60 @@ const forbidden = {
 } as unknown as Parameters<typeof signUpWithEmail>[0];
 
 const input = { email: "camille@exemple.test", password: "motdepasse-solide", next: "" };
+
+// CM-88 (PR 7) : la déconnexion aboutit toujours, même si Supabase échoue.
+test.describe("signOutLocal", () => {
+  /** Faux `document.cookie` : lecture de la liste, écriture = effacement. */
+  function fakeDoc(names: string[]) {
+    const jar = new Set(names);
+    const written: string[] = [];
+    return {
+      jar,
+      written,
+      get cookie() {
+        return [...jar].map((n) => `${n}=v`).join("; ");
+      },
+      set cookie(value: string) {
+        written.push(value);
+        const name = value.split("=")[0]!;
+        if (/max-age=0/i.test(value)) jar.delete(name);
+      },
+    };
+  }
+  const session = ["sb-127-auth-token.0", "sb-127-auth-token.1", "cm_onboarded", "autre"];
+  type Client = Parameters<typeof signOutLocal>[0];
+  const client = (signOut: () => Promise<{ error: unknown }>) =>
+    ({ auth: { signOut } }) as unknown as Client;
+
+  test("succès : Supabase a fermé la session, aucun cookie touché ici", async () => {
+    const doc = fakeDoc(session);
+    expect(await signOutLocal(client(async () => ({ error: null })), doc)).toBe(false);
+    expect(doc.written).toEqual([]);
+  });
+
+  test("erreur renvoyée (réseau) : cookies de session effacés, les autres gardés", async () => {
+    const doc = fakeDoc(session);
+    const failing = client(async () => ({ error: { name: "AuthRetryableFetchError" } }));
+    expect(await signOutLocal(failing, doc)).toBe(true);
+    expect([...doc.jar].sort()).toEqual(["autre", "cm_onboarded"]);
+  });
+
+  test("exception : cookies de session effacés", async () => {
+    const doc = fakeDoc(session);
+    const throwing = client(async () => {
+      throw new Error("réseau");
+    });
+    expect(await signOutLocal(throwing, doc)).toBe(true);
+    expect(doc.jar.has("sb-127-auth-token.0")).toBe(false);
+  });
+
+  test("pas de réponse : cookies effacés après le délai", async () => {
+    const doc = fakeDoc(session);
+    const hanging = client(() => new Promise(() => {}));
+    expect(await signOutLocal(hanging, doc, 20)).toBe(true);
+    expect(doc.jar.has("sb-127-auth-token.1")).toBe(false);
+  });
+});
 
 test.describe("Garde d'inscription de signUpWithEmail", () => {
   test("fermée : refus sans appel à Supabase", async () => {
