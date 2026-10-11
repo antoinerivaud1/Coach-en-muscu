@@ -356,12 +356,16 @@ export async function getCurrentSession(
  * idempotente (elle ne cible que des lignes vides du profil courant, donc rien
  * à la deuxième exécution). Une séance QUI A DES SÉRIES n'est jamais supprimée
  * automatiquement, même très ancienne : elle contient du travail réel.
+ *
+ * CM-88 : lancé depuis le navigateur (`usePurgeAbandonedSessions`). Renvoie le
+ * nombre de séances visées, pour que l'accueil ne relise ses données que si
+ * le nettoyage a réellement eu quelque chose à faire.
  */
 export async function purgeAbandonedEmptySessions(
   supabase: SupabaseClient<Database>,
   profileId: string,
   now: Date,
-): Promise<void> {
+): Promise<number> {
   const before = new Date(now.getTime() - ABANDONED_EMPTY_SESSION_MS).toISOString();
 
   const { data } = await supabase
@@ -375,7 +379,7 @@ export async function purgeAbandonedEmptySessions(
   const emptyIds = (data ?? [])
     .filter((s) => (s.session_sets ?? []).length === 0)
     .map((s) => s.id);
-  if (emptyIds.length === 0) return;
+  if (emptyIds.length === 0) return 0;
 
   // Le `.eq("profile_id", …)` est redondant avec le `select` ci-dessus, et
   // gardé : une suppression ne doit jamais pouvoir sortir du profil courant.
@@ -386,6 +390,7 @@ export async function purgeAbandonedEmptySessions(
     .delete()
     .in("id", emptyIds)
     .eq("profile_id", profileId);
+  return emptyIds.length;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -26,4 +26,14 @@ export const queryKeys = {
     progress: (profileId: string, requested: string) =>
       [profileId, "sessions", "progress", requested] as const,
   },
+
+  // ---- CM-88 PR 4 : accueil ----
+  /**
+   * Toutes les données de l'accueil (`/dashboard`), en une lecture. Rangée
+   * sous `[profileId, "sessions"]` : toute écriture sur les séances (fin,
+   * abandon, suppression) qui invalide cette tête relit aussi l'accueil.
+   */
+  dashboard: {
+    all: (profileId: string) => [profileId, "sessions", "dashboard"] as const,
+  },
 } as const;

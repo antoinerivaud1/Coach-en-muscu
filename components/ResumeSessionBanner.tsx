@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import ConfirmSubmit from "@/components/ConfirmSubmit";
 import { closeStaleSession, discardSession } from "@/app/sessions/[id]/actions";
+import { queryKeys } from "@/lib/data/queryKeys";
 
 /**
  * Bandeau « Séance en cours » de l'accueil (CM-83).
@@ -15,18 +19,37 @@ import { closeStaleSession, discardSession } from "@/app/sessions/[id]/actions";
  * clôturer sans rouvrir le logger, ou supprimer. La suppression demande une
  * confirmation en ligne via `ConfirmSubmit` : `window.confirm()` est supprimé en
  * PWA iOS standalone (CM-70).
+ *
+ * CM-88 : « Terminer » et « Supprimer » restent des server actions (écran
+ * séance, PR 6). Elles redirigent vers l'accueil, lu côté client : une fois
+ * l'action finie (redirection comprise), on invalide le cache de l'accueil
+ * pour que le bandeau disparaisse.
  */
 export default function ResumeSessionBanner({
+  profileId,
   sessionId,
   dayName,
   setCount,
   stale,
 }: {
+  profileId: string;
   sessionId: string;
   dayName: string;
   setCount: number;
   stale: boolean;
 }) {
+  const queryClient = useQueryClient();
+  // La redirection d'une server action rejette sa promesse (Next la traite
+  // ensuite) : l'invalidation se fait donc dans `finally`, et l'erreur repart.
+  const thenRefresh =
+    (action: (formData: FormData) => Promise<void>) => async (formData: FormData) => {
+      try {
+        await action(formData);
+      } finally {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all(profileId) });
+      }
+    };
+
   const setsLabel =
     setCount === 0 ? "Aucune série" : `${setCount} série${setCount > 1 ? "s" : ""}`;
 
@@ -59,7 +82,7 @@ export default function ResumeSessionBanner({
             telle quelle ou la supprimer.
           </p>
           <div className="mt-2 flex items-start gap-2">
-            <form action={closeStaleSession} className="flex-1">
+            <form action={thenRefresh(closeStaleSession)} className="flex-1">
               <input type="hidden" name="session_id" value={sessionId} />
               <button
                 type="submit"
@@ -68,7 +91,7 @@ export default function ResumeSessionBanner({
                 Terminer
               </button>
             </form>
-            <form action={discardSession} className="flex-1">
+            <form action={thenRefresh(discardSession)} className="flex-1">
               <input type="hidden" name="session_id" value={sessionId} />
               <ConfirmSubmit
                 message="Supprimer cette séance et ses séries ? C'est définitif."
