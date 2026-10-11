@@ -122,8 +122,8 @@ export const LEGAL: LegalConfig = {
     {
       name: "Sentry",
       purpose: "suivi des erreurs techniques",
-      location: todo("région d'hébergement Sentry retenue (UE ou États-Unis)"),
-      active: false,
+      location: "Union européenne (Francfort, Allemagne)",
+      active: true,
     },
   ],
   pricing: {

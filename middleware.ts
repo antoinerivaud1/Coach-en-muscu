@@ -14,7 +14,8 @@ export const config = {
      * - _next/static, _next/image (assets du build)
      * - favicon.ico, manifest.webmanifest, sw.js (PWA)
      * - icons/ et fichiers image
+     * - monitoring (tunnel Sentry, CM-95 : pas de session Supabase à rafraîchir)
      */
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|monitoring|favicon.ico|manifest.webmanifest|sw.js|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
