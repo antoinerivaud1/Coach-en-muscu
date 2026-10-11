@@ -4,7 +4,8 @@ Parcours critiques joués dans un vrai navigateur contre l'app démarrée.
 
 | Fichier | Parcours | Écrit en base |
 | --- | --- | --- |
-| `smoke.spec.ts` | sans session, l'accueil et le tableau de bord renvoient à `/login` (CM-59 B) | non |
+| `smoke.spec.ts` | sans session, l'accueil, le tableau de bord et le Guide (écran client, CM-88) renvoient à `/login` | non |
+| `guide.spec.ts` | CM-88 : le Guide, lu depuis le navigateur sous RLS, montre le catalogue de chacun (exercice perso de Solo invisible pour Théo) ; déconnexion puis autre compte par l'interface sans rien du compte précédent ; ouvert sans session, il revient après la connexion sans boucle ; une session d'avant CM-88 (cookie `httpOnly`) ou un retour arrière Vercel (cookies `httpOnly` malgré le marqueur) restent reconnus | non (purge CM-83 du tableau de bord) |
 | `isolation.spec.ts` | RLS (CM-59 B) : Solo n'ouvre pas une séance du duo et ne voit ni son programme ni son historique ; le duo n'ouvre pas une séance de Solo ; Elle voit l'historique de Toi | non (purge CM-83 du tableau de bord) |
 | `profil.spec.ts` | se connecter, se déconnecter | oui (purge CM-83 du tableau de bord) |
 | `seance.spec.ts` | démarrer, valider une série, abandonner, quitter puis reprendre, supprimer, terminer via la croix (CM-94) | oui |

@@ -12,6 +12,12 @@ import { purgeLocalQueues, unsyncedLocalCount } from "@/lib/localQueues";
  * S'il reste des données jamais enregistrées, on prévient d'abord, par une
  * feuille de confirmation (`window.confirm` est inerte en PWA iOS, CM-70).
  */
+/** CM-88 : `/login` par rechargement complet, le cache du navigateur repart de zéro. */
+async function signOutAndReload() {
+  const { redirectTo } = await signOut();
+  window.location.assign(redirectTo);
+}
+
 export default function SignOutButton() {
   const formRef = useRef<HTMLFormElement>(null);
   const confirmed = useRef(false);
@@ -49,7 +55,7 @@ export default function SignOutButton() {
 
   return (
     <>
-      <form ref={formRef} action={signOut} onSubmit={onSubmit} className="mt-6">
+      <form ref={formRef} action={signOutAndReload} onSubmit={onSubmit} className="mt-6">
         <button
           type="submit"
           className="w-full rounded-2xl border border-line bg-surface2 py-3.5 text-sm font-bold text-fg active:bg-white/10"

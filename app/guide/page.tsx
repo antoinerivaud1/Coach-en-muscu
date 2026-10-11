@@ -1,73 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
-import { requireProfileId, getDuoId } from "@/lib/profile";
-import { getCatalogExercises, isCustomExercise } from "@/lib/queries/exercises";
-import type { SystemExercise } from "@/lib/queries/exercises";
-import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
 import BottomNav from "@/components/BottomNav";
-import ExerciseInfo from "@/components/ExerciseInfo";
+import GuideScreen from "@/components/guide/GuideScreen";
 
-const GROUP_ORDER = [
-  "chest",
-  "back",
-  "shoulders",
-  "biceps",
-  "triceps",
-  "quads",
-  "hamstrings",
-  "glutes",
-  "calves",
-  "core",
-  "other",
-];
-
-export default async function GuidePage() {
-  const profileId = await requireProfileId("/guide");
-  const supabase = await createClient();
-  const duoId = await getDuoId(supabase, profileId);
-
-  const { data } = await getCatalogExercises(supabase, duoId, profileId);
-  const exercises: SystemExercise[] = data ?? [];
-
-  const byGroup: Record<string, SystemExercise[]> = {};
-  for (const ex of exercises) {
-    (byGroup[ex.muscle_group] ??= []).push(ex);
-  }
-  const groups = GROUP_ORDER.filter((g) => byGroup[g]?.length);
-
+// CM-88 : plus aucune lecture côté serveur. L'écran lit la session et le
+// catalogue dans le navigateur (GuideScreen), sous RLS.
+export default function GuidePage() {
   return (
     <main className="min-h-screen p-4 pb-28">
-      <div className="mx-auto max-w-lg">
-        <h1 className="text-2xl font-bold">Guide des exercices</h1>
-        <p className="mt-1 text-sm text-fg-muted">
-          Touche un exercice pour voir comment l&apos;exécuter, ce qu&apos;il
-          faut éviter, et comment étirer le muscle.
-        </p>
-
-        {groups.map((group) => (
-          <div key={group}>
-            <h2 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-fg-muted">
-              {MUSCLE_GROUP_LABELS[group] ?? group}
-            </h2>
-            <div className="space-y-2">
-              {byGroup[group]!.map((ex) => (
-                <ExerciseInfo
-                  key={ex.id}
-                  name={ex.name}
-                  muscleGroup={ex.muscle_group}
-                  isCompound={ex.is_compound}
-                  isCustom={isCustomExercise(ex)}
-                  triggerClassName="flex w-full items-center justify-between rounded-lg bg-surface px-4 py-3 text-left active:bg-surface2"
-                >
-                  <span className="text-base">{ex.name}</span>
-                  <span className="text-lg text-fg-muted" aria-hidden>
-                    ›
-                  </span>
-                </ExerciseInfo>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      <GuideScreen />
       <BottomNav />
     </main>
   );

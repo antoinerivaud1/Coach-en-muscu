@@ -3,16 +3,20 @@
 import { useActionState, useState } from "react";
 import { signUpWithPassword, type SignupFormState } from "@/lib/actions/signup";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/core";
+import { useFullPageRedirect } from "@/hooks/useFullPageRedirect";
 
 /**
  * CM-86 : formulaire « Crée ton compte » (maquette 2). CM-103 : `next`
  * (lien d'invitation) transmis à l'onboarding.
  */
 export default function SignupForm({ next = "" }: { next?: string }) {
-  const [state, action, pending] = useActionState<SignupFormState, FormData>(
+  const [state, action, actionPending] = useActionState<SignupFormState, FormData>(
     signUpWithPassword,
     {},
   );
+  useFullPageRedirect(state.redirectTo);
+  // Le rechargement prend un instant : le bouton reste occupé jusque-là.
+  const pending = actionPending || Boolean(state.redirectTo);
   const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
   const longEnough = password.length >= PASSWORD_MIN_LENGTH;

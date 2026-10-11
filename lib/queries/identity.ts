@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import type { PartnerColor } from "@/lib/members";
-import { readDuoMembership, DUO_READ_ERROR_MESSAGE } from "@/lib/profile";
+import { DUO_READ_ERROR_MESSAGE } from "@/lib/duoMembership";
+import { readDuoMembership } from "@/lib/queries/profiles";
 
 /**
  * CM-86 : identité d'un profil telle que l'onboarding et la section « Mon

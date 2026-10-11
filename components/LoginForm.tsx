@@ -3,13 +3,17 @@
 import { useActionState } from "react";
 import { signInWithPassword, type AuthFormState } from "@/lib/actions/auth";
 import AuthField from "@/components/AuthField";
+import { useFullPageRedirect } from "@/hooks/useFullPageRedirect";
 
 // CM-58 : formulaire de connexion email + mot de passe.
 export default function LoginForm({ next }: { next: string }) {
-  const [state, action, pending] = useActionState<AuthFormState, FormData>(
+  const [state, action, actionPending] = useActionState<AuthFormState, FormData>(
     signInWithPassword,
     {},
   );
+  useFullPageRedirect(state.redirectTo);
+  // Le rechargement prend un instant : le bouton reste occupé jusque-là.
+  const pending = actionPending || Boolean(state.redirectTo);
 
   return (
     <form action={action} className="flex flex-col gap-4" noValidate>

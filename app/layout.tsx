@@ -4,6 +4,7 @@ import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import OrientationLock from "@/components/OrientationLock";
 import PendingSync from "@/components/PendingSync";
+import QueryProvider from "@/components/providers/QueryProvider";
 
 // Direction Sport — Archivo (titres / interface) + Oswald (chiffres / scores)
 const archivo = Archivo({
@@ -50,7 +51,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className={`${archivo.variable} ${oswald.variable}`}>
       <body className="min-h-screen bg-ink font-sans text-fg antialiased">
-        {children}
+        <QueryProvider>{children}</QueryProvider>
         <PendingSync />
         <ServiceWorkerRegister />
         <OrientationLock />

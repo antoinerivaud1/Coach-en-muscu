@@ -10,7 +10,14 @@ import {
   onboardingRedirectTarget,
   type OnboardingState,
 } from "@/lib/onboarding";
-import { AUTH_COOKIE_OPTIONS, authEnv, hasSupabaseAuthCookie } from "./auth-config";
+import {
+  AUTH_COOKIE_OPTIONS,
+  AUTH_COOKIE_VERSION_COOKIE,
+  authCookieMarker,
+  authEnv,
+  hasSupabaseAuthCookie,
+  needsAuthCookieRewrite,
+} from "./auth-config";
 
 /**
  * CM-58 : rafraîchit la session Supabase à chaque requête (motif officiel
@@ -60,6 +67,39 @@ export async function updateSession(request: NextRequest) {
   // sinon déconnexions aléatoires). getClaims valide le JWT et le rafraîchit
   // si besoin, via setAll ci-dessus.
   const { data: claimsData } = await supabase.auth.getClaims();
+
+  // CM-88 : cookies de session réécrits avec les options actuelles (lisibles
+  // par le navigateur, 400 jours) quand le marqueur ne correspond plus à la
+  // session reçue, et toujours sur `/login` (voir auth-config.ts).
+  const requestCookies = request.cookies.getAll();
+  if (
+    claimsData &&
+    needsAuthCookieRewrite(requestCookies, request.cookies.get(AUTH_COOKIE_VERSION_COOKIE)?.value, {
+      force: request.nextUrl.pathname === "/login",
+    })
+  ) {
+    for (const c of requestCookies) {
+      if (!hasSupabaseAuthCookie([c.name]) || supabaseResponse.cookies.get(c.name)) continue;
+      supabaseResponse.cookies.set(c.name, c.value, AUTH_COOKIE_OPTIONS);
+    }
+    // Empreinte de la session telle que le navigateur la gardera : valeurs
+    // rafraîchies par getClaims ci-dessus si c'est le cas, sinon celles reçues.
+    const finalCookies = requestCookies
+      .map((c) => ({ name: c.name, value: supabaseResponse.cookies.get(c.name)?.value ?? c.value }))
+      .concat(
+        supabaseResponse.cookies
+          .getAll()
+          .filter((c) => !request.cookies.has(c.name))
+          .map((c) => ({ name: c.name, value: c.value })),
+      );
+    supabaseResponse.cookies.set(AUTH_COOKIE_VERSION_COOKIE, authCookieMarker(finalCookies), {
+      path: "/",
+      sameSite: "lax",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 400 * 24 * 60 * 60,
+    });
+  }
 
   // CM-86 : onboarding pas terminé => /onboarding.
   const userId = claimsData?.claims?.sub;

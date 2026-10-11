@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { createAuthClient } from "@/lib/supabase/server";
-import { readDuoMembership } from "@/lib/profile";
+import { readDuoMembership } from "@/lib/queries/profiles";
 
 /**
  * CM-87 : lectures du duo optionnel.
