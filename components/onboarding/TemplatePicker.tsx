@@ -1,11 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import {
-  applyOnboardingTemplate,
-  finishOnboarding,
-  type TemplateFormState,
-} from "@/app/onboarding/actions";
+import { useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { applyTemplate, markOnboarded, type OnboardingWriteResult } from "@/lib/data/onboarding";
+import { onboardingDestination, type OnboardingExit } from "@/lib/onboarding";
 
 export type TemplateCard = {
   id: string;
@@ -24,24 +22,52 @@ export type TemplateCard = {
  * finale. Pour un invité (`invited`), « Créer ma séance » n'est pas proposé :
  * il quitterait le parcours avant la confirmation de l'invitation ; les
  * modèles restent facultatifs, comme pour un solo.
+ *
+ * CM-88 (PR 7) : écritures depuis le navigateur (lib/data/onboarding.ts ;
+ * modèle et fin de l'onboarding en une transaction SQL). L'onboarding est
+ * terminé AVANT de partir, puis la destination s'ouvre par RECHARGEMENT
+ * COMPLET : la requête passe par le middleware, qui relit `onboarded_at`
+ * (déjà posé), laisse passer et pose son cookie de confort, sans renvoyer
+ * vers /onboarding ; le cache du navigateur (identité « pas onboardé »)
+ * repart de zéro.
  */
 export default function TemplatePicker({
+  profileId,
   templates,
   initialError,
   next = "",
   invited = false,
 }: {
+  profileId: string;
   templates: TemplateCard[];
   initialError?: string;
   next?: string;
   invited?: boolean;
 }) {
   const [picked, setPicked] = useState(templates[0]?.id ?? "");
-  const [state, action, pending] = useActionState<TemplateFormState, FormData>(
-    applyOnboardingTemplate,
-    {},
-  );
-  const error = state.error ?? initialError;
+  const [busy, setBusy] = useState<"template" | "finish" | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const pending = busy === "template";
+  const error = failure ?? initialError;
+
+  async function run(kind: "template" | "finish", exit: OnboardingExit, write: () => Promise<OnboardingWriteResult>) {
+    if (busy) return;
+    setBusy(kind);
+    setFailure(null);
+    const result = await write();
+    if (!result.ok) {
+      setFailure(result.error);
+      setBusy(null);
+      return;
+    }
+    // Le bouton reste occupé jusqu'au départ de la page.
+    window.location.assign(onboardingDestination(exit, next));
+  }
+
+  const finish = (exit: OnboardingExit) => (e: React.FormEvent) => {
+    e.preventDefault();
+    void run("finish", exit, () => markOnboarded(getSupabaseBrowserClient(), profileId));
+  };
 
   return (
     <>
@@ -90,11 +116,10 @@ export default function TemplatePicker({
       </div>
 
       {!invited && (
-        <form action={finishOnboarding}>
-          <input type="hidden" name="exit" value="/seances/new" />
-          {next && <input type="hidden" name="next" value={next} />}
+        <form onSubmit={finish("/seances/new")}>
           <button
             type="submit"
+            disabled={busy !== null}
             className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-[18px] border-[1.5px] border-dashed border-white/15 text-base font-bold text-fg"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
@@ -113,22 +138,26 @@ export default function TemplatePicker({
 
       <div className="flex-1" />
 
-      <form action={action} className="mt-8">
-        <input type="hidden" name="template" value={picked} />
-        {next && <input type="hidden" name="next" value={next} />}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!picked) return;
+          void run("template", "/dashboard", () => applyTemplate(getSupabaseBrowserClient(), picked));
+        }}
+        className="mt-8"
+      >
         <button
           type="submit"
-          disabled={pending || !picked}
+          disabled={busy !== null || !picked}
           className="h-14 w-full rounded-2xl bg-energy text-base font-extrabold text-ink disabled:opacity-60"
         >
           {pending ? "Ajout en cours…" : "Ajouter et c'est parti"}
         </button>
       </form>
-      <form action={finishOnboarding}>
-        <input type="hidden" name="exit" value="/dashboard" />
-        {next && <input type="hidden" name="next" value={next} />}
+      <form onSubmit={finish("/dashboard")}>
         <button
           type="submit"
+          disabled={busy !== null}
           className="mt-1.5 flex h-11 w-full items-center justify-center text-base font-semibold text-fg-muted"
         >
           Passer pour l&apos;instant

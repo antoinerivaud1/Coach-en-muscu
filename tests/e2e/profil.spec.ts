@@ -23,6 +23,44 @@ test.describe("Connexion et profil (CM-59 B)", () => {
     await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
   });
 
+  test("CM-88 (PR 7) : connexion et déconnexion depuis le navigateur, compte connecté renvoyé de /login", async ({ page }) => {
+    // Connexion : appel Auth émis par la page elle-même, aucune server action.
+    const calls: string[] = [];
+    page.on("request", (r) => {
+      const url = new URL(r.url());
+      if (url.pathname.includes("/auth/v1/")) calls.push(`${r.method()} ${url.pathname}`);
+      if (r.method() === "POST" && r.headers()["next-action"]) calls.push("server-action");
+    });
+    await login(page, E2E_ACCOUNT.email, E2E_ACCOUNT.password);
+    expect(calls).toContain("POST /auth/v1/token");
+    expect(calls).not.toContain("server-action");
+
+    // Déjà connecté : /login, /welcome et /signup renvoient vers `next`.
+    await page.goto("/login?next=%2Fprofile");
+    await expect(page).toHaveURL(/\/profile$/);
+    await page.goto("/welcome");
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/signup?next=%2Fguide");
+    await expect(page).toHaveURL(/\/guide$/);
+
+    // Déconnexion depuis le navigateur.
+    await page.goto("/profile");
+    await page.getByRole("button", { name: "Se déconnecter" }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    expect(calls).toContain("POST /auth/v1/logout");
+    expect(calls).not.toContain("server-action");
+
+    // Mauvais mot de passe : message, on reste sur /login, email conservé.
+    await page.getByLabel("Email").fill(E2E_ACCOUNT.email);
+    await page.getByLabel("Mot de passe").fill("pas-le-bon-mot-de-passe");
+    await page.getByRole("button", { name: "Se connecter" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveText(
+      "Email ou mot de passe incorrect.",
+    );
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByLabel("Email")).toHaveValue(E2E_ACCOUNT.email);
+  });
+
   test("CM-88 : le Profil est lu et enregistré depuis le navigateur", async ({ page }) => {
     await login(page, E2E_ACCOUNT.email, E2E_ACCOUNT.password);
     // Les lectures et l'écriture partent du navigateur (requêtes PostgREST

@@ -13,9 +13,8 @@ import LeaveDuoSheet from "@/components/duo/LeaveDuoSheet";
  * - invitation en attente : code, lien vers l'écran de partage, annulation ;
  * - en duo : partenaire, puis « Quitter le duo » (feuille de confirmation).
  *
- * CM-88 : l'état est lu dans le navigateur (ProfileScreen). Les actions
- * restent des server actions (PR 7) ; chacune rafraîchit le cache du
- * navigateur quand elle aboutit (`useDuoAction`).
+ * CM-88 : l'état est lu dans le navigateur (ProfileScreen), les actions y
+ * sont lancées aussi (PR 7, hooks/data/useDuoActions.ts).
  */
 export default function DuoSection({
   state,

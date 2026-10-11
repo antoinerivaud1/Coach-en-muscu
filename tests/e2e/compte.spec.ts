@@ -6,7 +6,7 @@ import { SEED_ACCOUNTS, guardWrites, login } from "./helpers";
 // données »). La suppression vise un compte CRÉÉ par le test (inscription,
 // email unique en `.test`) : rejouable, et les comptes du seed restent en
 // place pour les autres parcours (la CI rejoue tout avec DATA_CLIENT=service).
-// Nécessite SIGNUP_ENABLED=1 côté app (job e2e de la CI).
+// Nécessite NEXT_PUBLIC_SIGNUP_ENABLED=1 au build (job e2e de la CI).
 
 guardWrites();
 

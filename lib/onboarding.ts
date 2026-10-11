@@ -2,7 +2,7 @@
  * CM-86 : onboarding solo. Logique pure (aucun import Next ni Supabase),
  * testée dans tests/unit/onboarding.spec.ts.
  *
- * - drapeau serveur d'inscription (`SIGNUP_ENABLED`) ;
+ * - drapeau d'inscription (`NEXT_PUBLIC_SIGNUP_ENABLED`, affichage seulement) ;
  * - validation du profil saisi à l'onboarding et dans « Mon profil »
  *   (prénom, couleur, objectif hebdo) ;
  * - règle de redirection vers `/onboarding` (appliquée par le middleware) ;
@@ -25,10 +25,11 @@ import {
 // ---- Drapeau d'inscription ---------------------------------------------------
 
 /**
- * Inscription ouverte ? Variable SERVEUR `SIGNUP_ENABLED` (jamais exposée au
- * navigateur), désactivée par défaut : l'app n'est pas encore publique et
- * l'inscription est fermée dans Supabase prod. Seules les valeurs `1` et
- * `true` l'ouvrent (la CI e2e met `1`).
+ * Inscription ouverte à l'affichage ? CM-88 (PR 7) : variable PUBLIQUE
+ * `NEXT_PUBLIC_SIGNUP_ENABLED`, gravée au build (`signupOpen`,
+ * lib/data/auth.ts), désactivée par défaut : l'app n'est pas encore publique
+ * et l'inscription est fermée dans Supabase prod (la vraie barrière). Seules
+ * les valeurs `1` et `true` l'ouvrent (la CI e2e build avec `1`).
  */
 export function isSignupEnabled(value: string | null | undefined): boolean {
   const v = (value ?? "").trim().toLowerCase();

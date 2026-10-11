@@ -1,9 +1,19 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { saveOnboardingProfile, type IdentityFormState } from "@/lib/actions/identity";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/data/queryKeys";
+import { updateIdentity, type IdentityWriteResult } from "@/lib/data/profile";
+import { withNext } from "@/lib/auth/core";
 import { isMemberColor, DEFAULT_MEMBER_COLOR, type MemberColor } from "@/lib/members";
-import { DEFAULT_WEEKLY_GOAL, FIRST_NAME_MAX_LENGTH, parseWeeklyGoal } from "@/lib/onboarding";
+import {
+  DEFAULT_WEEKLY_GOAL,
+  FIRST_NAME_MAX_LENGTH,
+  parseWeeklyGoal,
+  type IdentityFieldErrors,
+} from "@/lib/onboarding";
 import MemberAvatar from "./MemberAvatar";
 import ColorPicker from "./ColorPicker";
 import GoalStepper from "./GoalStepper";
@@ -12,35 +22,56 @@ import GoalStepper from "./GoalStepper";
  * CM-86 : étape « Comment on t'appelle ? » (maquette 3) : prénom, avatar
  * (initiale sur fond de couleur, pas d'upload dans ce ticket), couleur parmi
  * 6, objectif hebdo de 1 à 7 (3 par défaut).
+ *
+ * CM-88 (PR 7) : écrit depuis le navigateur, même validation et même
+ * écriture que la section « Mon profil » (`updateIdentity`,
+ * lib/data/profile.ts : couleur du partenaire de duo refusée). Identité en
+ * cache relue AVANT de passer à l'étape 3, qui affiche le prénom.
  */
 export default function ProfileStepForm({
+  profileId,
   initialName,
   initialColor,
   initialGoal,
   next = "",
 }: {
+  profileId: string;
   initialName: string;
   initialColor: string;
   initialGoal: number;
   /** CM-103 : destination finale conservée (lien d'invitation). */
   next?: string;
 }) {
-  const [state, action, pending] = useActionState<IdentityFormState, FormData>(
-    saveOnboardingProfile,
-    {},
-  );
-  const [name, setName] = useState(state.values?.displayName ?? initialName);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const save = useMutation({
+    mutationFn: (values: { displayName: string; accentColor: string; weeklyGoal: string }) =>
+      updateIdentity(getSupabaseBrowserClient(), profileId, values),
+    onSuccess: async (result: IdentityWriteResult) => {
+      if (!result.ok) return;
+      await queryClient.invalidateQueries({ queryKey: queryKeys.profile.identity(profileId) });
+      router.push(withNext("/onboarding/seances", next));
+    },
+  });
+  // Après un succès, le bouton reste occupé jusqu'au changement d'écran.
+  const pending = save.isPending || save.data?.ok === true;
+  const state: { error?: string; fieldErrors?: IdentityFieldErrors } =
+    save.data && !save.data.ok ? save.data : {};
+  const [name, setName] = useState(initialName);
   const [color, setColor] = useState<MemberColor>(
     isMemberColor(initialColor) ? initialColor : DEFAULT_MEMBER_COLOR,
   );
   const [goal, setGoal] = useState(parseWeeklyGoal(initialGoal) ?? DEFAULT_WEEKLY_GOAL);
   const nameError = state.fieldErrors?.displayName;
 
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (pending) return;
+    save.mutate({ displayName: name, accentColor: color, weeklyGoal: String(goal) });
+  }
+
   return (
-    <form action={action} className="flex flex-1 flex-col" noValidate>
-      <input type="hidden" name="accent_color" value={color} />
-      <input type="hidden" name="weekly_goal" value={goal} />
-      {next && <input type="hidden" name="next" value={next} />}
+    <form onSubmit={submit} className="flex flex-1 flex-col" noValidate>
 
       <div className="mt-6 flex items-center gap-4">
         <MemberAvatar name={name} color={color} size={76} />

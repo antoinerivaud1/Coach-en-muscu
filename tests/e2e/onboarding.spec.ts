@@ -3,7 +3,7 @@ import { SEED_ACCOUNTS, guardWrites, login } from "./helpers";
 
 // CM-86 : onboarding solo. Crée de VRAIS comptes (emails uniques en `.test`)
 // dans la base locale de la CI : garde-fou obligatoire. Nécessite
-// SIGNUP_ENABLED=1 côté app (job e2e de la CI) et l'inscription ouverte dans
+// NEXT_PUBLIC_SIGNUP_ENABLED=1 au build (job e2e de la CI) et l'inscription ouverte dans
 // la stack Supabase locale (supabase/config.toml).
 
 guardWrites();
@@ -64,10 +64,20 @@ test.describe("Onboarding solo (CM-86)", () => {
       "aria-checked",
       "true",
     );
+    // CM-88 (PR 7) : modèle et fin de l'onboarding en UNE RPC, depuis le navigateur.
+    const rpc = page.waitForRequest((r) =>
+      r.url().includes("/rest/v1/rpc/apply_onboarding_template"),
+    );
     await page.getByRole("button", { name: "Ajouter et c'est parti" }).click();
+    await rpc;
 
+    // Pas de retour parasite vers /onboarding (le middleware relit
+    // onboarded_at puis pose son cookie de confort).
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole("heading", { name: /^Salut, Camille/ })).toBeVisible();
+    await expect
+      .poll(async () => (await page.context().cookies()).some((c) => c.name === "cm_onboarded"))
+      .toBe(true);
     const today = page.getByRole("region", { name: "Aujourd'hui" });
     await expect(today).toBeVisible();
     await expect(today).toContainText("Push");

@@ -41,3 +41,33 @@ test("CM-88 : le Profil sans session renvoie à la connexion, avec retour prévu
   await expect(page).toHaveURL(/\/login\?next=%2Fprofile$/);
   await expect(page.getByLabel("Email")).toBeVisible();
 });
+
+test("CM-88 (PR 7) : un lien d'invitation sans session passe par la connexion, code conservé", async ({ page }) => {
+  await page.goto("/duo/rejoindre?code=K7QM4P");
+  await expect(page).toHaveURL(/\/login\?next=%2Fduo%2Frejoindre%3Fcode%3DK7QM4P$/);
+  await expect(page.getByLabel("Email")).toBeVisible();
+  // La confirmation aussi (écran client), avec son propre retour.
+  await page.goto("/duo/rejoindre/confirmer?code=K7QM4P");
+  await expect(page).toHaveURL(/\/login\?next=%2Fduo%2Frejoindre%2Fconfirmer%3Fcode%3DK7QM4P$/);
+});
+
+test("CM-88 (PR 7) : l'onboarding et l'écran d'invitation sans session renvoient à la connexion", async ({ page }) => {
+  await page.goto("/onboarding");
+  await expect(page).toHaveURL(/\/login\?next=%2Fonboarding$/);
+  await page.goto("/duo/inviter");
+  await expect(page).toHaveURL(/\/login\?next=%2Fduo%2Finviter$/);
+});
+
+test("CM-88 (PR 7) : bienvenue et inscription sans session s'affichent, `next` suit", async ({ page }) => {
+  await page.goto("/welcome?next=%2Fduo%2Frejoindre%3Fcode%3DK7QM4P");
+  await expect(page.getByRole("heading", { name: "Chaque série compte." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "J'ai déjà un compte" })).toHaveAttribute(
+    "href",
+    "/login?next=%2Fduo%2Frejoindre%3Fcode%3DK7QM4P",
+  );
+  await page.goto("/signup");
+  // Ouverte ou fermée selon NEXT_PUBLIC_SIGNUP_ENABLED (build) : un des deux titres.
+  await expect(
+    page.getByRole("heading", { name: /Crée ton compte|Les inscriptions ouvriront bientôt/ }),
+  ).toBeVisible();
+});

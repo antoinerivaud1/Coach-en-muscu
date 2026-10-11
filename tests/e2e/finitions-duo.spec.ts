@@ -4,7 +4,7 @@ import { SEED_ACCOUNTS, SEED_NAMES, guardWrites, login } from "./helpers";
 // CM-103 : finitions du duo.
 // - Invitation conservée à l'inscription : un invité SANS compte ouvre le lien
 //   d'invitation, passe par /login, crée son compte (/welcome, /signup,
-//   SIGNUP_ENABLED=1 en CI), fait l'onboarding et arrive sur la confirmation
+//   NEXT_PUBLIC_SIGNUP_ENABLED=1 au build en CI), fait l'onboarding et arrive sur la confirmation
 //   de l'invitation, puis rejoint le duo.
 // - Couleur unique dans le duo : Théo ne peut pas choisir la couleur de Lina
 //   (grisée à l'écran, refusée par l'action serveur).

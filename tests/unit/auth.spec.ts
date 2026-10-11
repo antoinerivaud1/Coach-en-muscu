@@ -15,8 +15,20 @@ import {
   authCookieFingerprint,
   authCookieMarker,
   hasSupabaseAuthCookie,
+  isCodeVerifierCookie,
   needsAuthCookieRewrite,
 } from "@/lib/supabase/auth-config";
+
+// CM-88 (PR 7) : seul le « code verifier » PKCE est effacé, jamais la session.
+test("isCodeVerifierCookie : verifier PKCE seulement, pas la session", () => {
+  expect(isCodeVerifierCookie("sb-127-auth-token-code-verifier")).toBe(true);
+  expect(isCodeVerifierCookie("sb-drmmgwchoowggpsppilo-auth-token-code-verifier")).toBe(true);
+  expect(isCodeVerifierCookie("sb-127-auth-token-code-verifier.0")).toBe(true);
+  expect(isCodeVerifierCookie("sb-127-auth-token")).toBe(false);
+  expect(isCodeVerifierCookie("sb-127-auth-token.0")).toBe(false);
+  expect(isCodeVerifierCookie("cm_onboarded")).toBe(false);
+  expect(isCodeVerifierCookie("code-verifier")).toBe(false);
+});
 
 // Tests unitaires purs (CM-58) : aucun navigateur, aucun appel Supabase.
 

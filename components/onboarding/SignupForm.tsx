@@ -1,22 +1,42 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { signUpWithPassword, type SignupFormState } from "@/lib/actions/signup";
+import { useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { signUpWithEmail, type SignupFormState } from "@/lib/data/auth";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/core";
-import { useFullPageRedirect } from "@/hooks/useFullPageRedirect";
 
 /**
  * CM-86 : formulaire « Crée ton compte » (maquette 2). CM-103 : `next`
- * (lien d'invitation) transmis à l'onboarding.
+ * (lien d'invitation) transmis à l'onboarding. CM-88 (PR 7) : inscription
+ * depuis le navigateur (lib/data/auth.ts), puis onboarding par RECHARGEMENT
+ * COMPLET (cache du navigateur neuf). `onStart` : prévient l'écran qu'une
+ * inscription part (il cesse alors de rediriger lui-même).
  */
-export default function SignupForm({ next = "" }: { next?: string }) {
-  const [state, action, actionPending] = useActionState<SignupFormState, FormData>(
-    signUpWithPassword,
-    {},
-  );
-  useFullPageRedirect(state.redirectTo);
+export default function SignupForm({ next = "", onStart }: { next?: string; onStart?: () => void }) {
+  const [state, setState] = useState<SignupFormState>({});
+  const [busy, setBusy] = useState(false);
   // Le rechargement prend un instant : le bouton reste occupé jusque-là.
-  const pending = actionPending || Boolean(state.redirectTo);
+  const pending = busy || Boolean(state.redirectTo);
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (pending) return;
+    const data = new FormData(e.currentTarget);
+    setBusy(true);
+    onStart?.();
+    const result = await signUpWithEmail(getSupabaseBrowserClient(), {
+      email: String(data.get("email") ?? ""),
+      password: String(data.get("password") ?? ""),
+      next,
+    });
+    setState(result);
+    if (result.redirectTo) {
+      window.location.assign(result.redirectTo);
+      return;
+    }
+    setBusy(false);
+  }
+
   const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
   const longEnough = password.length >= PASSWORD_MIN_LENGTH;
@@ -26,8 +46,7 @@ export default function SignupForm({ next = "" }: { next?: string }) {
     "h-[54px] w-full rounded-[14px] border bg-surface px-4 text-base text-fg placeholder-fg-muted focus:border-energy focus:outline-none";
 
   return (
-    <form action={action} className="flex flex-1 flex-col" noValidate>
-      {next && <input type="hidden" name="next" value={next} />}
+    <form onSubmit={submit} className="flex flex-1 flex-col" noValidate>
       <div className="mt-8 flex flex-col gap-[18px]">
         <label className="flex flex-col gap-2">
           <span className="text-[15px] font-semibold text-[#A4A4AE]">Email</span>

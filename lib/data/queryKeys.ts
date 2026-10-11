@@ -49,4 +49,19 @@ export const queryKeys = {
   dashboard: {
     all: (profileId: string) => [profileId, "sessions", "dashboard"] as const,
   },
+
+  // ---- CM-88 PR 7 : duo, onboarding, connexion ----
+  /**
+   * Aperçu d'une invitation (écran de confirmation). Hors de
+   * `duo.state` : l'effacer après une action du duo ne touche pas l'aperçu.
+   */
+  duoInvitation: {
+    preview: (profileId: string, code: string) =>
+      [profileId, "duoInvitation", "preview", code] as const,
+  },
+  /** Email du compte connecté (pré-remplissage du prénom à l'onboarding). */
+  account: {
+    email: (profileId: string) => [profileId, "account", "email"] as const,
+  },
+  // ---- fin CM-88 PR 7 ----
 } as const;

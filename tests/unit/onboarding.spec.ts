@@ -19,7 +19,7 @@ import {
 
 const UID = "11111111-1111-1111-1111-111111111111";
 
-test.describe("Drapeau d'inscription SIGNUP_ENABLED", () => {
+test.describe("Drapeau d'inscription NEXT_PUBLIC_SIGNUP_ENABLED", () => {
   test("fermé par défaut, ouvert seulement par 1 ou true", () => {
     expect(isSignupEnabled(undefined)).toBe(false);
     expect(isSignupEnabled("")).toBe(false);

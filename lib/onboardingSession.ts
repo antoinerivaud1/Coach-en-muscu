@@ -1,45 +1,8 @@
-import { redirect } from "next/navigation";
-import { requireProfileId } from "@/lib/profile";
-import { createClient, createAuthClient } from "@/lib/supabase/server";
-import { readIdentity, type Identity } from "@/lib/queries/identity";
-import { onboardingDestination } from "@/lib/onboarding";
-
-export type OnboardingContext =
-  | { ok: true; identity: Identity; email: string | null }
-  | { ok: false };
-
 /**
- * CM-86 : contexte serveur des écrans d'onboarding. Sans session : connexion.
- * Onboarding déjà terminé : accueil (Antoine et Léa ne le revoient jamais),
- * ou CM-103 la destination `next` conservée (confirmation d'invitation).
- *
- * C7 : profil illisible (erreur réseau) ou introuvable : `{ ok: false }`, la
- * page affiche un écran d'erreur avec « Réessayer ». Surtout pas de
- * redirection : le middleware renverrait vers /onboarding (boucle possible
- * /onboarding → /login → /dashboard → /onboarding).
+ * CM-86 : aide pure des écrans d'onboarding. CM-88 (PR 7) : le contexte
+ * (session, identité, email) est lu dans le navigateur
+ * (hooks/data/useOnboardingContext.ts) ; plus aucun import serveur ici.
  */
-export async function requireOnboardingIdentity(
-  path: string,
-  next = "",
-): Promise<OnboardingContext> {
-  const profileId = await requireProfileId(path);
-  const supabase = await createClient();
-  const read = await readIdentity(supabase, profileId);
-  if (!read.ok || !read.identity) return { ok: false };
-  const identity = read.identity;
-  if (identity.onboarded_at) redirect(onboardingDestination("/dashboard", next));
-
-  let email: string | null = null;
-  try {
-    const auth = await createAuthClient();
-    const { data } = await auth.auth.getClaims();
-    const raw = data?.claims?.email;
-    email = typeof raw === "string" ? raw : null;
-  } catch {
-    email = null;
-  }
-  return { ok: true, identity, email };
-}
 
 /**
  * Prénom à pré-remplir : le trigger `handle_new_user` met le début de l'email

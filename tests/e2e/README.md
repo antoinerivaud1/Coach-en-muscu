@@ -4,17 +4,17 @@ Parcours critiques joués dans un vrai navigateur contre l'app démarrée.
 
 | Fichier | Parcours | Écrit en base |
 | --- | --- | --- |
-| `smoke.spec.ts` | sans session, l'accueil, le tableau de bord, le Guide, le Carnet, les Stats et le Profil (écrans client, CM-88) renvoient à `/login` (avec `next`) | non |
+| `smoke.spec.ts` | sans session, l'accueil, le tableau de bord, le Guide, le Carnet, les Stats et le Profil (écrans client, CM-88) renvoient à `/login` (avec `next`) ; CM-88 (PR 7) : le lien d'invitation, la confirmation, l'écran d'invitation et l'onboarding aussi (code conservé dans `next`), la bienvenue et l'inscription s'affichent avec `next` | non |
 | `accueil.spec.ts` | CM-88 (PR 4) : le tableau de bord, lu depuis le navigateur sous RLS, montre les séances types du compte (rien de Solo pour Théo) et son HTML serveur ne contient aucune donnée ; déconnexion puis autre compte par l'interface sans rien de l'accueil précédent ; après l'abandon d'une séance, aucun « Reprendre » périmé, même un instant ; `?error=` s'affiche | oui (démarre puis abandonne une séance, purge CM-83) |
 | `guide.spec.ts` | CM-88 : le Guide, lu depuis le navigateur sous RLS, montre le catalogue de chacun (exercice perso de Solo invisible pour Théo) ; déconnexion puis autre compte par l'interface sans rien du compte précédent ; ouvert sans session, il revient après la connexion sans boucle ; une session d'avant CM-88 (cookie `httpOnly`) ou un retour arrière Vercel (cookies `httpOnly` malgré le marqueur) restent reconnus | non (purge CM-83 du tableau de bord) |
 | `isolation.spec.ts` | RLS (CM-59 B) : Solo n'ouvre pas une séance du duo et ne voit ni son programme ni son historique ; le duo n'ouvre pas une séance de Solo ; Elle voit l'historique de Toi ; CM-88 : Solo ne lit pas les Stats de Théo via `?profile=`, Lina passe aux Stats de Théo par l'onglet | non (purge CM-83 du tableau de bord) |
-| `profil.spec.ts` | se connecter, se déconnecter ; CM-88 : le Profil est lu depuis le navigateur (requêtes `/rest/v1/profiles` du navigateur) et « Mon profil » s'enregistre depuis le navigateur (enregistré sans changement : données du seed intactes) | oui (purge CM-83 du tableau de bord) |
+| `profil.spec.ts` | se connecter, se déconnecter ; CM-88 : le Profil est lu depuis le navigateur (requêtes `/rest/v1/profiles` du navigateur) et « Mon profil » s'enregistre depuis le navigateur (enregistré sans changement : données du seed intactes) ; CM-88 (PR 7) : connexion et déconnexion depuis le navigateur (appels `/auth/v1/` de la page, aucune server action), compte connecté renvoyé de `/login`, `/welcome` et `/signup` vers `next`, mauvais mot de passe : message, email conservé | oui (purge CM-83 du tableau de bord) |
 | `seance.spec.ts` | démarrer, valider une série, abandonner, quitter puis reprendre, supprimer, terminer via la croix (CM-94) | oui |
 | `progression.spec.ts` | une séance terminée apparaît dans « Stats » ; CM-88 : Carnet déjà en cache, une séance terminée puis supprimée y est à jour au retour (navigation client) | oui |
-| `onboarding.spec.ts` | CM-86 : inscription d'un nouveau compte, onboarding complet (prénom, couleur, objectif), modèle de séances ajouté, accueil du premier jour ; un solo crée un exercice perso et le retrouve dans le catalogue ; un compte déjà onboardé n'est jamais redirigé vers `/onboarding` | oui (crée des comptes `cm86-…@coach-en-muscu.test`) |
+| `onboarding.spec.ts` | CM-86 : inscription d'un nouveau compte, onboarding complet (prénom, couleur, objectif), modèle de séances ajouté, accueil du premier jour ; un solo crée un exercice perso et le retrouve dans le catalogue ; un compte déjà onboardé n'est jamais redirigé vers `/onboarding` ; CM-88 (PR 7) : le modèle part en UNE RPC du navigateur (`apply_onboarding_template`), puis accueil sans retour parasite vers `/onboarding` (cookie `cm_onboarded` posé par le middleware) | oui (crée des comptes `cm86-…@coach-en-muscu.test`) |
 | `compte.spec.ts` | CM-60 : Solo exporte ses données (ZIP non vide, ses séances ; CM-88 : ZIP construit dans le navigateur), Lina exporte sans rien de Théo mais avec la bibliothèque du duo (marquée partagée) ; un compte créé par le test se supprime (feuille en deux temps, mot « SUPPRIMER » ; CM-88 : RPC et fermeture de session depuis le navigateur ; un refus de la base, simulé par `page.route`, affiche le message et laisse la session intacte), ses files locales sont vidées, puis il ne peut plus se connecter | oui (crée puis supprime des comptes `cm60-…@coach-en-muscu.test`) |
 | `duo.spec.ts` | CM-87 : Solo invite, Duo2 rejoint par le lien puis Solo quitte avec une copie ; « Pour qui ? » seulement en duo ; prénoms et couleurs ; CM-88 : le Profil (écran client) suit la création et l'annulation d'une invitation sans rechargement ni ancien état en cache | oui (invitations et duo de Solo et Duo2, remis hors duo par l'UI) |
-| `finitions-duo.spec.ts` | CM-103 : un invité sans compte ouvre le lien d'invitation, passe par `/login`, crée son compte (`/welcome`, `/signup`), fait l'onboarding et arrive sur la confirmation de l'invitation, puis rejoint le duo de Solo (Solo le quitte à la fin) ; Théo ne peut pas choisir la couleur de Lina (grisée, refusée à l'écriture) | oui (crée des comptes `cm103-invite-…@coach-en-muscu.test`) |
+| `finitions-duo.spec.ts` | CM-103 : un invité sans compte ouvre le lien d'invitation, passe par `/login`, crée son compte (`/welcome`, `/signup`), fait l'onboarding et arrive sur la confirmation de l'invitation, puis rejoint le duo de Solo (Solo le quitte à la fin ; CM-88 (PR 7) : le `?code=` du lien ne ferme plus la session d'un compte tout juste inscrit) ; Théo ne peut pas choisir la couleur de Lina (grisée, refusée à l'écriture) | oui (crée des comptes `cm103-invite-…@coach-en-muscu.test`) |
 
 Depuis CM-59 B, l'app n'a plus de sélecteur de profil ni de mode d'auth : les
 parcours se connectent par `/login` avec les comptes du seed (helper `login`),
@@ -51,9 +51,10 @@ sur `main`, sans aucun secret :
 3. `supabase status -o env` fournit `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` et `SUPABASE_SERVICE_ROLE_KEY` (clés de démo
    locales) ; le job refuse toute URL qui n'est pas `http://127.0.0.1:…`.
-4. `npm run build` puis `next start` sur le port 3000, attente de la réponse.
-5. `npm run test:e2e` avec `E2E_ALLOW_WRITES=1`, `SIGNUP_ENABLED=1` (CM-86 :
-   inscription ouverte côté app, lue par `next start`) et
+4. `npm run build` (avec `NEXT_PUBLIC_SIGNUP_ENABLED=1` : CM-86 / CM-88,
+   inscription ouverte à l'affichage, variable publique gravée AU BUILD)
+   puis `next start` sur le port 3000, attente de la réponse.
+5. `npm run test:e2e` avec `E2E_ALLOW_WRITES=1` et
    `E2E_SEANCE_NAME=Haut du corps` (données du seed) ; les parcours se
    connectent avec le compte « Toi » du seed.
 
@@ -81,8 +82,9 @@ eval "$(supabase status -o env \
   | grep -E '^(NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=' \
   | sed 's/^/export /')"
 
-# 3. App sur la base locale
-npm run build && npm run start          # laisser tourner
+# 3. App sur la base locale (inscription ouverte : variable lue AU BUILD,
+#    nécessaire pour onboarding.spec.ts, finitions-duo.spec.ts et compte.spec.ts)
+NEXT_PUBLIC_SIGNUP_ENABLED=1 npm run build && npm run start          # laisser tourner
 
 # 4. Dans un autre terminal (mêmes variables exportées)
 npx playwright install chromium          # une fois
@@ -91,7 +93,6 @@ E2E_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
 E2E_BASE_URL=http://localhost:3000 \
 E2E_SEANCE_NAME="Haut du corps" \
 npm run test:e2e
-# (l'app doit avoir été démarrée avec SIGNUP_ENABLED=1 pour onboarding.spec.ts et compte.spec.ts)
 
 # 5. Fin
 supabase stop --no-backup
