@@ -49,10 +49,9 @@ begin
 end;
 $function$;
 
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
+-- Le trigger `on_auth_user_created` (CM-58) n'est PAS recréé : il appelle
+-- déjà cette fonction, `create or replace` suffit (recréer le trigger
+-- prendrait un verrou exclusif sur auth.users).
 
 revoke all on function public.handle_new_user() from public, anon, authenticated;
 grant execute on function public.handle_new_user() to service_role;

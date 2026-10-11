@@ -9,6 +9,11 @@
 -- l'app encore en prod (CM-87) lirait une colonne disparue (Profil,
 -- onboarding : erreur « column profiles.color_role does not exist »).
 --
+-- !!! Une fois ce SQL appliqué, ne jamais revenir sur Vercel à un
+-- déploiement antérieur à la PR #40 (Profil et onboarding casseraient :
+-- l'ancien code lit color_role). Revenir en arrière côté code impose
+-- d'abord le RETOUR ARRIÈRE SQL en bas de ce fichier. !!!
+--
 -- Contenu = la migration du repo, À L'IDENTIQUE, dans une transaction :
 --   supabase/migrations/20261011120000_cm103_drop_color_role.sql
 -- Si une instruction échoue, rien n'est appliqué (rollback automatique).
@@ -18,7 +23,8 @@
 -- Prérequis : socle CM-86 appliqué (profiles.accent_color, remplie depuis
 -- color_role : 'elle' -> rose, sinon cyan) et RPC CM-87 appliquées.
 --
--- Sans interruption : remplace handle_new_user (trigger d'inscription),
+-- Sans interruption : remplace handle_new_user (fonction du trigger
+-- d'inscription, trigger lui-même non recréé : aucun verrou sur auth.users),
 -- retire un droit de colonne, supprime une colonne et un type enum devenus
 -- inutiles. Aucune autre donnée touchée ; couleurs d'Antoine et Léa
 -- (accent_color) inchangées.
@@ -86,10 +92,9 @@ begin
 end;
 $function$;
 
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
+-- Le trigger `on_auth_user_created` (CM-58) n'est PAS recréé : il appelle
+-- déjà cette fonction, `create or replace` suffit (recréer le trigger
+-- prendrait un verrou exclusif sur auth.users).
 
 revoke all on function public.handle_new_user() from public, anon, authenticated;
 grant execute on function public.handle_new_user() to service_role;
