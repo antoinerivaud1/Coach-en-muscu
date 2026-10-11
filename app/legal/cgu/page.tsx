@@ -193,8 +193,8 @@ export default function CguPage() {
 
       <Section id="fin" n={10} title={TOC[9].title}>
         <P>
-          Tu peux arrêter d’utiliser l’app et demander la suppression de ton compte à tout
-          moment (bientôt directement depuis Profil, en attendant via le{" "}
+          Tu peux arrêter d’utiliser l’app et supprimer ton compte à tout moment, depuis
+          Profil, section « Mes données » (voir le{" "}
           <A href="/support#suppression">support</A>).
         </P>
         <P>

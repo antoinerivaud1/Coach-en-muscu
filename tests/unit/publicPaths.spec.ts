@@ -13,6 +13,8 @@ test.describe("isPublicPath (CM-93)", () => {
       "/legal/mentions",
       "/support",
       "/support/",
+      // CM-60 : page affichée après la suppression du compte.
+      "/compte-supprime",
     ]) {
       expect(isPublicPath(p), p).toBe(true);
     }
@@ -25,7 +27,16 @@ test.describe("isPublicPath (CM-93)", () => {
   });
 
   test("correspondance par segment, pas par préfixe brut", () => {
-    for (const p of ["/legalese", "/legal-cgu", "/supports", "/support-admin", "/profile/legal", "/x/support"]) {
+    for (const p of [
+      "/legalese",
+      "/legal-cgu",
+      "/supports",
+      "/support-admin",
+      "/profile/legal",
+      "/x/support",
+      "/compte-supprimes",
+      "/profile/compte-supprime",
+    ]) {
       expect(isPublicPath(p), p).toBe(false);
     }
   });

@@ -495,6 +495,8 @@ export type Database = {
         Args: never
         Returns: { code: string; token: string; expires_at: string }[]
       }
+      // CM-60 : suppression du compte (supabase/migrations/20261011100000_cm60_delete_account.sql).
+      delete_my_account: { Args: { p_confirmation: string }; Returns: undefined }
       leave_duo: { Args: never; Returns: undefined }
       revoke_duo_invitation: { Args: never; Returns: undefined }
       set_seance_shared: {
