@@ -1,37 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  deleteSeance,
-  duplicateSeance,
-  moveSeance,
-  startSession,
-  type SeanceActionResult,
-} from "./actions";
 import { daysSince, formatLastDone } from "@/lib/utils/recommendation";
+import type { SeanceView, SeanceWriteResult } from "@/lib/data/seances";
+import { useSeanceLibraryAction, type SeanceLibraryAction } from "@/hooks/data/useSeances";
 
-export type SeanceExerciseView = {
-  id: string;
-  name: string;
-  groupLabel: string;
-  targetSets: number;
-  repsMin: number;
-  repsMax: number;
-};
-
-export type SeanceView = {
-  id: string;
-  name: string;
-  exerciseCount: number;
-  setCount: number;
-  tags: string[];
-  extraTags: number;
-  /** Dernière exécution TERMINÉE de cette séance par le profil courant. */
-  lastDoneAt: string | null;
-  exercises: SeanceExerciseView[];
-};
+export type { SeanceExerciseView, SeanceView } from "@/lib/data/seances";
 
 /**
  * Au-delà de ce nombre de jours, la « dernière fois » passe en orange : la
@@ -42,19 +17,24 @@ const STALE_DAYS = 5;
 /**
  * Bibliothèque « Mes séances ».
  *
- * `now` est calculé par le serveur et transmis ici : les libellés « Hier »,
- * « Il y a 6 jours » doivent être identiques au rendu serveur, sinon
- * l'hydratation diverge.
+ * CM-88 (PR 5) : écrans client. Dupliquer, supprimer, monter / descendre
+ * écrivent depuis le navigateur (`useSeanceLibraryAction`), « Démarrer »
+ * aussi (`onStart`, `useStartSession` de l'accueil). `now` vient de l'écran
+ * (heure du rendu), commun aux deux sections.
  */
 export default function SeanceLibrary({
   seances,
   now,
+  profileId,
+  onStart,
 }: {
   seances: SeanceView[];
-  now: string;
+  now: Date;
+  profileId: string;
+  onStart: (dayId: string) => void;
 }) {
-  const router = useRouter();
-  const [isPending, startAction] = useTransition();
+  const libraryAction = useSeanceLibraryAction(profileId);
+  const isPending = libraryAction.isPending;
   /** Erreur courante, rattachée à l'id de la séance concernée. */
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -62,35 +42,41 @@ export default function SeanceLibrary({
   /** Séance dont la suppression attend une confirmation, rendue dans le DOM. */
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
-  const nowDate = new Date(now);
+  const nowDate = now;
 
-  function run(key: string, action: () => Promise<SeanceActionResult>) {
+  async function run(key: string, action: SeanceLibraryAction) {
+    if (isPending) return;
     setErrorKey(null);
     setErrorMessage(null);
     setBusyId(key);
-    startAction(async () => {
-      const result = await action();
-      setBusyId(null);
-      setConfirmingId(null);
-      if (!result.success) {
-        setErrorKey(key);
-        setErrorMessage(result.error);
-        return;
-      }
-      router.refresh();
-    });
+    let result: SeanceWriteResult;
+    try {
+      // Se termine une fois la bibliothèque relue (liste déjà à jour).
+      result = await libraryAction.mutateAsync(action);
+    } catch (e) {
+      result = {
+        ok: false,
+        error: e instanceof Error ? e.message : "Une erreur est survenue. Réessaie dans un instant.",
+      };
+    }
+    setBusyId(null);
+    setConfirmingId(null);
+    if (!result.ok) {
+      setErrorKey(key);
+      setErrorMessage(result.error);
+    }
   }
 
   /**
    * CM-70 : la confirmation passait par `window.confirm()`. Ce dialogue natif
    * est supprimé (et renvoie donc `false`) dans une web app iOS en
-   * `display: standalone` comme dans la WKWebView Capacitor — les deux
+   * `display: standalone` comme dans la WKWebView Capacitor, les deux
    * contextes de cette app. `handleDelete` sortait avant même d'appeler la
    * server action : aucune requête, aucune erreur, aucun message. La
    * confirmation est désormais rendue dans le DOM (voir `confirmingId`).
    */
   function handleDelete(seance: SeanceView) {
-    run(seance.id, () => deleteSeance(seance.id));
+    void run(seance.id, { kind: "delete", dayId: seance.id, name: seance.name });
   }
 
   return (
@@ -133,19 +119,17 @@ export default function SeanceLibrary({
                 >
                   {formatLastDone(seance.lastDoneAt, nowDate)}
                 </span>
-                <form action={startSession}>
-                  <input type="hidden" name="day_id" value={seance.id} />
-                  <button
-                    type="submit"
-                    disabled={isEmpty}
-                    title={
-                      isEmpty ? "Ajoute au moins un exercice pour démarrer" : undefined
-                    }
-                    className="rounded-xl bg-energy px-4 py-2 text-sm font-extrabold text-ink disabled:opacity-40"
-                  >
-                    Démarrer
-                  </button>
-                </form>
+                <button
+                  type="button"
+                  onClick={() => onStart(seance.id)}
+                  disabled={isEmpty}
+                  title={
+                    isEmpty ? "Ajoute au moins un exercice pour démarrer" : undefined
+                  }
+                  className="rounded-xl bg-energy px-4 py-2 text-sm font-extrabold text-ink disabled:opacity-40"
+                >
+                  Démarrer
+                </button>
               </div>
             </div>
 
@@ -196,7 +180,7 @@ export default function SeanceLibrary({
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
               <button
                 type="button"
-                onClick={() => run(seance.id, () => moveSeance(seance.id, "up"))}
+                onClick={() => void run(seance.id, { kind: "move", dayId: seance.id, direction: "up" })}
                 disabled={index === 0 || isPending}
                 aria-label={`Monter la séance ${seance.name}`}
                 className="rounded-lg bg-surface2 px-3 py-2 text-sm font-bold text-fg disabled:opacity-30"
@@ -206,7 +190,7 @@ export default function SeanceLibrary({
               <button
                 type="button"
                 onClick={() =>
-                  run(seance.id, () => moveSeance(seance.id, "down"))
+                  void run(seance.id, { kind: "move", dayId: seance.id, direction: "down" })
                 }
                 disabled={index === seances.length - 1 || isPending}
                 aria-label={`Descendre la séance ${seance.name}`}
@@ -225,7 +209,7 @@ export default function SeanceLibrary({
               </Link>
               <button
                 type="button"
-                onClick={() => run(seance.id, () => duplicateSeance(seance.id))}
+                onClick={() => void run(seance.id, { kind: "duplicate", dayId: seance.id })}
                 disabled={isPending}
                 className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-fg disabled:opacity-50"
               >

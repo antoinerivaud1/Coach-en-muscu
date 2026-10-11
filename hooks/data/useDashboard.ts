@@ -12,10 +12,11 @@ export function useDashboard(profileId: string | null) {
     queryKey: queryKeys.dashboard.all(profileId ?? ""),
     queryFn: () => fetchDashboard(getSupabaseBrowserClient(), profileId!),
     enabled: !!profileId,
-    // La fin de séance, l'abandon, la création ou l'édition d'une séance type
-    // restent des server actions (PR 5/6) qui ne peuvent pas invalider ce
-    // cache : relecture à chaque ouverture de l'accueil, les données en cache
-    // s'affichent pendant ce temps. Resserré en PR 5/6.
+    // Les séances types s'écrivent depuis le navigateur (PR 5) et invalident
+    // `[profileId, "sessions"]`, donc ce cache. La fin de séance et l'abandon
+    // restent des server actions (PR 6) qui ne peuvent pas l'invalider :
+    // relecture à chaque ouverture de l'accueil, les données en cache
+    // s'affichent pendant ce temps. Resserré en PR 6.
     staleTime: 0,
   });
 }

@@ -1,9 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
-import { completedSessionsQuery } from "@/lib/queries/sessions";
 import { writeErrorMessage } from "@/lib/supabase/rlsErrors";
-import { seanceDestination, type SeanceTarget } from "@/lib/duo";
-import type { LibraryTarget } from "@/lib/duoMembership";
 
 /**
  * Id du programme partagé du couple (CM-80).
@@ -224,55 +221,9 @@ export async function nextOrderIndex(
   return { ok: true, value: typeof max === "number" ? max + 1 : 0 };
 }
 
-/** Nom du programme partagé, jamais montré à l'utilisateur (CM-81). */
-export const SHARED_PROGRAM_NAME = "Nos séances";
-
-export type EnsureSharedProgram =
+export type EnsureProgram =
   | { ok: true; programId: string }
   | { ok: false; error: string };
-
-/**
- * Id du programme partagé du couple, créé à la volée s'il n'existe pas encore
- * (CM-81).
- *
- * La notion de programme a disparu de l'UI : Antoine et Léa n'ont qu'une
- * bibliothèque de séances. Le schéma, lui, exige toujours un `programs` parent
- * (`program_days.program_id` est NOT NULL), d'où cette ligne unique créée en
- * silence à la première séance puis toujours réutilisée.
- *
- * Seule fonction de ce module qui écrit : elle est ici pour que l'appel reste
- * un « donne-moi l'id du programme partagé » côté action, et pour qu'il n'y
- * ait qu'un seul endroit capable de créer ce programme.
- */
-export async function ensureSharedProgram(
-  supabase: SupabaseClient<Database>,
-  duoId: string,
-): Promise<EnsureSharedProgram> {
-  const existing = await getSharedProgramId(supabase, duoId);
-  if (existing) return { ok: true, programId: existing };
-
-  const { data, error } = await supabase
-    .from("programs")
-    .insert({
-      name: SHARED_PROGRAM_NAME,
-      duo_id: duoId,
-      owner_profile_id: null,
-    })
-    .select("id")
-    .returns<{ id: string }[]>()
-    .single();
-
-  if (error || !data) {
-    return {
-      ok: false,
-      error: error
-        ? writeErrorMessage(error)
-        : "Impossible de créer la bibliothèque du couple",
-    };
-  }
-
-  return { ok: true, programId: data.id };
-}
 
 /** Nom du programme perso, jamais montré à l'utilisateur (CM-86). */
 export const PERSONAL_PROGRAM_NAME = "Mes séances";
@@ -318,7 +269,8 @@ export async function getPersonalProgramId(
 }
 
 /**
- * Équivalent perso d'`ensureSharedProgram` (CM-86) : la bibliothèque d'un
+ * Programme perso créé à la volée (CM-86 ; utilisé par l'onboarding, les
+ * séances types passent par la RPC `save_seance` depuis CM-88) : la bibliothèque d'un
  * utilisateur qui s'entraîne seul vit dans un programme à son nom, créé
  * paresseusement à la PREMIÈRE ÉCRITURE (jamais au simple affichage d'une
  * page) puis toujours réutilisé. Il reste à lui s'il rejoint un duo plus tard.
@@ -329,7 +281,7 @@ export async function getPersonalProgramId(
 export async function ensurePersonalProgram(
   supabase: SupabaseClient<Database>,
   profileId: string,
-): Promise<EnsureSharedProgram> {
+): Promise<EnsureProgram> {
   const existing = await readPersonalProgramId(supabase, profileId);
   if (!existing.ok) {
     return { ok: false, error: `Impossible de lire ta bibliothèque (${existing.error})` };
@@ -355,69 +307,4 @@ export async function ensurePersonalProgram(
   }
 
   return { ok: true, programId: data.id };
-}
-
-/**
- * CM-87 : bibliothèque où va une NOUVELLE séance type. Fonction partagée par
- * la création de séance, par-dessus `ensureSharedProgram` /
- * `ensurePersonalProgram` (CM-86). `library` vient TOUJOURS de
- * `libraryTarget(await readDuoId(…))` : une lecture du duo en échec est un
- * refus, jamais un repli en perso (`seanceDestination`, lib/duo.ts).
- */
-export async function resolveTargetProgram(
-  supabase: SupabaseClient<Database>,
-  input: {
-    profileId: string;
-    library: LibraryTarget;
-    target?: SeanceTarget | null;
-  },
-): Promise<EnsureSharedProgram & { target?: SeanceTarget }> {
-  const dest = seanceDestination(input.library, input.target);
-  if (!dest.ok) return { ok: false, error: dest.error };
-  const result =
-    dest.target === "duo" && input.library.kind === "shared"
-      ? await ensureSharedProgram(supabase, input.library.duoId)
-      : await ensurePersonalProgram(supabase, input.profileId);
-  return result.ok ? { ...result, target: dest.target } : result;
-}
-
-// ---- Historique rattaché à une séance type ----
-
-export type LoggedSessionCount =
-  | { ok: true; count: number }
-  | { ok: false; error: string };
-
-/**
- * Nombre de séances RÉELLEMENT réalisées sur cette séance type, c.-à-d. les
- * `sessions` TERMINÉES qui ont au moins une ligne dans `session_sets`.
- *
- * Les sessions vides (démarrées puis abandonnées sans aucune série) ne comptent
- * pas : un décompte naïf sur `sessions` donnerait des chiffres faux (CM-65).
- * Depuis CM-83 les séances en cours ne comptent pas non plus : elles ont des
- * séries dès le premier « Valider » (CM-78), le compteur bougeait donc pendant
- * la séance et le garde-fou de `deleteSeance` s'armait avant qu'elle soit finie.
- *
- * CM-70 : l'erreur est remontée au lieu d'être avalée. Auparavant un échec de
- * cette requête renvoyait `0`, ce qui désarmait silencieusement le garde-fou
- * d'historique de `deleteSeance` et détachait les séances déjà réalisées.
- */
-export async function countLoggedSessionsForDay(
-  supabase: SupabaseClient<Database>,
-  dayId: string,
-): Promise<LoggedSessionCount> {
-  const { data, error } = await completedSessionsQuery(
-    supabase,
-    "id, session_sets(id)",
-  )
-    .eq("program_day_id", dayId)
-    .returns<{ id: string; session_sets: { id: string }[] }[]>();
-
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-
-  return {
-    ok: true,
-    count: (data ?? []).filter((s) => (s.session_sets ?? []).length > 0).length,
-  };
 }

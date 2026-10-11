@@ -8,9 +8,9 @@ import CreateExerciseForm from "@/components/CreateExerciseForm";
 /**
  * Bottom sheet d'ajout d'un exercice en cours de séance (CM-62).
  *
- * Le catalogue (exercices système + persos du couple) est chargé côté serveur
- * et passé en prop : le filtrage se fait ici, en mémoire, la liste étant petite.
- * Aucune requête Supabase côté client.
+ * Le catalogue (exercices système + persos du couple) est passé en prop : le
+ * filtrage se fait ici, en mémoire, la liste étant petite. Seule la création
+ * d'un exercice (`CreateExerciseForm`) écrit, depuis le navigateur (CM-88).
  */
 export default function AddExerciseSheet({
   open,
