@@ -2,12 +2,7 @@
 
 import { useState } from "react";
 import LineChart, { type ChartPoint } from "@/components/LineChart";
-
-export type ExerciseSeries = {
-  exercise_id: string;
-  name: string;
-  points: { label: string; topWeight: number; e1rm: number }[];
-};
+import type { ExerciseSeries } from "@/lib/data/progress";
 
 type Metric = "weight" | "e1rm";
 

@@ -1,0 +1,23 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/data/queryKeys";
+import { fetchProgress } from "@/lib/data/progress";
+
+/**
+ * CM-88 : écran Stats. `requestedProfileId` est le `?profile=` de l'URL, non
+ * vérifié : la lecture ne le retient que s'il est membre de mon duo actif.
+ */
+export function useProgress(profileId: string | null, requestedProfileId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.sessions.progress(profileId ?? "", requestedProfileId ?? ""),
+    queryFn: () =>
+      fetchProgress(getSupabaseBrowserClient(), profileId!, requestedProfileId),
+    enabled: !!profileId,
+    // Même raison que `useHistory` : tant que l'écran de séance écrit par des
+    // server actions (PR 6), relecture à chaque ouverture. À resserrer quand
+    // la PR 6 invalidera `queryKeys.sessions.all`.
+    staleTime: 0,
+  });
+}

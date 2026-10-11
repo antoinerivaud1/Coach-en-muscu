@@ -16,6 +16,17 @@ export const queryKeys = {
     catalog: (profileId: string) => [profileId, "exercises", "catalog"] as const,
   },
 
+  // ---- CM-88 PR 3 : Carnet (historique) et Stats (progression) ----
+  // Clé de tête `[profileId, "sessions"]` : une écriture de séance (fin,
+  // suppression, édition d'une série) n'aura qu'elle à invalider (PR 6).
+  sessions: {
+    all: (profileId: string) => [profileId, "sessions"] as const,
+    history: (profileId: string) => [profileId, "sessions", "history"] as const,
+    /** `requested` : `?profile=` de l'URL tel quel ("" si absent), validé par la lecture. */
+    progress: (profileId: string, requested: string) =>
+      [profileId, "sessions", "progress", requested] as const,
+  },
+
   // ---- CM-88 PR 4 : accueil ----
   /**
    * Toutes les données de l'accueil (`/dashboard`), en une lecture. Rangée
