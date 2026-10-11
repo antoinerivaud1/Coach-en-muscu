@@ -1,10 +1,19 @@
 import { test, expect } from "@playwright/test";
-import { SEED_ACCOUNTS, SEED_NAMES, guardWrites, login } from "./helpers";
+import {
+  E2E_ACCOUNT,
+  SEED_ACCOUNTS,
+  SEED_NAMES,
+  deleteSessionViaUi,
+  guardWrites,
+  login,
+  openExitSheet,
+  startSession,
+} from "./helpers";
 
 // CM-88 (PR 4) : l'accueil est lu depuis le NAVIGATEUR (client Supabase anon
-// + session en cookie, sous RLS). Ne crée rien, mais l'accueil purge les
-// séances vides abandonnées (CM-83) : garde-fou obligatoire. Données de
-// supabase/seed.sql.
+// + session en cookie, sous RLS). Écrit en base : l'accueil purge les séances
+// vides abandonnées (CM-83) et un parcours démarre puis abandonne une séance
+// (supprimée par l'UI quoi qu'il arrive). Données de supabase/seed.sql.
 
 guardWrites();
 
@@ -39,6 +48,28 @@ test.describe("Accueil lu côté client (CM-88)", () => {
     await expect(page.getByText("Full body").first()).toBeVisible();
     await expect(page.getByText("Haut du corps")).toHaveCount(0);
     await expect(page.getByText(SEED_NAMES.toi)).toHaveCount(0);
+  });
+
+  test("après l'abandon d'une séance, l'accueil n'affiche jamais un « Reprendre » périmé", async ({ page }) => {
+    await login(page, E2E_ACCOUNT.email, E2E_ACCOUNT.password);
+    const id = await startSession(page);
+    try {
+      // Abandon par la server action du logger, qui redirige vers l'accueil.
+      const sheet = await openExitSheet(page);
+      await sheet.getByRole("button", { name: "Abandonner" }).click();
+      await expect(page).toHaveURL(/\/dashboard$/);
+      await expect(page.getByRole("heading", { name: /^Salut,/ })).toBeVisible();
+
+      // Vérification IMMÉDIATE, sans réessai : pas même un instant de bandeau
+      // venu du cache d'avant l'abandon.
+      const resume = page.getByRole("link", { name: "Reprendre" });
+      expect(await resume.count()).toBe(0);
+      // Et toujours rien une fois l'accueil relu.
+      await page.waitForLoadState("networkidle");
+      expect(await resume.count()).toBe(0);
+    } finally {
+      await deleteSessionViaUi(page, id);
+    }
   });
 
   test("un message d'erreur en query string s'affiche (CM-70)", async ({ page }) => {

@@ -256,6 +256,10 @@ export type HomeView = {
   /** Nom de la séance en cours, pour le bandeau. */
   currentDayName: string;
   seances: SeanceCard[];
+  /**
+   * Ligne « Suggestion ». Null quand le bandeau de reprise est affiché : il
+   * occupe déjà cette place (CM-83).
+   */
   recommended: SeanceCard | null;
 };
 
@@ -430,6 +434,6 @@ export function buildDashboardView(
     banner,
     currentDayName: currentSession?.program_days?.name ?? "Séance",
     seances,
-    recommended,
+    recommended: banner.kind === "banner" ? null : recommended,
   };
 }

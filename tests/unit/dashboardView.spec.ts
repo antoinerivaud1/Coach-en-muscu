@@ -129,6 +129,83 @@ test.describe("buildDashboardView (CM-88)", () => {
     expect(view.partnerRecord?.exerciseName).toBe("Squat");
   });
 
+  test("séance vide ouverte depuis plus de 2 h : abandonnée, aucun bandeau", () => {
+    const view = buildDashboardView(
+      data({
+        sessions: [monday(1)],
+        currentSession: {
+          id: "vide",
+          performed_at: "2026-10-07T07:30:00.000Z",
+          program_days: { name: "Push" },
+          session_sets: [],
+        },
+      }),
+      ME,
+      NOW,
+    );
+    expect(view.kind).toBe("home");
+    if (view.kind !== "home") return;
+    expect(view.banner).toEqual({ kind: "abandoned", sessionId: "vide" });
+  });
+
+  test("frontière de fuseau : dimanche 23 h UTC est déjà lundi à Paris", () => {
+    // Lundi 12 octobre, 1 h à Paris.
+    const now = new Date("2026-10-11T23:00:00.000Z");
+    const at = (iso: string) => ({ ...monday(1), id: iso, performed_at: iso });
+    const view = buildDashboardView(
+      data({
+        sessions: [
+          // Dimanche 22 h à Paris : semaine précédente.
+          at("2026-10-11T20:00:00.000Z"),
+          // Lundi 0 h 30 à Paris : cette semaine, lundi.
+          at("2026-10-11T22:30:00.000Z"),
+        ],
+      }),
+      ME,
+      now,
+    );
+    expect(view.kind).toBe("home");
+    if (view.kind !== "home") return;
+    expect(view.todayIdx).toBe(0);
+    expect(view.doneThisWeek).toEqual([0]);
+  });
+
+  test("suggestion masquée quand le bandeau de reprise est affiché", () => {
+    const legs = {
+      id: "legs",
+      name: "Jambes",
+      order_index: 1,
+      program_exercises: [
+        { target_sets: 3, rest_seconds: 90, exercises: { muscle_group: "quads" as const } },
+      ],
+    };
+    const base = data();
+    const programs = [{ ...base.programs[0]!, program_days: [...base.programs[0]!.program_days, legs] }];
+    const sessions = [monday(2), { ...monday(3), performed_at: "2026-10-03T17:00:00.000Z" }];
+
+    const idle = buildDashboardView(data({ programs, sessions }), ME, NOW);
+    if (idle.kind !== "home") throw new Error("accueil attendu");
+    expect(idle.recommended).not.toBeNull();
+
+    const live = buildDashboardView(
+      data({
+        programs,
+        sessions,
+        currentSession: {
+          id: "live",
+          performed_at: "2026-10-07T09:30:00.000Z",
+          program_days: { name: "Push" },
+          session_sets: [{ created_at: "2026-10-07T09:40:00.000Z" }],
+        },
+      }),
+      ME,
+      NOW,
+    );
+    if (live.kind !== "home") throw new Error("accueil attendu");
+    expect(live.banner.kind).toBe("banner");
+    expect(live.recommended).toBeNull();
+  });
+
   test("partenaire illisible : aucune section duo", () => {
     const view = buildDashboardView(
       data({ duoId: "duo", partner: null, partnerLive: { dayName: "Jambes" }, sessions: [monday(1)] }),
