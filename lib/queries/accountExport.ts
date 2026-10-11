@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import { readDuoId } from "@/lib/duoMembership";
 import type {
   AccountExportData,
   ExportExercise,
@@ -13,9 +14,13 @@ import type {
  * (`createClient`, sous RLS ; service-role avec le filet DATA_CLIENT=service).
  *
  * Seulement les données de `profileId`, filtrées EXPLICITEMENT dans chaque
- * requête : la RLS laisse voir les séances du partenaire de duo et la
- * bibliothèque du duo, qui ne lui appartiennent pas (et le filet contourne la
- * RLS). Le partenaire n'apparaît jamais dans l'export.
+ * requête : la RLS laisse voir les séances du partenaire de duo, qui ne lui
+ * appartiennent pas (et le filet contourne la RLS). Les séances et séries du
+ * partenaire n'apparaissent jamais dans l'export.
+ *
+ * En duo, la bibliothèque COMMUNE (« Nos séances » : séances types et
+ * exercices du duo) est exportée aussi, marquée « partagée » : c'est là que
+ * sont les séances types d'un duo, et elles sont aussi les siennes.
  */
 
 const PAGE = 500;
@@ -45,6 +50,7 @@ type ProgramRow = {
   id: string;
   name: string;
   created_at: string;
+  duo_id: string | null;
   program_days: {
     id: string;
     name: string;
@@ -107,13 +113,17 @@ async function readSessions(
 async function readPrograms(
   supabase: SupabaseClient<Database>,
   profileId: string,
+  duoId: string | null,
 ): Promise<ExportProgram[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("programs")
     .select(
-      "id, name, created_at, program_days (id, name, order_index, program_exercises (order_index, exercise_id, target_sets, target_reps_min, target_reps_max, rest_seconds, notes, exercises (name)))",
-    )
-    .eq("owner_profile_id", profileId)
+      "id, name, created_at, duo_id, program_days (id, name, order_index, program_exercises (order_index, exercise_id, target_sets, target_reps_min, target_reps_max, rest_seconds, notes, exercises (name)))",
+    );
+  query = duoId
+    ? query.or(`owner_profile_id.eq.${profileId},duo_id.eq.${duoId}`)
+    : query.eq("owner_profile_id", profileId);
+  const { data, error } = await query
     .order("created_at", { ascending: true })
     .returns<ProgramRow[]>();
   if (error) throw new Error(error.message);
@@ -121,6 +131,7 @@ async function readPrograms(
     id: p.id,
     name: p.name,
     created_at: p.created_at,
+    shared: p.duo_id !== null,
     days: (p.program_days ?? []).map((d) => ({
       id: d.id,
       name: d.name,
@@ -139,18 +150,26 @@ async function readPrograms(
   }));
 }
 
+type ExerciseRow = Omit<ExportExercise, "shared"> & { duo_id: string | null };
+
+/** Exercices perso, et ceux du duo (partagés) en duo. Catalogue système exclu. */
 async function readExercises(
   supabase: SupabaseClient<Database>,
   profileId: string,
+  duoId: string | null,
 ): Promise<ExportExercise[]> {
-  const { data, error } = await supabase
+  const query = supabase
     .from("exercises")
-    .select("id, name, muscle_group, is_compound, created_at")
-    .eq("owner_profile_id", profileId)
+    .select("id, name, muscle_group, is_compound, created_at, duo_id");
+  const { data, error } = await (duoId
+    ? query.or(`owner_profile_id.eq.${profileId},duo_id.eq.${duoId}`)
+    : query.eq("owner_profile_id", profileId)
+  )
     .order("created_at", { ascending: true })
-    .returns<ExportExercise[]>();
+    .order("id", { ascending: true })
+    .returns<ExerciseRow[]>();
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return (data ?? []).map(({ duo_id, ...e }) => ({ ...e, shared: duo_id !== null }));
 }
 
 async function readProfile(
@@ -173,11 +192,14 @@ export async function readAccountExport(
   profileId: string,
   email: string | null,
 ): Promise<AccountExportData> {
+  // Duo (même en attente, à un seul membre : sa bibliothèque est alors vide).
+  const duo = await readDuoId(supabase, profileId);
+  if (!duo.ok) throw new Error(duo.error);
   const [profile, programs, sessions, exercises] = await Promise.all([
     readProfile(supabase, profileId),
-    readPrograms(supabase, profileId),
+    readPrograms(supabase, profileId, duo.duoId),
     readSessions(supabase, profileId),
-    readExercises(supabase, profileId),
+    readExercises(supabase, profileId, duo.duoId),
   ]);
   return { email, profile, programs, sessions, exercises };
 }

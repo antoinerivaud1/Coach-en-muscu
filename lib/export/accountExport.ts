@@ -43,6 +43,8 @@ export type ExportProgram = {
   id: string;
   name: string;
   created_at: string;
+  /** Bibliothèque du duo (« Nos séances »), commune aux deux membres. */
+  shared: boolean;
   days: { id: string; name: string; order_index: number; exercises: ExportSeanceExercise[] }[];
 };
 
@@ -52,6 +54,8 @@ export type ExportExercise = {
   muscle_group: string;
   is_compound: boolean;
   created_at: string;
+  /** Exercice du duo (sinon : exercice perso). */
+  shared: boolean;
 };
 
 export type ExportProfile = {
@@ -183,7 +187,12 @@ export function buildSetsCsv(sessions: readonly ExportSession[]): string {
 const num = (v: number | string | null): number | null =>
   v === null || v === "" ? null : Number(v);
 
-/** Export complet, clés en français, une seule personne (la connectée). */
+/**
+ * Export complet, clés en français. Une seule personne (la connectée) pour
+ * le profil, les séances et les séries ; en duo, la bibliothèque commune
+ * (séances types et exercices du duo) est incluse, marquée `partagee` /
+ * `partage`.
+ */
 export function buildExportJson(data: AccountExportData, generatedAt: Date): string {
   const payload = {
     format: "coach-en-muscu-export",
@@ -205,6 +214,7 @@ export function buildExportJson(data: AccountExportData, generatedAt: Date): str
           id: d.id,
           nom: d.name,
           bibliotheque: p.name,
+          partagee: p.shared,
           exercices: [...d.exercises]
             .sort((a, b) => a.order_index - b.order_index)
             .map((e) => ({
@@ -240,13 +250,18 @@ export function buildExportJson(data: AccountExportData, generatedAt: Date): str
             enregistree_le: x.created_at,
           })),
       })),
-    exercices_perso: data.exercises.map((e) => ({
-      id: e.id,
-      nom: e.name,
-      groupe_musculaire: e.muscle_group,
-      polyarticulaire: e.is_compound,
-      cree_le: e.created_at,
-    })),
+    // Exercices perso, puis ceux du duo (`partage` : true). Le catalogue
+    // commun de l'app n'y est pas.
+    exercices: [...data.exercises]
+      .sort((a, b) => Number(a.shared) - Number(b.shared))
+      .map((e) => ({
+        id: e.id,
+        nom: e.name,
+        groupe_musculaire: e.muscle_group,
+        polyarticulaire: e.is_compound,
+        partage: e.shared,
+        cree_le: e.created_at,
+      })),
   };
   return `${JSON.stringify(payload, null, 2)}\n`;
 }

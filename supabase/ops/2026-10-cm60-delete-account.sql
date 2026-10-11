@@ -94,7 +94,12 @@ begin
   end if;
   -- Verrou du profil : deux appels simultanés (double tap, deux appareils)
   -- s'exécutent l'un après l'autre ; le second ne trouve plus le compte.
-  perform 1 from public.profiles where id = v_me for update;
+  -- FOR NO KEY UPDATE et non FOR UPDATE : il reste compatible avec le FOR KEY
+  -- SHARE que posent les écritures qui RÉFÉRENCENT ce profil. Un leave_duo
+  -- concurrent du partenaire (verrou du duo, puis exercices et séances types
+  -- passés au nom de l'appelant) n'entre donc pas en interblocage avec nous :
+  -- il se termine, puis nous prenons le verrou du duo (déjà dissous).
+  perform 1 from public.profiles where id = v_me for no key update;
   if not found then raise exception 'cm60:account_not_found'; end if;
 
   -- 2. Duo -------------------------------------------------------------------------
@@ -179,7 +184,7 @@ commit;
 -- ---------------------------------------------------------------------------
 
 with f as (
-  select p.oid, p.prosecdef, p.proconfig, p.proacl
+  select p.oid, p.prosecdef, p.proconfig, p.proacl, p.proowner
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname = 'delete_my_account'
 ),
@@ -198,6 +203,9 @@ v as (
             and not exists (select 1 from aclexplode(proacl) a
                             where a.grantee = 0 and a.privilege_type = 'EXECUTE')
      from f) as anon_public_refuses,
+    -- La fonction supprime dans auth.users avec les droits de son propriétaire.
+    (select has_table_privilege(proowner, 'auth.users', 'DELETE') from f)
+      as proprietaire_delete_auth_users,
     (select count(*) from pg_policies where schemaname = 'public') = 22 as policies_22,
     -- Données intactes (comptages au 10/10/2026 : 10, 190, 81 ; Antoine et
     -- Léa, toujours en duo).
@@ -218,7 +226,8 @@ v as (
 select
   *,
   (fonction_presente and definer_search_path and authenticated_execute
-   and anon_public_refuses and policies_22 and donnees_intactes
+   and anon_public_refuses and proprietaire_delete_auth_users and policies_22
+   and donnees_intactes
    and deux_profils_et_duo_intacts) as ok
 from v;
 

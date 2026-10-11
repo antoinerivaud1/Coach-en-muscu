@@ -12,6 +12,7 @@ import {
   DELETE_CONFIRMATION_WORD,
   deleteAccountErrorMessage,
   isDeleteConfirmation,
+  type DeleteAccountError,
 } from "@/lib/accountDeletion";
 
 export type DeleteAccountState = { error?: string };
@@ -25,7 +26,9 @@ export type DeleteAccountState = { error?: string };
  * dont la clé n'a pas d'utilisateur (comme les RPC du duo). Aucune clé
  * service-role.
  *
- * Échec : message, rien n'est supprimé, la session reste ouverte.
+ * Échec : message, la session reste ouverte. Refus explicite de la base :
+ * rien n'est supprimé (transaction annulée). Réponse perdue : « non
+ * confirmée », jamais « rien n'a été supprimé ».
  * Succès : session fermée sur cet appareil (cookies effacés), puis la page
  * publique « Compte supprimé », qui vide les files locales du téléphone.
  */
@@ -34,24 +37,26 @@ export async function deleteMyAccount(
   formData: FormData,
 ): Promise<DeleteAccountState> {
   if (!(await getCurrentProfileId())) {
-    return { error: deleteAccountErrorMessage("cm60:not_authenticated") };
+    return { error: deleteAccountErrorMessage({ message: "cm60:not_authenticated" }) };
   }
   if (!isDeleteConfirmation(String(formData.get("confirmation") ?? ""))) {
-    return { error: deleteAccountErrorMessage("cm60:confirmation_required") };
+    return { error: deleteAccountErrorMessage({ message: "cm60:confirmation_required" }) };
   }
 
   const supabase = await createAuthClient();
-  let failure: string | null = null;
+  // Réponse perdue (exception, ou erreur sans code PostgreSQL / PostgREST) :
+  // la suppression a pu aboutir, le message ne prétend pas le contraire.
+  let failure: DeleteAccountError | null = null;
   try {
     const { error } = await supabase.rpc("delete_my_account", {
       p_confirmation: DELETE_CONFIRMATION_WORD,
     });
-    if (error) failure = error.message;
+    if (error) failure = { message: error.message, code: error.code };
   } catch (e) {
-    failure = e instanceof Error ? e.message : "network";
+    failure = { message: e instanceof Error ? e.message : "network", code: null };
   }
   if (failure !== null) {
-    console.error("[CM-60] suppression refusée :", failure);
+    console.error("[CM-60] suppression en échec :", failure.code, failure.message);
     return { error: deleteAccountErrorMessage(failure) };
   }
 

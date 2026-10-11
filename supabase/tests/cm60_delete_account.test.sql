@@ -22,7 +22,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(48);
+select plan(50);
 
 -- ---------------------------------------------------------------------------
 -- Outils (postgres)
@@ -187,6 +187,14 @@ select ok((select p.proacl is not null
           '1. PUBLIC : pas d''EXECUTE');
 select is((select count(*)::int from pg_policies where schemaname = 'public'),
           22, '1. toujours 22 policies dans public');
+select ok((select p.prosrc ~* 'from public\.profiles where id = v_me for no key update'
+           from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = 'delete_my_account'),
+          '1. verrou du profil FOR NO KEY UPDATE (compatible avec un leave_duo concurrent du partenaire)');
+select ok(has_table_privilege((select p.proowner from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                               where n.nspname = 'public' and p.proname = 'delete_my_account'),
+                              'auth.users', 'DELETE'),
+          '1. le propriétaire de la fonction a DELETE sur auth.users');
 
 -- ---------------------------------------------------------------------------
 -- 2. Refus : rien n'est supprimé

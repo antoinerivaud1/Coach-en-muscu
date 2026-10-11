@@ -4,6 +4,7 @@ import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { deleteMyAccount, type DeleteAccountState } from "@/lib/actions/account";
 import { DELETE_CONFIRMATION_WORD, isDeleteConfirmation } from "@/lib/accountDeletion";
 import { unsyncedLocalCount } from "@/lib/localQueues";
+import ExportButton from "@/components/profile/ExportButton";
 
 export type DeleteAccountDuo =
   | { kind: "solo" }
@@ -202,18 +203,7 @@ export default function DeleteAccountSheet({ duo }: { duo: DeleteAccountDuo }) {
                   <p className="text-balance text-base leading-snug text-fg">
                     Garde une copie de tes séances et de tes séries avant de partir.
                   </p>
-                  <a
-                    href="/profile/export"
-                    download
-                    className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-energy/40 text-[17px] font-bold text-energy"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden>
-                      <path d="M12 4v11" />
-                      <path d="m7 10 5 5 5-5" />
-                      <path d="M5 20h14" />
-                    </svg>
-                    Exporter mes données
-                  </a>
+                  <ExportButton variant="sheet" />
                 </div>
 
                 <p className="mt-4 text-balance text-sm leading-snug text-fg-muted">

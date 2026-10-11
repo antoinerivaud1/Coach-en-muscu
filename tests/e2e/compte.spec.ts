@@ -17,9 +17,14 @@ async function exportData(page: Page): Promise<{ name: string; text: string; byt
   await page.goto("/profile");
   const section = page.getByRole("region", { name: "Mes données" });
   await expect(section).toBeVisible();
+  // Branche « téléchargement » (la feuille de partage du système n'est pas
+  // pilotable ici ; les deux branches sont testées en unitaire).
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "canShare", { value: () => false, configurable: true });
+  });
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    section.getByRole("link", { name: /Exporter mes données/ }).click(),
+    section.getByRole("button", { name: /Exporter mes données/ }).click(),
   ]);
   const path = await download.path();
   const buf = readFileSync(path);
@@ -51,6 +56,8 @@ test.describe("Mes données (CM-60)", () => {
     expect(file.text).not.toContain("toi@coach-en-muscu.test");
     expect(file.text).not.toContain("Séance de test (seed)");
     expect(file.text).not.toContain('"prenom": "Théo"');
+    // Bibliothèque du duo incluse, marquée partagée (séances types du seed).
+    expect(file.text).toMatch(/"nom": "Haut du corps",\s+"bibliotheque": "Nos séances",\s+"partagee": true/);
   });
 
   test("un nouveau compte se supprime, puis ne peut plus se connecter", async ({ page }) => {
@@ -84,10 +91,7 @@ test.describe("Mes données (CM-60)", () => {
       "Toutes tes séances et tes séries",
     );
     await expect(sheet).toContainText("1 élément pas encore enregistré");
-    await expect(sheet.getByRole("link", { name: "Exporter mes données" })).toHaveAttribute(
-      "href",
-      "/profile/export",
-    );
+    await expect(sheet.getByRole("button", { name: "Exporter mes données" })).toBeVisible();
     // Solo : aucun partenaire annoncé.
     await expect(sheet.getByRole("list", { name: "Ce que garde ton partenaire" })).toHaveCount(0);
 

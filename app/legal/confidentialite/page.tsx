@@ -197,8 +197,9 @@ export default function ConfidentialitePage() {
           Pour récupérer tes données, <B>Exporter mes données</B>, dans la même section,
           télécharge un fichier ZIP qui contient tes séances et tes séries au format CSV
           (lisible dans un tableur) et l’ensemble de tes données au format JSON : profil,
-          séances types, séances, séries et exercices personnalisés. L’export ne contient que
-          tes données, jamais celles de ton partenaire.
+          séances types, séances, séries et exercices personnalisés. En duo, la bibliothèque
+          commune (« Nos séances » et les exercices du duo) y figure aussi, marquée comme
+          partagée. Les séances et les séries de ton partenaire n’y figurent jamais.
         </P>
         <P>
           Tu peux aussi écrire au support depuis l’adresse email de ton compte : nous

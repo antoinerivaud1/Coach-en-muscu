@@ -23,7 +23,14 @@ import {
   DELETE_CONFIRMATION_WORD,
   deleteAccountErrorMessage,
   isDeleteConfirmation,
+  isExplicitRefusal,
 } from "@/lib/accountDeletion";
+import {
+  EXPORT_URL,
+  deliverExport,
+  exportFileName,
+  type ExportDeps,
+} from "@/lib/export/deliverExport";
 import { isPublicPath } from "@/lib/auth/publicPaths";
 
 // CM-60 : export des données (CSV, JSON, ZIP) et garde de confirmation de la
@@ -206,9 +213,17 @@ const DATA: AccountExportData = {
   },
   programs: [
     {
+      id: "p0",
+      name: "Nos séances",
+      created_at: "2026-09-01T00:00:00Z",
+      shared: true,
+      days: [{ id: "d9", name: "Haut du corps", order_index: 0, exercises: [] }],
+    },
+    {
       id: "p1",
       name: "Programme solo",
       created_at: "2026-10-01T00:00:00Z",
+      shared: false,
       days: [
         {
           id: "d2",
@@ -244,7 +259,22 @@ const DATA: AccountExportData = {
     }),
   ],
   exercises: [
-    { id: "e9", name: "Exercice perso", muscle_group: "other", is_compound: false, created_at: "2026-10-01T00:00:00Z" },
+    {
+      id: "e8",
+      name: "Exercice du duo",
+      muscle_group: "back",
+      is_compound: true,
+      created_at: "2026-09-01T00:00:00Z",
+      shared: true,
+    },
+    {
+      id: "e9",
+      name: "Exercice perso",
+      muscle_group: "other",
+      is_compound: false,
+      created_at: "2026-10-01T00:00:00Z",
+      shared: false,
+    },
   ],
 };
 
@@ -260,9 +290,19 @@ test.describe("JSON complet (CM-60)", () => {
   });
 
   test("séances types triées, avec leurs exercices", () => {
-    expect(json.seances_types.map((d: { nom: string }) => d.nom)).toEqual(["Full body", "Jambes"]);
-    expect(json.seances_types[0].bibliotheque).toBe("Programme solo");
-    expect(json.seances_types[0].exercices[0]).toMatchObject({ exercice: "Squat barre", series: 3 });
+    const perso = json.seances_types.filter((d: { partagee: boolean }) => !d.partagee);
+    expect(perso.map((d: { nom: string }) => d.nom)).toEqual(["Full body", "Jambes"]);
+    expect(perso[0].bibliotheque).toBe("Programme solo");
+    expect(perso[0].exercices[0]).toMatchObject({ exercice: "Squat barre", series: 3 });
+  });
+
+  test("bibliothèque du duo incluse, marquée partagée", () => {
+    expect(json.seances_types[0]).toMatchObject({
+      nom: "Haut du corps",
+      bibliotheque: "Nos séances",
+      partagee: true,
+    });
+    expect(json.seances_types.filter((d: { partagee: boolean }) => d.partagee)).toHaveLength(1);
   });
 
   test("séances et séries, nombres en nombres", () => {
@@ -271,9 +311,10 @@ test.describe("JSON complet (CM-60)", () => {
     expect(json.seances[0].series[0]).toMatchObject({ exercice: "Squat barre", poids_kg: 60, rpe: 7, numero: 1 });
   });
 
-  test("exercices perso", () => {
-    expect(json.exercices_perso).toEqual([
-      expect.objectContaining({ nom: "Exercice perso", groupe_musculaire: "other" }),
+  test("exercices perso, puis ceux du duo (partagés)", () => {
+    expect(json.exercices).toEqual([
+      expect.objectContaining({ nom: "Exercice perso", groupe_musculaire: "other", partage: false }),
+      expect.objectContaining({ nom: "Exercice du duo", partage: true }),
     ]);
   });
 });
@@ -358,17 +399,162 @@ test.describe("Suppression du compte : garde de confirmation (CM-60)", () => {
     expect(sql).toContain(`p_confirmation is distinct from '${DELETE_CONFIRMATION_WORD}'`);
   });
 
-  test("messages d'erreur en français ; erreur inconnue : rien n'a été supprimé", () => {
-    expect(deleteAccountErrorMessage("cm60:confirmation_required")).toContain("SUPPRIMER");
-    expect(deleteAccountErrorMessage("cm60:not_authenticated")).toContain("session a expiré");
-    expect(deleteAccountErrorMessage("cm60:account_not_found")).toContain("n'existe plus");
-    for (const other of [null, undefined, "", "fetch failed", "cm87:already_in_duo", "cm60:inconnu"]) {
-      expect(deleteAccountErrorMessage(other)).toContain("Rien n'a été supprimé");
+  test("messages d'erreur : codes cm60 traduits", () => {
+    expect(deleteAccountErrorMessage({ message: "cm60:confirmation_required", code: "P0001" })).toContain(
+      "SUPPRIMER",
+    );
+    expect(deleteAccountErrorMessage({ message: "cm60:not_authenticated" })).toContain("session a expiré");
+    expect(deleteAccountErrorMessage({ message: "cm60:account_not_found", code: "P0001" })).toContain(
+      "n'existe plus",
+    );
+  });
+
+  test("refus explicite de la base : « Rien n'a été supprimé »", () => {
+    for (const refused of [
+      { message: "cm87:already_in_duo", code: "P0001" },
+      { message: "cm60:inconnu", code: "P0001" },
+      { message: "permission denied for function delete_my_account", code: "42501" },
+      { message: "deadlock detected", code: "40P01" },
+      { message: "Could not find the function", code: "PGRST202" },
+    ]) {
+      expect(isExplicitRefusal(refused), refused.message).toBe(true);
+      expect(deleteAccountErrorMessage(refused), refused.message).toContain("Rien n'a été supprimé");
+    }
+  });
+
+  test("réponse perdue : suppression « non confirmée », jamais « rien n'a été supprimé »", () => {
+    for (const lost of [
+      null,
+      undefined,
+      { message: "TypeError: fetch failed", code: "" },
+      { message: "network", code: null },
+      { message: "<html>502 Bad Gateway</html>" },
+      { message: "", code: "502" },
+    ]) {
+      expect(isExplicitRefusal(lost), JSON.stringify(lost)).toBe(false);
+      const msg = deleteAccountErrorMessage(lost);
+      expect(msg).toBe("La suppression n'a pas pu être confirmée. Reconnecte-toi pour vérifier.");
+      expect(msg).not.toContain("Rien n'a été supprimé");
     }
   });
 
   test("la page « Compte supprimé » est publique", () => {
     expect(ACCOUNT_DELETED_PATH).toBe("/compte-supprime");
     expect(isPublicPath(ACCOUNT_DELETED_PATH)).toBe(true);
+  });
+});
+
+// ---- Remise du fichier : partage système ou téléchargement --------------------
+
+type Calls = { fetched: string[]; shared: ShareData[]; links: { href: string; name: string }[] };
+
+function zipResponse(body = "PK\u0003\u0004contenu", headers: Record<string, string> = {}): Response {
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": 'attachment; filename="coach-en-muscu-export-2026-10-11.zip"',
+      ...headers,
+    },
+  });
+}
+
+function deps(
+  over: { response?: Response | Error; canShare?: boolean; share?: (d: ShareData) => Promise<void> } = {},
+): { deps: ExportDeps; calls: Calls } {
+  const calls: Calls = { fetched: [], shared: [], links: [] };
+  const share =
+    over.share ??
+    (async (d: ShareData) => {
+      calls.shared.push(d);
+    });
+  return {
+    calls,
+    deps: {
+      fetch: async (url) => {
+        calls.fetched.push(url);
+        if (over.response instanceof Error) throw over.response;
+        return over.response ?? zipResponse();
+      },
+      navigator:
+        over.canShare === undefined
+          ? {}
+          : {
+              canShare: () => over.canShare!,
+              share: async (d) => {
+                calls.shared.push(d);
+                return share(d);
+              },
+            },
+      createObjectURL: () => "blob:test/1",
+      revokeObjectURL: () => {},
+      clickDownloadLink: (href, name) => calls.links.push({ href, name }),
+      now: () => new Date("2026-10-11T08:00:00Z"),
+    },
+  };
+}
+
+test.describe("Remise de l'export (CM-60)", () => {
+  test("partage de fichiers possible : feuille de partage avec le ZIP, aucun téléchargement", async () => {
+    const { deps: d, calls } = deps({ canShare: true });
+    expect(await deliverExport(d)).toBe("shared");
+    expect(calls.fetched).toEqual([EXPORT_URL]);
+    expect(calls.links).toEqual([]);
+    const file = calls.shared[0].files![0];
+    expect(file.name).toBe("coach-en-muscu-export-2026-10-11.zip");
+    expect(file.type).toBe("application/zip");
+    expect(await file.text()).toContain("contenu");
+  });
+
+  test("partage de fichiers impossible : téléchargement par lien temporaire", async () => {
+    const { deps: d, calls } = deps({ canShare: false });
+    expect(await deliverExport(d)).toBe("downloaded");
+    expect(calls.shared).toEqual([]);
+    expect(calls.links).toEqual([{ href: "blob:test/1", name: "coach-en-muscu-export-2026-10-11.zip" }]);
+  });
+
+  test("pas d'API de partage du tout : téléchargement", async () => {
+    const { deps: d, calls } = deps();
+    expect(await deliverExport(d)).toBe("downloaded");
+    expect(calls.links).toHaveLength(1);
+  });
+
+  test("feuille de partage fermée : rien d'autre", async () => {
+    const abort = Object.assign(new Error("annulé"), { name: "AbortError" });
+    const { deps: d, calls } = deps({ canShare: true, share: async () => Promise.reject(abort) });
+    expect(await deliverExport(d)).toBe("cancelled");
+    expect(calls.links).toEqual([]);
+  });
+
+  test("partage refusé (geste expiré) : repli sur le téléchargement", async () => {
+    const denied = Object.assign(new Error("refusé"), { name: "NotAllowedError" });
+    const { deps: d, calls } = deps({ canShare: true, share: async () => Promise.reject(denied) });
+    expect(await deliverExport(d)).toBe("downloaded");
+    expect(calls.links).toHaveLength(1);
+  });
+
+  test("échecs : réseau, statut HTTP, page HTML (redirection), fichier vide", async () => {
+    for (const response of [
+      new Error("offline"),
+      new Response("erreur", { status: 500, headers: { "Content-Type": "application/zip" } }),
+      new Response("<html>Profil</html>", { status: 200, headers: { "Content-Type": "text/html" } }),
+      zipResponse(""),
+    ]) {
+      const { deps: d, calls } = deps({ canShare: true, response });
+      await expect(deliverExport(d)).rejects.toThrow();
+      expect(calls.shared).toEqual([]);
+      expect(calls.links).toEqual([]);
+    }
+  });
+
+  test("nom du fichier : en-tête, sinon date du jour", () => {
+    const now = new Date("2026-10-11T08:00:00Z");
+    expect(exportFileName('attachment; filename="coach-en-muscu-export-2026-10-09.zip"', now)).toBe(
+      "coach-en-muscu-export-2026-10-09.zip",
+    );
+    expect(exportFileName(null, now)).toBe("coach-en-muscu-export-2026-10-11.zip");
+    expect(exportFileName('attachment; filename="../../etc/passwd"', now)).toBe(
+      "coach-en-muscu-export-2026-10-11.zip",
+    );
   });
 });

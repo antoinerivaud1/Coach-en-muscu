@@ -64,7 +64,12 @@ begin
   end if;
   -- Verrou du profil : deux appels simultanés (double tap, deux appareils)
   -- s'exécutent l'un après l'autre ; le second ne trouve plus le compte.
-  perform 1 from public.profiles where id = v_me for update;
+  -- FOR NO KEY UPDATE et non FOR UPDATE : il reste compatible avec le FOR KEY
+  -- SHARE que posent les écritures qui RÉFÉRENCENT ce profil. Un leave_duo
+  -- concurrent du partenaire (verrou du duo, puis exercices et séances types
+  -- passés au nom de l'appelant) n'entre donc pas en interblocage avec nous :
+  -- il se termine, puis nous prenons le verrou du duo (déjà dissous).
+  perform 1 from public.profiles where id = v_me for no key update;
   if not found then raise exception 'cm60:account_not_found'; end if;
 
   -- 2. Duo -------------------------------------------------------------------------

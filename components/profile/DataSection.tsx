@@ -1,3 +1,4 @@
+import ExportButton from "@/components/profile/ExportButton";
 import DeleteAccountSheet, { type DeleteAccountDuo } from "@/components/profile/DeleteAccountSheet";
 
 /**
@@ -29,25 +30,7 @@ export default function DataSection({
         </p>
       )}
       <div className="flex flex-col gap-2.5">
-        {/* Lien simple (pas next/link) : réponse en pièce jointe, téléchargée
-            par le navigateur. */}
-        <a
-          href="/profile/export"
-          download
-          className="flex min-h-[64px] items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 transition-colors hover:border-white/20"
-        >
-          <span className="flex-1">
-            <span className="block font-extrabold text-fg">Exporter mes données</span>
-            <span className="mt-0.5 block text-xs font-semibold text-fg-muted">
-              Séances et séries pour tableur, et tout le reste, en un fichier
-            </span>
-          </span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 flex-none text-fg-muted" aria-hidden>
-            <path d="M12 4v11" />
-            <path d="m7 10 5 5 5-5" />
-            <path d="M5 20h14" />
-          </svg>
-        </a>
+        <ExportButton variant="row" />
         <DeleteAccountSheet duo={duo} />
       </div>
     </section>

@@ -61,7 +61,7 @@ export default function SupportPage() {
         <P>
           Pour garder une copie avant de partir : <B>Exporter mes données</B>, dans la même
           section. Tu reçois un fichier ZIP avec tes séances et séries (CSV, pour un tableur)
-          et toutes tes données (JSON).
+          et toutes tes données (JSON), y compris, en duo, la bibliothèque « Nos séances ».
         </P>
         <Muted>
           Si tu as un abonnement Premium, pense à le résilier aussi dans les réglages de ton
