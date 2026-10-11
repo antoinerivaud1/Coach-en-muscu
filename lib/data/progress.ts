@@ -13,15 +13,42 @@ import {
   formatDateShort,
   estimatedOneRepMax,
 } from "@/lib/utils/training";
-import type { ExerciseSeries } from "@/components/progress/ProgressView";
-import type { StatsData } from "@/components/progress/StatsSummary";
+import {
+  APP_TIME_ZONE,
+  localDayNumber,
+  localWeekdayIndex,
+} from "@/lib/utils/recommendation";
 
 /**
  * CM-88 : lecture de l'écran Stats (progression) côté client, sous RLS.
- * Mêmes requêtes et mêmes calculs que l'ancienne page serveur ; une lecture
- * en échec LÈVE (l'écran affiche `ScreenError`, jamais des stats à zéro qui
- * se confondraient avec « aucune séance »).
+ * Mêmes requêtes et mêmes agrégats que l'ancienne page serveur, avec une
+ * correction volontaire : semaines, mois et dates sont calculés dans
+ * `APP_TIME_ZONE` (Europe/Paris, convention de l'accueil) et non plus dans le
+ * fuseau de la machine (UTC sur Vercel). Une lecture en échec LÈVE (l'écran
+ * affiche `ScreenError`, jamais des stats à zéro qui se confondraient avec
+ * « aucune séance »).
  */
+
+export type ExerciseSeries = {
+  exercise_id: string;
+  name: string;
+  points: { label: string; topWeight: number; e1rm: number }[];
+};
+
+export type StatsData = {
+  sessionsThisMonth: number;
+  sessionsDelta: number;
+  totalVolumeKg: number;
+  totalSets: number;
+  recordE1rm: number;
+  recordExercise: string;
+  weeks: { label: string; volume: number }[];
+  groups: { group: string; pct: number }[];
+  weekGoal: number;
+  weekSessions: number;
+  /** CM-87 : membres du duo (prénom, couleur) ; vide sans duo. */
+  couple: { name: string; color: string; sets: number }[];
+};
 
 export type ProgressData = {
   members: Member[];
@@ -36,6 +63,51 @@ export type ProgressData = {
 
 const DEFAULT_COLOR = "#2FE6FF";
 const READ_ERROR = "Impossible de charger tes statistiques.";
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// ---- Calendrier en heure de Paris ------------------------------------------
+
+/** Numéro de jour (cf. `localDayNumber`) du lundi de la semaine de `date`, à Paris. */
+export function mondayDayNumber(date: Date): number {
+  return localDayNumber(date) - localWeekdayIndex(date);
+}
+
+const monthPartsFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+});
+
+/** Mois absolu (année × 12 + mois) de `date`, à Paris. */
+export function localMonthIndex(date: Date): number {
+  const parts = monthPartsFormatter.formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes): number =>
+    Number(parts.find((p) => p.type === type)?.value ?? Number.NaN);
+  return part("year") * 12 + part("month") - 1;
+}
+
+/** Libellé « j/m » d'un numéro de jour (date civile, donc lue en UTC). */
+function dayLabel(dayNumber: number): string {
+  const d = new Date(dayNumber * MS_PER_DAY);
+  return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
+}
+
+// ---- Profil affiché ---------------------------------------------------------
+
+/**
+ * `?profile=` n'est retenu que s'il désigne un membre affiché (moi ou mon
+ * partenaire de duo actif, éventuellement en ligne neutre si son profil est
+ * illisible) ; sinon, et sans membre connu, c'est moi.
+ */
+export function pickSelectedProfile(
+  members: readonly Pick<Member, "id">[],
+  requested: string | null,
+  me: string,
+): string {
+  return requested && members.some((m) => m.id === requested) ? requested : me;
+}
+
+// ---- Lecture -----------------------------------------------------------------
 
 export async function fetchProgress(
   supabase: BrowserSupabase,
@@ -48,10 +120,7 @@ export async function fetchProgress(
   const members = toMembers(profiles, profileId);
   const ids = members.map((m) => m.id);
 
-  const selectedProfileId =
-    requestedProfileId && ids.includes(requestedProfileId)
-      ? requestedProfileId
-      : profileId;
+  const selectedProfileId = pickSelectedProfile(members, requestedProfileId, profileId);
   const selectedProfile: Profile | null =
     profiles.find((p) => p.id === selectedProfileId) ?? null;
   const selectedMember =
@@ -84,23 +153,26 @@ export async function fetchProgress(
 
   // Objectif hebdo : séances TERMINÉES seulement. L'anneau d'objectif et la
   // comparaison du duo ne doivent pas compter une séance encore ouverte (CM-83).
-  const thisMonday = startOfWeek(now);
-  const { data: weekSess, error: weekError } = await getCompletedSessionsSince(
+  // Lecture large (depuis le dimanche 0 h UTC, toujours avant le lundi 0 h à
+  // Paris), puis filtre exact sur le lundi de Paris.
+  const monday = mondayDayNumber(now);
+  const { data: weekSessData, error: weekError } = await getCompletedSessionsSince(
     supabase,
     ids,
-    thisMonday.toISOString(),
+    new Date((monday - 1) * MS_PER_DAY).toISOString(),
   );
   if (weekError) throw new Error(READ_ERROR);
+  const weekSess = filterSinceMonday(weekSessData ?? [], now);
 
   // Comparaison du duo : seulement en duo actif (inchangé).
   let weekSetSessionIds: string[] = [];
-  if (showsComparison(members) && (weekSess?.length ?? 0) > 0) {
+  if (showsComparison(members) && weekSess.length > 0) {
     const { data: wkSets, error } = await supabase
       .from("session_sets")
       .select("session_id")
       .in(
         "session_id",
-        (weekSess ?? []).map((s) => s.id),
+        weekSess.map((s) => s.id),
       )
       .returns<{ session_id: string }[]>();
     if (error) throw new Error(READ_ERROR);
@@ -120,20 +192,20 @@ export async function fetchProgress(
       weekGoal: selectedProfile?.weekly_goal ?? 4,
       selectedProfileId,
       members,
-      weekSessions: weekSess ?? [],
+      weekSessions: weekSess,
       weekSetSessionIds,
       now,
     }),
   };
 }
 
-/** Lundi 0 h (heure locale) de la semaine de `d`. */
-function startOfWeek(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  const dow = (x.getDay() + 6) % 7;
-  x.setDate(x.getDate() - dow);
-  return x;
+/** Séances faites depuis le lundi 0 h (heure de Paris) de la semaine de `now`. */
+export function filterSinceMonday<T extends { performed_at: string }>(
+  sessions: T[],
+  now: Date,
+): T[] {
+  const monday = mondayDayNumber(now);
+  return sessions.filter((s) => localDayNumber(new Date(s.performed_at)) >= monday);
 }
 
 /** Courbes par exercice : une valeur par séance, triées par date. */
@@ -165,7 +237,7 @@ export function buildSeries(
     .sort((a, b) => b.points.length - a.points.length);
 }
 
-/** Statistiques résumées du profil affiché. */
+/** Statistiques résumées du profil affiché (calendrier de Paris). */
 export function buildStats(input: {
   allSets: ProgressRow[];
   names: Record<string, string>;
@@ -173,6 +245,7 @@ export function buildStats(input: {
   weekGoal: number;
   selectedProfileId: string;
   members: Member[];
+  /** Séances terminées depuis le lundi de Paris (cf. `filterSinceMonday`). */
   weekSessions: WeekSessionRow[];
   /** `session_id` de chaque série des séances de la semaine (duo actif seulement). */
   weekSetSessionIds: string[];
@@ -186,14 +259,13 @@ export function buildStats(input: {
     if (at) sessionPerformedAt.set(r.session_id, at);
   }
 
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const thisMonth = localMonthIndex(now);
   let sessionsThisMonth = 0;
   let sessionsLastMonth = 0;
   for (const at of sessionPerformedAt.values()) {
-    const d = new Date(at);
-    if (d >= monthStart) sessionsThisMonth++;
-    else if (d >= prevMonthStart) sessionsLastMonth++;
+    const month = localMonthIndex(new Date(at));
+    if (month >= thisMonth) sessionsThisMonth++;
+    else if (month === thisMonth - 1) sessionsLastMonth++;
   }
 
   let totalVolumeKg = 0;
@@ -212,21 +284,17 @@ export function buildStats(input: {
     volumeByGroup[g] = (volumeByGroup[g] ?? 0) + vol;
   }
 
-  const thisMonday = startOfWeek(now);
+  // 6 dernières semaines (lundi de Paris), la plus ancienne d'abord.
+  const thisMonday = mondayDayNumber(now);
   const weekBuckets: { start: number; label: string; volume: number }[] = [];
   for (let i = 5; i >= 0; i--) {
-    const wkStart = new Date(thisMonday);
-    wkStart.setDate(wkStart.getDate() - 7 * i);
-    weekBuckets.push({
-      start: wkStart.getTime(),
-      label: `${wkStart.getDate()}/${wkStart.getMonth() + 1}`,
-      volume: 0,
-    });
+    const start = thisMonday - 7 * i;
+    weekBuckets.push({ start, label: dayLabel(start), volume: 0 });
   }
   for (const r of allSets) {
     const at = r.sessions?.performed_at;
     if (!at) continue;
-    const ws = startOfWeek(new Date(at)).getTime();
+    const ws = mondayDayNumber(new Date(at));
     const bucket = weekBuckets.find((b) => b.start === ws);
     if (bucket) bucket.volume += r.weight_kg * r.reps;
   }

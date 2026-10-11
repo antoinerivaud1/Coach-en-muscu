@@ -1,19 +1,5 @@
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
-
-export type StatsData = {
-  sessionsThisMonth: number;
-  sessionsDelta: number;
-  totalVolumeKg: number;
-  totalSets: number;
-  recordE1rm: number;
-  recordExercise: string;
-  weeks: { label: string; volume: number }[];
-  groups: { group: string; pct: number }[];
-  weekGoal: number;
-  weekSessions: number;
-  /** CM-87 : membres du duo (prénom, couleur) ; vide sans duo. */
-  couple: { name: string; color: string; sets: number }[];
-};
+import type { StatsData } from "@/lib/data/progress";
 
 function volumeParts(kg: number): { value: string; unit: string } {
   if (kg >= 1000) {

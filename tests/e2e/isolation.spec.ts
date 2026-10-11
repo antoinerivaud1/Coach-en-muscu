@@ -87,5 +87,10 @@ test.describe("Isolation des données (RLS, CM-59)", () => {
     await expect(page).toHaveURL(new RegExp(`/progress\\?profile=${TOI_PROFILE}$`));
     await expect(theo).toHaveAttribute("aria-current", "page");
     await expect(lina).not.toHaveAttribute("aria-current", "page");
+    // Une donnée de Théo, lue sous RLS (visible_profile_ids) : sa séance du
+    // seed, développé couché à 72,5 kg.
+    await page.getByRole("button", { name: "Développé couché barre", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Développé couché barre", level: 2 })).toBeVisible();
+    await expect(page.getByText("72.5", { exact: true }).first()).toBeVisible();
   });
 });
