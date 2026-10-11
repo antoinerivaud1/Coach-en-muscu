@@ -20,8 +20,9 @@ export {
 export type { DuoMembership } from "@/lib/duo";
 
 /**
- * CM-87 : la couleur d'un membre est `accent_color` (lue par `memberAccent`) ;
- * `color_role` n'est plus lue par le code (elle reste en base pour l'instant).
+ * CM-87 : la couleur d'un membre est `accent_color` (lue par `memberAccent`).
+ * CM-103 : l'ancien `color_role` n'est plus lu nulle part (colonne supprimée
+ * après déploiement, migration 20261011120000).
  */
 export type Profile = {
   id: string;

@@ -108,12 +108,18 @@ export default async function ProfilePage({
       <DuoSection state={duo} me={me} />
 
       {/* CM-86 : prénom, couleur et objectif (remplace l'ancien bloc
-          « Objectif hebdomadaire » 3 à 6, l'objectif va désormais de 1 à 7). */}
+          « Objectif hebdomadaire » 3 à 6, l'objectif va désormais de 1 à 7).
+          CM-103 : en duo, la couleur du partenaire n'est pas proposée. */}
       {identity && (
         <IdentitySection
           displayName={identity.display_name}
           accentColor={identity.accent_color}
           weeklyGoal={identity.weekly_goal}
+          partner={
+            duo.kind === "duo"
+              ? { name: duo.partner.display_name, color: duo.partner.accent_color }
+              : null
+          }
         />
       )}
 

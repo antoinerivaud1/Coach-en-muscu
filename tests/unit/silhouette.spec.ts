@@ -11,28 +11,23 @@ import { EXERCISE_MUSCLES } from "@/lib/exerciseMuscles";
 // Tests unitaires purs (CM-30) : silhouette par défaut et coloration.
 // Lancer : npm run test:unit
 
-test.describe("Silhouette par défaut (CM-30)", () => {
-  test("déduite du rôle couleur du profil actif", () => {
-    expect(defaultSilhouette("elle")).toBe("femme");
-    expect(defaultSilhouette("toi")).toBe("homme");
+test.describe("Silhouette par défaut (CM-30, CM-103)", () => {
+  test("homme par défaut (plus aucun lien avec l'ancien color_role)", () => {
+    expect(defaultSilhouette()).toBe("homme");
   });
 
-  test("rien de déductible : homme", () => {
-    expect(defaultSilhouette(null)).toBe("homme");
-    expect(defaultSilhouette(undefined)).toBe("homme");
-  });
-
-  test("le choix mémorisé l'emporte sur le profil", () => {
-    expect(resolveSilhouette("homme", "elle")).toBe("homme");
-    expect(resolveSilhouette("femme", "toi")).toBe("femme");
-    expect(resolveSilhouette("femme", undefined)).toBe("femme");
+  test("le choix mémorisé l'emporte sur le défaut", () => {
+    expect(resolveSilhouette("homme")).toBe("homme");
+    expect(resolveSilhouette("femme")).toBe("femme");
   });
 
   test("une valeur mémorisée invalide est ignorée", () => {
     expect(parseSilhouette("toi")).toBeNull();
+    expect(parseSilhouette("elle")).toBeNull();
     expect(parseSilhouette(null)).toBeNull();
-    expect(resolveSilhouette("elle", "elle")).toBe("femme");
-    expect(resolveSilhouette("n'importe quoi", "toi")).toBe("homme");
+    expect(resolveSilhouette("elle")).toBe("homme");
+    expect(resolveSilhouette("n'importe quoi")).toBe("homme");
+    expect(resolveSilhouette(undefined)).toBe("homme");
   });
 });
 

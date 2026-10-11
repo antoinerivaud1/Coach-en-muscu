@@ -17,10 +17,13 @@ export default function ProfileStepForm({
   initialName,
   initialColor,
   initialGoal,
+  next = "",
 }: {
   initialName: string;
   initialColor: string;
   initialGoal: number;
+  /** CM-103 : destination finale conservée (lien d'invitation). */
+  next?: string;
 }) {
   const [state, action, pending] = useActionState<IdentityFormState, FormData>(
     saveOnboardingProfile,
@@ -37,6 +40,7 @@ export default function ProfileStepForm({
     <form action={action} className="flex flex-1 flex-col" noValidate>
       <input type="hidden" name="accent_color" value={color} />
       <input type="hidden" name="weekly_goal" value={goal} />
+      {next && <input type="hidden" name="next" value={next} />}
 
       <div className="mt-6 flex items-center gap-4">
         <MemberAvatar name={name} color={color} size={76} />

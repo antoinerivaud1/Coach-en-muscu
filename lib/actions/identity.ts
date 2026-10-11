@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfileId } from "@/lib/profile";
+import { readPartnerColor } from "@/lib/queries/identity";
+import { partnerColorConflict } from "@/lib/members";
+import { withNext } from "@/lib/auth/core";
 import {
   validateIdentityInput,
   type IdentityFieldErrors,
@@ -20,6 +23,10 @@ import {
  * CM-86 : prénom, couleur et objectif hebdo. Une seule écriture, partagée par
  * l'étape « Comment on t'appelle ? » de l'onboarding et la section « Mon
  * profil » du Profil.
+ *
+ * CM-103 : dans un duo, chaque membre garde sa couleur. La couleur du
+ * partenaire (lue via les données du duo) est refusée ici aussi, pas
+ * seulement grisée à l'écran. Un solo n'a aucune restriction.
  */
 
 export type IdentityFormState = {
@@ -39,13 +46,22 @@ function readForm(formData: FormData) {
   };
 }
 
-async function writeIdentity(
-  value: IdentityInput,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+type WriteResult =
+  | { ok: true }
+  | { ok: false; error?: string; fieldErrors?: IdentityFieldErrors };
+
+async function writeIdentity(value: IdentityInput): Promise<WriteResult> {
   const profileId = await getCurrentProfileId();
   if (!profileId) return { ok: false, error: SESSION_EXPIRED_MESSAGE };
 
   const supabase = await createClient();
+
+  // CM-103 : couleur déjà portée par le partenaire de duo : refus.
+  const partner = await readPartnerColor(supabase, profileId);
+  if (!partner.ok) return { ok: false, error: partner.error };
+  const conflict = partnerColorConflict(value.accentColor, partner.partner);
+  if (conflict) return { ok: false, fieldErrors: { accentColor: conflict } };
+
   // CM-59 B : sous RLS, un update refusé touche 0 ligne sans erreur.
   const { data, error } = await supabase
     .from("profiles")
@@ -70,12 +86,14 @@ export async function saveOnboardingProfile(
   const parsed = validateIdentityInput(values);
   if (!parsed.ok) return { fieldErrors: parsed.errors, values };
 
+  // CM-103 : destination finale conservée (lien d'invitation).
+  const next = String(formData.get("next") ?? "");
   const result = await writeIdentity(parsed.value);
   if (!result.ok) {
     if (result.error === SESSION_EXPIRED_MESSAGE) redirect("/login");
-    return { error: result.error, values };
+    return { error: result.error, fieldErrors: result.fieldErrors, values };
   }
-  redirect("/onboarding/seances");
+  redirect(withNext("/onboarding/seances", next));
 }
 
 /** Profil, section « Mon profil ». */
@@ -88,7 +106,7 @@ export async function updateIdentity(
   if (!parsed.ok) return { fieldErrors: parsed.errors, values };
 
   const result = await writeIdentity(parsed.value);
-  if (!result.ok) return { error: result.error, values };
+  if (!result.ok) return { error: result.error, fieldErrors: result.fieldErrors, values };
 
   revalidatePath("/profile");
   revalidatePath("/dashboard");

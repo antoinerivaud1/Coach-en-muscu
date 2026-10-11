@@ -11,6 +11,7 @@ Parcours critiques joués dans un vrai navigateur contre l'app démarrée.
 | `progression.spec.ts` | une séance terminée apparaît dans « Stats » | oui |
 | `onboarding.spec.ts` | CM-86 : inscription d'un nouveau compte, onboarding complet (prénom, couleur, objectif), modèle de séances ajouté, accueil du premier jour ; un solo crée un exercice perso et le retrouve dans le catalogue ; un compte déjà onboardé n'est jamais redirigé vers `/onboarding` | oui (crée des comptes `cm86-…@coach-en-muscu.test`) |
 | `compte.spec.ts` | CM-60 : Solo exporte ses données (ZIP non vide, ses séances), Lina exporte sans rien de Théo mais avec la bibliothèque du duo (marquée partagée) ; un compte créé par le test se supprime (feuille en deux temps, mot « SUPPRIMER »), ses files locales sont vidées, puis il ne peut plus se connecter | oui (crée puis supprime des comptes `cm60-…@coach-en-muscu.test`) |
+| `finitions-duo.spec.ts` | CM-103 : un invité sans compte ouvre le lien d'invitation, passe par `/login`, crée son compte (`/welcome`, `/signup`), fait l'onboarding et arrive sur la confirmation de l'invitation, puis rejoint le duo de Solo (Solo le quitte à la fin) ; Théo ne peut pas choisir la couleur de Lina (grisée, refusée par l'action serveur) | oui (crée des comptes `cm103-invite-…@coach-en-muscu.test`) |
 
 Depuis CM-59 B, l'app n'a plus de sélecteur de profil ni de mode d'auth : les
 parcours se connectent par `/login` avec les comptes du seed (helper `login`),

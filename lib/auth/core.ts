@@ -50,6 +50,26 @@ export function loginPath(next?: string | null): string {
   return safe && safe === next.trim() ? `/login?next=${encodeURIComponent(safe)}` : "/login";
 }
 
+/**
+ * CM-103 : `next` reçu en query (`?next=…`, chaîne ou tableau) : chemin
+ * interne validé par `safeNextPath`, sinon chaîne vide (pas de destination).
+ */
+export function readNextParam(raw: string | string[] | null | undefined): string {
+  return safeNextPath(Array.isArray(raw) ? raw[0] : raw, "");
+}
+
+/**
+ * CM-103 : `path` qui transporte une destination `next` le long d'un parcours
+ * (connexion, bienvenue, inscription, onboarding), pour revenir au chemin
+ * demandé au départ (lien d'invitation). `next` absent ou refusé par
+ * `safeNextPath` : `path` tel quel.
+ */
+export function withNext(path: string, next?: string | null): string {
+  const safe = safeNextPath(next, "");
+  if (!safe) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}next=${encodeURIComponent(safe)}`;
+}
+
 export const PASSWORD_MIN_LENGTH = 8;
 // Limite bcrypt de Supabase Auth (72 octets) : au-delà, le reste est ignoré.
 export const PASSWORD_MAX_LENGTH = 72;

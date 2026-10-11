@@ -4,8 +4,11 @@ import { useActionState, useState } from "react";
 import { signUpWithPassword, type SignupFormState } from "@/lib/actions/signup";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/core";
 
-/** CM-86 : formulaire « Crée ton compte » (maquette 2). */
-export default function SignupForm() {
+/**
+ * CM-86 : formulaire « Crée ton compte » (maquette 2). CM-103 : `next`
+ * (lien d'invitation) transmis à l'onboarding.
+ */
+export default function SignupForm({ next = "" }: { next?: string }) {
   const [state, action, pending] = useActionState<SignupFormState, FormData>(
     signUpWithPassword,
     {},
@@ -20,6 +23,7 @@ export default function SignupForm() {
 
   return (
     <form action={action} className="flex flex-1 flex-col" noValidate>
+      {next && <input type="hidden" name="next" value={next} />}
       <div className="mt-8 flex flex-col gap-[18px]">
         <label className="flex flex-col gap-2">
           <span className="text-[15px] font-semibold text-[#A4A4AE]">Email</span>

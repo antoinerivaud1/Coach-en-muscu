@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { LEGACY_PROFILE_COOKIE, authErrorMessage } from "@/lib/auth/core";
+import { LEGACY_PROFILE_COOKIE, authErrorMessage, withNext } from "@/lib/auth/core";
 import {
   ONBOARDED_COOKIE,
   isSignupEnabled,
@@ -61,5 +61,6 @@ export async function signUpWithPassword(
   // Un cookie d'onboarding d'un autre compte sur cet appareil ne doit rien sauter.
   store.delete(ONBOARDED_COOKIE);
   revalidatePath("/", "layout");
-  redirect("/onboarding");
+  // CM-103 : `next` (lien d'invitation) conservé pour la fin de l'onboarding.
+  redirect(withNext("/onboarding", String(formData.get("next") ?? "")));
 }
