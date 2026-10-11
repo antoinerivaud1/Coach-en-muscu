@@ -1,4 +1,8 @@
 // Helpers d'entraînement: 1RM estimée, formatage.
+// Dates affichées dans `APP_TIME_ZONE` (Europe/Paris), comme l'accueil : même
+// jour quel que soit le fuseau du serveur ou du téléphone.
+
+import { APP_TIME_ZONE } from "@/lib/utils/recommendation";
 
 /**
  * 1RM estimée (formule d'Epley). Renvoie 0 si reps/poids invalides.
@@ -49,6 +53,7 @@ export function formatClock(totalSeconds: number): string {
 /** Formate une date ISO en court FR: "12 juin". */
 export function formatDateShort(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-FR", {
+    timeZone: APP_TIME_ZONE,
     day: "numeric",
     month: "short",
   });
@@ -57,6 +62,7 @@ export function formatDateShort(iso: string): string {
 /** Formate une date ISO complète FR: "ven. 12 juin 2026". */
 export function formatDateLong(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-FR", {
+    timeZone: APP_TIME_ZONE,
     weekday: "short",
     day: "numeric",
     month: "short",

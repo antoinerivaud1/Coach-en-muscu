@@ -23,6 +23,19 @@ test("CM-88 : un écran client sans session renvoie à la connexion, avec retour
   await expect(page.getByLabel("Email")).toBeVisible();
 });
 
+test("CM-88 : le Carnet sans session renvoie à la connexion, avec retour prévu", async ({ page }) => {
+  await page.goto("/history");
+  await expect(page).toHaveURL(/\/login\?next=%2Fhistory$/);
+  await expect(page.getByLabel("Email")).toBeVisible();
+});
+
+test("CM-88 : les Stats sans session renvoient à la connexion, avec retour prévu", async ({ page }) => {
+  // Le `?profile=` n'est pas repris dans `next`, comme avant CM-88.
+  await page.goto("/progress?profile=00000000-0000-0000-0000-000000000000");
+  await expect(page).toHaveURL(/\/login\?next=%2Fprogress$/);
+  await expect(page.getByLabel("Email")).toBeVisible();
+});
+
 test("CM-88 : le Profil sans session renvoie à la connexion, avec retour prévu", async ({ page }) => {
   await page.goto("/profile");
   await expect(page).toHaveURL(/\/login\?next=%2Fprofile$/);
