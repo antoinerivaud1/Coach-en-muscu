@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { startSession } from "@/app/seances/actions";
+import type { FormEvent } from "react";
 import BottomNav from "@/components/BottomNav";
 import MemberAvatar from "@/components/onboarding/MemberAvatar";
 
@@ -16,6 +18,9 @@ export type FirstDaySeance = {
  * qui n'a encore terminé aucune séance : carte « Aujourd'hui » avec sa
  * première séance, compteur de la semaine, ses séances, un conseil. Aucune
  * section duo. Dès la première séance terminée, l'accueil habituel reprend.
+ *
+ * CM-88 : rendu par l'accueil client (`DashboardScreen`), qui lui passe
+ * `onStart` (démarrage d'une séance dans le navigateur, `useStartSession`).
  */
 export default function FirstDayHome({
   name,
@@ -26,6 +31,7 @@ export default function FirstDayHome({
   todayMinutes,
   seances,
   error,
+  onStart,
 }: {
   name: string;
   accent: string;
@@ -35,7 +41,13 @@ export default function FirstDayHome({
   todayMinutes: number;
   seances: FirstDaySeance[];
   error?: string;
+  /** Démarre la séance type `dayId` (navigation vers la séance). */
+  onStart: (dayId: string) => void;
 }) {
+  const startOnSubmit = (dayId: string) => (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    onStart(dayId);
+  };
   const plural = (n: number) => `${n} exercice${n > 1 ? "s" : ""}`;
 
   return (
@@ -93,8 +105,7 @@ export default function FirstDayHome({
             {todayMinutes > 0 && <> · environ&nbsp;{todayMinutes}&nbsp;min</>}
           </span>
         </div>
-        <form action={startSession}>
-          <input type="hidden" name="day_id" value={today.id} />
+        <form onSubmit={startOnSubmit(today.id)}>
           <button
             type="submit"
             className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-base font-extrabold text-energy"
@@ -115,8 +126,7 @@ export default function FirstDayHome({
       </div>
       <div className="mt-1 grid grid-cols-3 gap-2">
         {seances.map((s) => (
-          <form key={s.id} action={startSession}>
-            <input type="hidden" name="day_id" value={s.id} />
+          <form key={s.id} onSubmit={startOnSubmit(s.id)}>
             <button
               type="submit"
               disabled={s.exerciseCount === 0}

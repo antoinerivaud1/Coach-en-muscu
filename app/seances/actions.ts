@@ -495,7 +495,11 @@ export type SeanceActionResult =
   | { success: false; error: string };
 
 /**
- * Démarre une séance depuis la bibliothèque ou la grille de l'accueil.
+ * Démarre une séance depuis la bibliothèque.
+ *
+ * CM-88 : l'accueil (grille, suggestion, premier jour) démarre désormais la
+ * séance dans le navigateur (`startSessionFromDay`, lib/data/sessions.ts, même
+ * logique). Cette action reste utilisée par SeanceLibrary jusqu'à la PR 5.
  *
  * `day_id` vient d'un champ caché du formulaire : son appartenance est
  * vérifiée ici avant d'insérer la session, sans quoi un id arbitraire

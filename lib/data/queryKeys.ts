@@ -15,4 +15,10 @@ export const queryKeys = {
     all: (profileId: string) => [profileId, "exercises"] as const,
     catalog: (profileId: string) => [profileId, "exercises", "catalog"] as const,
   },
+
+  // ---- CM-88 PR 4 : accueil ----
+  /** Toutes les données de l'accueil (`/dashboard`), en une lecture. */
+  dashboard: {
+    all: (profileId: string) => [profileId, "dashboard"] as const,
+  },
 } as const;
