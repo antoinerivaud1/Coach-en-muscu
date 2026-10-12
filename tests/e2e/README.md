@@ -62,6 +62,11 @@ sur `main`, sans aucun secret :
 6. CM-88 : plus de second passage avec `DATA_CLIENT=service` ; le filet
    service-role est supprimé (toutes les données passent par le navigateur,
    sous RLS).
+7. CM-89 (PR 3) : `npm run build:native` (export statique, mêmes
+   variables), `npm run serve:native -- --port 4300` (imite le routeur iOS)
+   puis `npm run test:native` (`tests/native/` : `/login`, connexion jusqu'au
+   tableau de bord, rechargement du Carnet et d'une séance, aucune requête
+   `vercel.app`). Détails dans NATIVE.md.
 
 En cas d'échec, l'artefact `playwright-report` contient le rapport HTML, les
 traces (`test-results/`), `next.log` et les logs PostgREST. Le job e2e tourne

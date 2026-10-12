@@ -31,6 +31,7 @@ un changement de `capacitor.config.ts` / plugins, les régénérer :
 ```bash
 npm ci
 npx cap sync ios   # copie capacitor/www + capacitor.config.json, puis pod install
+                   # (capacitor/www absent : placeholder, voir « Cible native »)
 # si pod install échoue (Apple Silicon, specs périmées) :
 cd ios/App && pod install --repo-update
 ```
@@ -91,3 +92,80 @@ les projets natifs (après `cap add`) :
 npm run assets:gen   # = npx capacitor-assets generate
 npx cap sync
 ```
+
+## Cible native : bundle embarqué (CM-89 PR 3)
+
+Deux cibles de build, un seul code (next.config.mjs) :
+- **web** (`npm run build`, Vercel) : inchangée (middleware, redirections des
+  anciennes adresses, tunnel Sentry `/monitoring`, `/sentry-test`).
+- **native** (`npm run build:native`) : `BUILD_TARGET=native`, export statique
+  (`output: "export"`, `trailingSlash: false`), sans middleware, sans
+  `redirects()`, Sentry sans tunnel (envoi direct). L'export remplace tout le
+  contenu de `capacitor/www`.
+
+```bash
+npm run build:native                       # out/ -> capacitor/www (liste les pages)
+npm run serve:native -- --port 4300        # serveur statique « routeur iOS »
+E2E_NATIVE_BASE_URL=http://localhost:4300 npm run test:native
+```
+`build:native` réécrit `.next` : relancer `npm run build` avant un
+`npm start` web. Les variables `NEXT_PUBLIC_*` sont gravées au build (prod :
+celles de `.env.local`).
+
+### Fichiers web seulement : suffixe `.web`
+Un export statique refuse le middleware, les route handlers et les pages
+dynamiques. Ces fichiers portent le suffixe `.web` : `middleware.web.ts`,
+`app/sentry-test/page.web.tsx`. Le build web déclare les extensions
+`web.tsx` / `web.ts` (`pageExtensions`), le build natif non : Next (et le
+plugin Sentry) les ignorent. Rien n'est déplacé sur le disque, donc rien à
+restaurer si un build échoue ou est interrompu.
+
+Règle : toute nouvelle page doit rester statique (pas de `cookies()`,
+`headers()`, `force-dynamic`, segment `[id]`) ; un fichier qui a VRAIMENT
+besoin du serveur web (route handler, page dynamique) se nomme `*.web.ts(x)`.
+Une route de métadonnées (`app/manifest.ts`) doit déclarer
+`dynamic = "force-static"`. `npm run build:native` échoue sinon : la CI le
+lance à chaque PR (job e2e).
+
+### `capacitor/www` : généré, ignoré par git
+Le placeholder versionné est `capacitor/placeholder/index.html`. Le hook
+Capacitor `capacitor:copy:before` (package.json,
+`scripts/native-placeholder.mjs`) le copie dans `capacitor/www` si ce
+dossier n'a pas d'`index.html`, **seulement tant que `server.url` est
+défini** : sur un clone neuf, `npx cap sync` fonctionne et le dossier
+`ios/App/App/public` (référencé par le projet Xcode) existe. Sans
+`server.url` (PR 4), Capacitor refuse lui-même un `capacitor/www` vide :
+lancer `npm run build:native` avant `npx cap sync`.
+
+### Adresses : règles du routeur iOS (à reproduire en Swift, PR 4)
+Le serveur de fichiers de Capacitor iOS renvoie `index.html` pour toute
+adresse sans extension. Le routeur personnalisé de la PR 4 doit suivre
+exactement les règles de `scripts/serve-native.mjs` (testées par
+`tests/native/routes.spec.ts`) :
+1. chemin avec extension (`/_next/static/…js`, `/dashboard.txt`,
+   `/icons/…png`) : le fichier tel quel, 404 s'il manque ;
+2. chemin sans extension : `<chemin>.html` s'il existe, sinon
+   `<chemin>/index.html` s'il existe, sinon `/index.html` ;
+3. la query (`?id=`, `?code=`) et le `/` final sont ignorés pour choisir le
+   fichier.
+
+L'ordre compte : `duo/rejoindre.html` et le dossier `duo/rejoindre/`
+coexistent (idem `onboarding`, `seances`). Les navigations client lisent
+`<page>.txt` (charge utile RSC), servis par la règle 1.
+
+Pages générées : `index`, `404`, `login`, `welcome`, `signup`, `dashboard`,
+`history`, `progress`, `profile`, `guide`, `credits`, `support`,
+`compte-supprime`, `onboarding`, `onboarding/seances`, `seances`,
+`seances/new`, `seances/edit`, `sessions/view`, `duo/inviter`,
+`duo/rejoindre`, `duo/rejoindre/confirmer`, `legal/cgu`,
+`legal/confidentialite`, `legal/mentions` (`.html` chacune), plus
+`manifest.webmanifest`, `public/` et `_next/`.
+
+### Smoke tests (CI)
+Projet Playwright `native` (`tests/native/`), jamais lancé par
+`npm run test:e2e`. Dans le job e2e, après les e2e web : build natif sur la
+stack Supabase locale, serveur statique sur le port 4300, puis : `/login`
+servi par `login.html` ; connexion avec le compte du seed jusqu'à
+`/dashboard` (rechargement complet servi par `dashboard.html`) ;
+rechargement de `/history` et de `/sessions/view?id=` (le bon écran, pas la
+racine) ; aucune requête vers `vercel.app` ni vers `/monitoring`.
