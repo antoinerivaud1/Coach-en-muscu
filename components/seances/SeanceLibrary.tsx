@@ -22,17 +22,28 @@ const STALE_DAYS = 5;
  * écrivent depuis le navigateur (`useSeanceLibraryAction`), « Démarrer »
  * aussi (`onStart`, `useStartSession` de l'accueil). `now` vient de l'écran
  * (heure du rendu), commun aux deux sections.
+ *
+ * CM-104 : `shareWith` (partenaire présent, section « Mes séances » en duo
+ * seulement) ajoute « Partager avec [prénom] » sous chaque carte, avec une
+ * confirmation dans le DOM. Absent en solo et sur « Nos séances » : cartes
+ * inchangées.
  */
+export type ShareTarget = { name: string; color: string };
+
+type Confirming = { id: string; kind: "delete" | "share" } | null;
+
 export default function SeanceLibrary({
   seances,
   now,
   profileId,
   onStart,
+  shareWith,
 }: {
   seances: SeanceView[];
   now: Date;
   profileId: string;
   onStart: (dayId: string) => void;
+  shareWith?: ShareTarget;
 }) {
   const libraryAction = useSeanceLibraryAction(profileId);
   const isPending = libraryAction.isPending;
@@ -40,8 +51,14 @@ export default function SeanceLibrary({
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  /** Séance dont la suppression attend une confirmation, rendue dans le DOM. */
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  /** Séance dont la suppression ou le partage attend une confirmation (DOM). */
+  const [confirming, setConfirming] = useState<Confirming>(null);
+
+  function toggleConfirm(id: string, kind: "delete" | "share") {
+    setErrorKey(null);
+    setErrorMessage(null);
+    setConfirming((prev) => (prev?.id === id && prev.kind === kind ? null : { id, kind }));
+  }
 
   const nowDate = now;
 
@@ -61,7 +78,7 @@ export default function SeanceLibrary({
       };
     }
     setBusyId(null);
-    setConfirmingId(null);
+    setConfirming(null);
     if (!result.ok) {
       setErrorKey(key);
       setErrorMessage(result.error);
@@ -74,7 +91,7 @@ export default function SeanceLibrary({
    * `display: standalone` comme dans la WKWebView Capacitor, les deux
    * contextes de cette app. `handleDelete` sortait avant même d'appeler la
    * server action : aucune requête, aucune erreur, aucun message. La
-   * confirmation est désormais rendue dans le DOM (voir `confirmingId`).
+   * confirmation est désormais rendue dans le DOM (voir `confirming`).
    */
   function handleDelete(seance: SeanceView) {
     void run(seance.id, { kind: "delete", dayId: seance.id, name: seance.name });
@@ -218,20 +235,62 @@ export default function SeanceLibrary({
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  setConfirmingId((prev) =>
-                    prev === seance.id ? null : seance.id,
-                  )
-                }
+                onClick={() => toggleConfirm(seance.id, "delete")}
                 disabled={isPending}
-                aria-expanded={confirmingId === seance.id}
+                aria-expanded={confirming?.id === seance.id && confirming.kind === "delete"}
                 className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-red-400 disabled:opacity-50"
               >
                 Supprimer
               </button>
             </div>
 
-            {confirmingId === seance.id && (
+            {shareWith && (
+              <button
+                type="button"
+                onClick={() => toggleConfirm(seance.id, "share")}
+                disabled={isPending}
+                aria-expanded={confirming?.id === seance.id && confirming.kind === "share"}
+                className="mt-2.5 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface2 px-3 text-[15px] font-bold text-fg disabled:opacity-50"
+              >
+                <span
+                  aria-hidden
+                  className="h-3.5 w-3.5 flex-none rounded-full"
+                  style={{ background: shareWith.color }}
+                />
+                Partager avec {shareWith.name}
+              </button>
+            )}
+
+            {shareWith && confirming?.id === seance.id && confirming.kind === "share" && (
+              <div className="mt-3 rounded-xl border border-energy/40 bg-energy/10 p-3">
+                <p className="text-balance text-sm font-semibold text-fg">
+                  Partager « {seance.name} » avec {shareWith.name}&nbsp;?{" "}
+                  {shareWith.name} pourra la voir, la lancer et la modifier.
+                </p>
+                <div className="mt-2.5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(null)}
+                    disabled={isPending}
+                    className="min-h-11 flex-1 rounded-lg bg-surface2 text-sm font-semibold text-fg disabled:opacity-50"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void run(seance.id, { kind: "share", dayId: seance.id, name: seance.name })
+                    }
+                    disabled={isPending}
+                    className="min-h-11 flex-1 rounded-lg bg-energy text-sm font-extrabold text-ink disabled:opacity-50"
+                  >
+                    {busy ? "Partage…" : "Oui, partager"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {confirming?.id === seance.id && confirming.kind === "delete" && (
               <div className="mt-3 rounded-xl border border-flame/40 bg-flame/10 p-3">
                 <p className="text-sm font-semibold text-flame">
                   Supprimer la séance « {seance.name} » ? Cette action est
@@ -240,7 +299,7 @@ export default function SeanceLibrary({
                 <div className="mt-2.5 flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setConfirmingId(null)}
+                    onClick={() => setConfirming(null)}
                     disabled={isPending}
                     className="flex-1 rounded-lg bg-surface2 py-2 text-sm font-semibold text-fg disabled:opacity-50"
                   >

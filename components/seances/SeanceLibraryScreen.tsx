@@ -270,7 +270,14 @@ export default function SeanceLibraryScreen() {
                     Les séances créées «&nbsp;Pour moi&nbsp;» arrivent ici. {partner?.name ?? "Ton partenaire"} ne les voit pas.
                   </p>
                 ) : (
-                  <SeanceLibrary seances={mine} now={now} profileId={profileId} onStart={start} />
+                  <SeanceLibrary
+                    seances={mine}
+                    now={now}
+                    profileId={profileId}
+                    onStart={start}
+                    // CM-104 : raccourci de partage, seulement avec un partenaire.
+                    shareWith={partner ? { name: partner.name, color: partner.color } : undefined}
+                  />
                 )}
               </div>
             </section>

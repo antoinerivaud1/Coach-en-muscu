@@ -611,6 +611,44 @@ export async function moveSeance(
 }
 
 /**
+ * CM-104 : message quand le nom est déjà pris dans « Nos séances ». La RPC
+ * refuse avant tout changement : rien n'a bougé, on renvoie vers Modifier.
+ */
+export function shareNameTakenMessage(name: string): string {
+  return (
+    `« ${name} » existe déjà dans « Nos séances ». Rien n'a été modifié : ` +
+    "renomme-la avec « Modifier », puis partage-la."
+  );
+}
+
+/**
+ * CM-104 : raccourci « Partager avec … » de la bibliothèque. Même RPC que le
+ * choix « Pour qui ? » de l'écran Modifier (`set_seance_shared`, atomique,
+ * relit l'état réel sous verrou) : la séance perso passe dans « Nos
+ * séances ». Déjà partagée (`unchanged`) : rien à faire, ce n'est pas une
+ * erreur, la bibliothèque relue l'affiche à sa vraie place.
+ */
+export async function shareSeance(
+  supabase: BrowserSupabase,
+  dayId: string,
+  name: string,
+): Promise<SeanceWriteResult> {
+  try {
+    const { error } = await supabase.rpc("set_seance_shared", {
+      p_day_id: dayId,
+      p_shared: true,
+    });
+    if (!error) return { ok: true };
+    if (duoErrorCode(error.message) === "name_taken") {
+      return { ok: false, error: shareNameTakenMessage(name) };
+    }
+    return { ok: false, error: seanceRpcErrorMessage(error, { name }) };
+  } catch (e) {
+    return { ok: false, error: thrownMessage(e) };
+  }
+}
+
+/**
  * Message du refus de suppression d'une séance type déjà réalisée (`n`
  * séances terminées avec séries, partenaire compris).
  */
