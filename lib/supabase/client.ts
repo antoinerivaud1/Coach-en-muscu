@@ -1,29 +1,60 @@
+import { Capacitor } from "@capacitor/core";
+import { Preferences } from "@capacitor/preferences";
 import { createBrowserClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { AUTH_COOKIE_OPTIONS, invitationCodePage, isCodeVerifierCookie } from "./auth-config";
+import {
+  clearPreferencesSession,
+  clearSessionCookies,
+  createPreferencesStorage,
+} from "./nativeSession";
 
 export type BrowserSupabase = SupabaseClient<Database>;
+
+/**
+ * CM-89 (PR 4) : app native (bundle embarqué, `capacitor://localhost`) ?
+ * En cas de doute, non : le web garde son comportement.
+ */
+function isNativeApp(): boolean {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+}
 
 /**
  * CM-88 : client Supabase du NAVIGATEUR, clé anon uniquement. Les requêtes
  * partent avec le JWT de l'utilisateur connecté et passent sous RLS (CM-59),
  * exactement comme le client utilisateur côté serveur.
  *
- * Session : cookies (`@supabase/ssr`), mêmes options que le serveur. Pendant
- * la migration écran par écran, les pages serveur pas encore converties, le
- * middleware et les écrans client partagent donc la même session. Le stockage
- * natif (Capacitor Preferences) viendra avec le bundle embarqué (CM-89).
+ * Session, selon la plateforme :
+ * - Web : cookies (`@supabase/ssr`), mêmes options que le middleware, qui les
+ *   rafraîchit et les réécrit (auth-config.ts). Inchangé.
+ * - Natif (CM-89 (PR 4)) : Capacitor Preferences (`createPreferencesStorage`).
+ *   Pas de serveur ni de middleware dans le bundle embarqué, donc aucune
+ *   raison de passer par des cookies. `detectSessionInUrl` faux : l'app ne
+ *   reçoit aucun retour d'authentification par URL, et un `?code=`
+ *   d'invitation (`/duo/rejoindre?code=…`) ne doit jamais être pris pour un.
  *
  * Jamais de clé service-role ici : seules les variables `NEXT_PUBLIC_` sont
  * lisibles dans le navigateur.
  */
 export function createClient(): BrowserSupabase {
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookieOptions: AUTH_COOKIE_OPTIONS },
-  );
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  if (isNativeApp()) {
+    return createSupabaseClient<Database>(url, anonKey, {
+      auth: {
+        storage: createPreferencesStorage(Preferences),
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
+    });
+  }
+  return createBrowserClient<Database>(url, anonKey, { cookieOptions: AUTH_COOKIE_OPTIONS });
 }
 
 let browserClient: BrowserSupabase | null = null;
@@ -43,6 +74,10 @@ let browserClient: BrowserSupabase | null = null;
  * Ailleurs, rien n'est effacé : un futur flux PKCE (lien magique,
  * réinitialisation, OAuth web CM-96 / CM-100) garde son verifier. Limite :
  * son retour ne doit jamais viser `/duo/rejoindre…`.
+ *
+ * CM-89 (PR 4) : web seulement. Le client natif ne lit jamais l'URL
+ * (`detectSessionInUrl` faux) et, en flux implicite (défaut de supabase-js),
+ * `signUp` n'y enregistre aucun verifier : rien à purger.
  */
 function purgeCodeVerifierCookies(): void {
   if (typeof document === "undefined") return;
@@ -58,8 +93,22 @@ function purgeCodeVerifierCookies(): void {
 /** Client navigateur unique pour toute l'app (une seule session, un seul écouteur d'auth). */
 export function getSupabaseBrowserClient(): BrowserSupabase {
   if (!browserClient) {
-    purgeCodeVerifierCookies();
+    if (!isNativeApp()) purgeCodeVerifierCookies();
     browserClient = createClient();
   }
   return browserClient;
+}
+
+/**
+ * CM-89 (PR 4) : efface la session de CET appareil, sans réseau, quand
+ * `signOut` n'a pas pu le faire (déconnexion en échec, compte supprimé).
+ * Web : cookies `sb-…-auth-token*`. Natif : clés de session dans
+ * Preferences ; sans ça, l'app se rouvrirait connectée au prochain lancement.
+ */
+export async function clearLocalSession(): Promise<void> {
+  if (isNativeApp()) {
+    await clearPreferencesSession(Preferences);
+    return;
+  }
+  if (typeof document !== "undefined") clearSessionCookies(document);
 }

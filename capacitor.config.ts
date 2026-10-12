@@ -1,21 +1,18 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * Phase 5 (privé) : on embarque l'app Next.js hébergée sur Vercel dans une
- * coque native (server.url), pour garder server actions + Supabase service_role
- * côté serveur sans réécriture. Le bundle natif autonome viendra en Phase 6
- * (refactor data côté client sous RLS).
+ * Phase 7 / CM-89 : l'app native charge le bundle EMBARQUÉ (export statique
+ * de Next, `npm run build:native` vers `capacitor/www`), servi par Capacitor
+ * en `capacitor://localhost`. Plus de `server.url` ni d'`allowNavigation` :
+ * l'app ne dépend plus de Vercel, seule Supabase est appelée (sous RLS).
+ * Session dans Capacitor Preferences (lib/supabase/client.ts). Sur iOS, un
+ * routeur dédié sert `<chemin>.html` pour chaque écran au rechargement
+ * complet (ios/App/App/StaticExportRouter.swift).
  */
 const config: CapacitorConfig = {
   appId: "com.antoinerivaud.coachenmuscu",
   appName: "Coach en Muscu",
   webDir: "capacitor/www",
-  server: {
-    // App hébergée (prod). À mettre à jour si l'URL de prod change.
-    url: "https://v0-gym-workout-tracker-silk.vercel.app",
-    cleartext: false,
-    allowNavigation: ["v0-gym-workout-tracker-silk.vercel.app"],
-  },
   backgroundColor: "#0B0B0F",
   plugins: {
     SplashScreen: {

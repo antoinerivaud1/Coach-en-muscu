@@ -1,10 +1,9 @@
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
-import type { BrowserSupabase } from "@/lib/supabase/client";
+import { clearLocalSession, type BrowserSupabase } from "@/lib/supabase/client";
 import {
   DELETE_CONFIRMATION_WORD,
   deleteAccountErrorMessage,
   isDeleteConfirmation,
-  sessionCookieNames,
   type DeleteAccountError,
 } from "@/lib/accountDeletion";
 
@@ -67,9 +66,10 @@ export const SIGN_OUT_TIMEOUT_MS = 3_000;
 /**
  * Compte supprimé : fermeture de la session sur cet appareil, sans jamais
  * bloquer le départ vers « Compte supprimé ».
- * 1. Les cookies de session (lisibles en JS depuis CM-88, morceaux `.0`,
- *    `.1` compris) sont effacés d'abord : la session est fermée même si la
- *    suite n'aboutit pas.
+ * 1. La session de cet appareil est effacée d'abord (`clearLocalSession`) :
+ *    cookies de session sur le web (lisibles en JS depuis CM-88, morceaux
+ *    `.0`, `.1` compris), clés de session dans Preferences dans l'app native
+ *    (CM-89 (PR 4)). La session est fermée même si la suite n'aboutit pas.
  * 2. `signOut({ scope: "local" })` vide l'état du client (et prévient les
  *    écouteurs), borné à `timeoutMs` : réseau mort, verrou d'auth bloqué…
  *
@@ -82,15 +82,17 @@ export const SIGN_OUT_TIMEOUT_MS = 3_000;
  * supprimé : comparé à la session, il ne vaut pour aucun autre compte, qui
  * relit donc son profil.
  *
- * `doc` est injectable pour les tests (tests/unit/accountExport.spec.ts).
+ * `clearSession` est injectable pour les tests (tests/unit/accountExport.spec.ts).
  */
 export async function closeDeletedAccountSession(
   supabase: Pick<BrowserSupabase, "auth">,
-  doc: { cookie: string } = document,
+  clearSession: () => unknown = clearLocalSession,
   timeoutMs: number = SIGN_OUT_TIMEOUT_MS,
 ): Promise<void> {
-  for (const name of sessionCookieNames(doc.cookie)) {
-    doc.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+  try {
+    await clearSession();
+  } catch {
+    // Stockage indisponible : `signOut` ci-dessous tente encore de l'effacer.
   }
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -101,7 +103,7 @@ export async function closeDeletedAccountSession(
       }),
     ]);
   } catch {
-    // Cookies déjà effacés : rien d'autre à faire.
+    // Session déjà effacée : rien d'autre à faire.
   } finally {
     clearTimeout(timer);
   }

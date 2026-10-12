@@ -17,8 +17,8 @@ import { purgeLocalQueues, unsyncedLocalCount } from "@/lib/localQueues";
  * CM-88 (PR 7) : déconnexion de cet appareil depuis le navigateur, puis
  * `/login` par rechargement complet, le cache du navigateur repart de zéro.
  * Toujours jusqu'au bout : réseau coupé ou erreur Auth, `signOutLocal`
- * efface lui-même les cookies de session, et `/login` est ouvert quoi qu'il
- * arrive.
+ * efface lui-même la session de l'appareil (cookies sur le web, Preferences
+ * dans l'app native, CM-89 (PR 4)), et `/login` est ouvert quoi qu'il arrive.
  */
 async function signOutAndReload() {
   try {
