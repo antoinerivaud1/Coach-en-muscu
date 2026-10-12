@@ -176,6 +176,15 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
 
     await page.goto(`/sessions/${id}`);
     await expect(page.getByText("Volume total")).toBeVisible();
+
+    // « Modifier », retour au récap, puis « Modifier » encore, dans la même
+    // page : la saisie se rouvre à chaque fois.
+    for (let i = 0; i < 2; i += 1) {
+      await page.getByRole("link", { name: "Modifier" }).click();
+      await expect(page.getByRole("button", { name: "Quitter la séance" })).toBeVisible();
+      await page.goBack();
+      await expect(page.getByText("Volume total")).toBeVisible();
+    }
   });
 
   test("dans le récap : supprimer une série, puis la séance (retour au Carnet)", async ({ page }) => {
@@ -208,17 +217,24 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
 
     // La base « ne voit plus » la séance (jeton parti en anonyme, séance type
     // supprimée…), puis le réseau coupe et revient : relecture automatique.
-    await page.route("**/rest/v1/sessions?*", (route) =>
+    const pattern = "**/rest/v1/sessions?*";
+    await page.route(pattern, (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
     );
-    await page.context().setOffline(true);
-    await page.context().setOffline(false);
-    await page.waitForTimeout(1500);
+    try {
+      const reread = page.waitForRequest((r) => r.url().includes("/rest/v1/sessions?"));
+      await page.context().setOffline(true);
+      await page.context().setOffline(false);
+      // La relecture a bien eu lieu (sinon le test ne prouverait rien).
+      await reread;
+      await page.waitForTimeout(500);
 
-    // Toujours la saisie, avec la série 1 validée : ni « Séance introuvable »,
-    // ni logger remonté sur une lecture d'avant la série.
-    await expect(page.getByRole("heading", { name: "Séance introuvable" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Supprimer la série 1" })).toBeVisible();
-    await page.unroute("**/rest/v1/sessions?*");
+      // Toujours la saisie, avec la série 1 validée : ni « Séance
+      // introuvable », ni logger remonté sur une lecture d'avant la série.
+      await expect(page.getByRole("heading", { name: "Séance introuvable" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Supprimer la série 1" })).toBeVisible();
+    } finally {
+      await page.unroute(pattern);
+    }
   });
 });

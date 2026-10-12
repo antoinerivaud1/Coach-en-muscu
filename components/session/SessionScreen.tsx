@@ -44,6 +44,10 @@ export default function SessionScreen({ sessionId }: { sessionId: string }) {
   const pinKey = `${sessionId}:${edit ? "edit" : "run"}`;
 
   const [pin, setPin] = useState<Pin | null>(null);
+  // Autre adresse (autre séance, « Modifier », retour arrière) : l'épingle
+  // ne vaut plus. Jamais réutilisée, elle rouvrirait une saisie sur une
+  // lecture périmée, ou bloquerait l'écran en attente d'un récap.
+  if (pin && pin.key !== pinKey) setPin(null);
   const livePin = pin?.key === pinKey ? pin : null;
 
   const next = `/sessions/${sessionId}${edit ? "?edit=1" : editSets ? "?editsets=1" : ""}`;
@@ -70,6 +74,7 @@ export default function SessionScreen({ sessionId }: { sessionId: string }) {
         key={pinKey}
         data={livePin.data}
         profileId={livePin.profileId}
+        editMode={edit}
         onFinished={() => setPin({ key: pinKey, data: null, profileId: livePin.profileId })}
       />
     );
@@ -124,10 +129,12 @@ export default function SessionScreen({ sessionId }: { sessionId: string }) {
 function LoggerHost({
   data,
   profileId,
+  editMode,
   onFinished,
 }: {
   data: LoggerData;
   profileId: string;
+  editMode: boolean;
   onFinished: () => void;
 }) {
   return (
@@ -146,6 +153,7 @@ function LoggerHost({
         initialSets={data.initialSets}
         catalog={data.catalog}
         canCreateExercise={data.canCreateExercise}
+        editMode={editMode}
         onFinished={onFinished}
       />
     </main>

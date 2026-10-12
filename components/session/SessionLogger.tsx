@@ -91,6 +91,8 @@ type Props = {
    * saisie épinglée et attend le récap relu (voir `SessionScreen`).
    */
   onFinished: () => void;
+  /** Ouvert par « Modifier » (`?edit=1`) : la fin ramène à l'adresse du récap. */
+  editMode: boolean;
 };
 
 /** Ligne vide, non touchée : un emplacement « à venir ». */
@@ -131,6 +133,7 @@ export default function SessionLogger({
   catalog,
   canCreateExercise,
   onFinished,
+  editMode,
 }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -701,7 +704,7 @@ export default function SessionLogger({
       // « Modifier » (`?edit=1`) : retour à l'adresse du récap, lue à
       // l'arrivée ; la lecture « edit » n'est pas relancée pour rien.
       onFinished();
-      if (finishedDurationSeconds === null) {
+      if (!editMode) {
         await invalidateSessions(queryClient, profileId);
       } else {
         void invalidateSessions(queryClient, profileId, { skipDetailOf: sessionId });
