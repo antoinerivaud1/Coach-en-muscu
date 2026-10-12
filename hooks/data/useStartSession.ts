@@ -6,11 +6,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/data/queryKeys";
 import { startSessionFromDay } from "@/lib/data/sessionStart";
+import { sessionPath } from "@/lib/routes";
 
 /**
  * CM-88 (PR 4) : « Démarrer une séance » depuis l'accueil (grille, suggestion,
  * accueil du premier jour) et, depuis la PR 5, depuis la bibliothèque
- * `/seances`. Remplace la server action `startSession` (supprimée) : succès → `/sessions/<id>` ; échec → `/dashboard?error=…`, le
+ * `/seances`. Remplace la server action `startSession` (supprimée) : succès → `sessionPath(<id>)` ; échec → `/dashboard?error=…`, le
  * message s'affiche en haut de l'accueil (même parcours que `redirectWithError`,
  * CM-70).
  *
@@ -40,7 +41,7 @@ export function useStartSession(profileId: string | null) {
         // relirait tout de suite, pour rien : on le quitte. La suite (fin,
         // abandon) invalide `[profileId, "sessions"]` (PR 6).
         queryClient.removeQueries({ queryKey: queryKeys.dashboard.all(id) });
-        router.push(`/sessions/${result.sessionId}`);
+        router.push(sessionPath(result.sessionId));
         return;
       }
       // La séance type a pu disparaître : l'accueil est relu.

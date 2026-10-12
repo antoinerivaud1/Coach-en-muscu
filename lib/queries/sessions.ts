@@ -20,7 +20,7 @@ import { ABANDONED_EMPTY_SESSION_MS } from "@/lib/utils/currentSession";
 // Deux exceptions volontaires, qui doivent VOIR les séances en cours :
 //   - l'indicateur « partenaire en séance » de l'accueil (CM-53) ;
 //   - le bandeau de reprise de l'accueil (`getCurrentSession`, CM-83).
-// Le récap d'une séance (`/sessions/[id]`) n'est pas concerné : il lit une
+// Le récap d'une séance (`/sessions/view?id=`) n'est pas concerné : il lit une
 // séance précise par son id.
 // ─────────────────────────────────────────────────────────────────────────────
 

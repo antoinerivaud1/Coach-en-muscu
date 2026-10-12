@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { loginPath } from "@/lib/auth/core";
+import { sessionPath } from "@/lib/routes";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   deleteOwnSession,
@@ -248,7 +249,7 @@ export default function SessionLogger({
   // compact) lisent le même décompte.
   // La notification de fin de repos est planifiée par le hook, sur l'échéance
   // du timer (CM-74) : aucune planification ici.
-  const rest = useRestTimer({ notificationUrl: `/sessions/${sessionId}` });
+  const rest = useRestTimer({ notificationUrl: sessionPath(sessionId) });
   const restCardRef = useRef<HTMLDivElement | null>(null);
   const [isPinned, setIsPinned] = useState(false);
   const restState = rest.state;
@@ -708,7 +709,7 @@ export default function SessionLogger({
         await invalidateSessions(queryClient, profileId);
       } else {
         void invalidateSessions(queryClient, profileId, { skipDetailOf: sessionId });
-        router.replace(`/sessions/${sessionId}`);
+        router.replace(sessionPath(sessionId));
       }
     });
   }
@@ -1576,7 +1577,7 @@ export default function SessionLogger({
         {(persistence.sessionExpired || finishExpired) && (
           <p role="alert" className="mt-2 text-center text-[13px] font-medium text-flame">
             Session expirée : tes séries sont gardées sur ce téléphone.{" "}
-            <Link href={loginPath(`/sessions/${sessionId}`)} className="font-bold underline">
+            <Link href={loginPath(sessionPath(sessionId))} className="font-bold underline">
               Se reconnecter
             </Link>
           </p>

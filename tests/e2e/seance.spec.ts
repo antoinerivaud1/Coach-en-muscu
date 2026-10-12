@@ -6,6 +6,8 @@ import {
   login,
   logSet,
   openExitSheet,
+  sessionPath,
+  sessionUrlExact,
   startSession,
 } from "./helpers";
 
@@ -16,7 +18,7 @@ guardWrites();
 function resumeLinkTo(page: Page, sessionId: string) {
   return page
     .getByRole("link", { name: "Reprendre" })
-    .and(page.locator(`[href="/sessions/${sessionId}"]`));
+    .and(page.locator(`[href="${sessionPath(sessionId)}"]`));
 }
 
 // Un seul profil pour tous les tests : on les enchaîne pour que le bandeau
@@ -75,7 +77,7 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(resumeLinkTo(page, id)).toHaveCount(0);
     // Plus rien à nettoyer : la séance n'existe plus.
-    await page.goto(`/sessions/${id}`);
+    await page.goto(sessionPath(id));
     await expect(page.getByRole("heading", { name: "Séance introuvable" })).toBeVisible();
   });
 
@@ -90,10 +92,10 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
 
     // Bandeau de reprise (CM-83) pointant sur la séance laissée en cours.
     const resume = page.getByRole("link", { name: "Reprendre" });
-    await expect(resume).toHaveAttribute("href", `/sessions/${id}`);
+    await expect(resume).toHaveAttribute("href", sessionPath(id));
     await resume.click();
 
-    await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
+    await expect(page).toHaveURL(sessionUrlExact(id));
     // La série écrite au « Valider » (CM-78) est toujours là après la reprise.
     // Vérifiée via la feuille : la reprise rouvre sur l'exercice suivant si le
     // premier est déjà complet (cible à 1 série).
@@ -112,7 +114,7 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
 
     // Récap (séance terminée) : mêmes URL, plus de logger.
     await expect(page.getByRole("link", { name: "Corriger les séries" })).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
+    await expect(page).toHaveURL(sessionUrlExact(id));
     await expect(page.getByRole("button", { name: "Quitter la séance" })).toHaveCount(0);
     await expect(page.getByText("Volume total")).toBeVisible();
   });
@@ -124,7 +126,7 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     const sheet = await openExitSheet(page);
     await sheet.getByRole("button", { name: "Terminer la séance" }).click();
     await page.getByRole("link", { name: "Corriger les séries" }).click();
-    await expect(page).toHaveURL(new RegExp(`/sessions/${id}\\?editsets=1$`));
+    await expect(page).toHaveURL(sessionUrlExact(id, { editSets: true }));
 
     // Correction par le formulaire du récap (écriture navigateur sous RLS,
     // CM-88 PR 6) : on attend la réponse de l'update avant de recharger.
@@ -138,7 +140,7 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await page.reload();
     await expect(page.locator('input[name="weight"]').first()).toHaveValue("23.5");
     await page.getByRole("link", { name: "Terminer", exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
+    await expect(page).toHaveURL(sessionUrlExact(id));
     await expect(page.getByText("23.5", { exact: true }).first()).toBeVisible();
   });
 
@@ -154,7 +156,7 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
 
     // Page statique : le HTML servi, même avec la session, ne contient ni le
     // récap ni le logger.
-    const html = await (await page.request.get(`/sessions/${id}`)).text();
+    const html = await (await page.request.get(sessionPath(id))).text();
     expect(html).not.toContain("Volume total");
     expect(html).not.toContain("Corriger les séries");
   });
@@ -167,14 +169,14 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await sheet.getByRole("button", { name: "Terminer la séance" }).click();
 
     await page.getByRole("link", { name: "Modifier" }).click();
-    await expect(page).toHaveURL(new RegExp(`/sessions/${id}\\?edit=1$`));
+    await expect(page).toHaveURL(sessionUrlExact(id, { edit: true }));
     await expect(page.getByRole("button", { name: "Quitter la séance" })).toBeVisible();
     // Séance terminée : la croix ramène à l'accueil sans feuille de sortie.
     await page.getByRole("button", { name: "Quitter la séance" }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.locator(`a[href="/sessions/${id}"]`).filter({ hasText: "Reprendre" })).toHaveCount(0);
+    await expect(page.locator(`a[href="${sessionPath(id)}"]`).filter({ hasText: "Reprendre" })).toHaveCount(0);
 
-    await page.goto(`/sessions/${id}`);
+    await page.goto(sessionPath(id));
     await expect(page.getByText("Volume total")).toBeVisible();
 
     // « Modifier », retour au récap, puis « Modifier » encore, dans la même
@@ -214,11 +216,11 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await expect(page.getByText(/C'est définitif/)).toBeVisible();
     await page.getByRole("button", { name: "Annuler" }).click();
     await expect(page.getByText(/C'est définitif/)).toHaveCount(0);
-    await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
+    await expect(page).toHaveURL(sessionUrlExact(id));
     await page.getByRole("button", { name: "Supprimer", exact: true }).click();
     await page.getByRole("button", { name: "Oui, supprimer" }).click();
     await expect(page).toHaveURL(/\/history$/);
-    await expect(page.locator(`a[href="/sessions/${id}"]`)).toHaveCount(0);
+    await expect(page.locator(`a[href="${sessionPath(id)}"]`)).toHaveCount(0);
   });
 
   test("en pleine séance, une relecture ratée ne démonte jamais la saisie", async ({ page }) => {

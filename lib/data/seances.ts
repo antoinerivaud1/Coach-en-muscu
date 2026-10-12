@@ -35,7 +35,7 @@ import { REFUSED_MESSAGE, writeErrorMessage } from "@/lib/supabase/rlsErrors";
 
 /**
  * CM-88 (PR 5) : séances types côté client (bibliothèque `/seances` et
- * éditeur `/seances/new`, `/seances/[id]/edit`), sous RLS.
+ * éditeur `/seances/new`, `/seances/edit?id=`), sous RLS.
  *
  * - Lectures : `fetchSeanceLibrary`, `fetchSeanceEditor` (une lecture
  *   essentielle en échec LÈVE, l'écran propose « Réessayer »).
