@@ -7,7 +7,8 @@ import { readDuoMembership } from "@/lib/queries/profiles";
 /**
  * CM-86 : identité d'un profil telle que l'onboarding et la section « Mon
  * profil » la manipulent (prénom, couleur de membre, objectif, onboarding).
- * Distincte de `getProfile` (lib/profile.ts), que le reste de l'app lit.
+ * Distincte de `getProfile` (lib/queries/profiles.ts), que le reste de l'app
+ * lit. CM-89 (PR 1) : `onboarded_at` y est aussi lu par `OnboardingGate`.
  */
 export type Identity = {
   id: string;

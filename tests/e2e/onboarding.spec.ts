@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { SEED_ACCOUNTS, guardWrites, login } from "./helpers";
 
 // CM-86 : onboarding solo. Crée de VRAIS comptes (emails uniques en `.test`)
@@ -48,7 +48,8 @@ test.describe("Onboarding solo (CM-86)", () => {
   test("inscription, onboarding complet, modèle ajouté, accueil du premier jour", async ({ page }) => {
     await signUp(page, uniqueEmail("modele"));
 
-    // Pas encore onboardé : toute page privée renvoie à l'onboarding.
+    // Pas encore onboardé : toute page privée renvoie à l'onboarding (CM-89
+    // (PR 1) : dans le navigateur, `toHaveURL` attend la redirection).
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/onboarding$/);
 
@@ -71,13 +72,16 @@ test.describe("Onboarding solo (CM-86)", () => {
     await page.getByRole("button", { name: "Ajouter et c'est parti" }).click();
     await rpc;
 
-    // Pas de retour parasite vers /onboarding (le middleware relit
-    // onboarded_at puis pose son cookie de confort).
+    // Pas de retour parasite vers /onboarding. CM-89 (PR 1) : le mémo
+    // « onboarding fait » de l'appareil (localStorage) est posé avant le
+    // départ, l'accueil s'ouvre sans relire le profil.
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole("heading", { name: /^Salut, Camille/ })).toBeVisible();
     await expect
-      .poll(async () => (await page.context().cookies()).some((c) => c.name === "cm_onboarded"))
-      .toBe(true);
+      .poll(() => page.evaluate(() => window.localStorage.getItem("cm_onboarded")))
+      .toMatch(/^[0-9a-f-]{36}$/);
+    // Plus aucun cookie de confort (il était posé par le middleware).
+    expect((await page.context().cookies()).some((c) => c.name === "cm_onboarded")).toBe(false);
     const today = page.getByRole("region", { name: "Aujourd'hui" });
     await expect(today).toBeVisible();
     await expect(today).toContainText("Push");
@@ -147,11 +151,81 @@ test.describe("Onboarding solo (CM-86)", () => {
     ).toBeVisible();
   });
 
+  test("CM-89 (PR 1) : pas onboardé, /dashboard mène à l'onboarding sans jamais afficher l'accueil", async ({ page }) => {
+    await signUp(page, uniqueEmail("flash"));
+
+    // Témoin posé avant tout script de la page : note si le titre de l'accueil
+    // ou la barre de navigation apparaît, même un instant (la redirection se
+    // fait dans le navigateur, plus avant l'affichage par le middleware).
+    await page.addInitScript(() => {
+      const w = window as unknown as { __cmPrivateSeen?: boolean };
+      w.__cmPrivateSeen = false;
+      const check = () => {
+        const heading = [...document.querySelectorAll("h1")].some((h) =>
+          (h.textContent ?? "").startsWith("Salut,"),
+        );
+        if (heading || document.querySelector('a[aria-label="Nouvelle séance"]')) {
+          w.__cmPrivateSeen = true;
+        }
+      };
+      new MutationObserver(check).observe(document, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    });
+
+    // `/` aussi, et un lien d'invitation est conservé en `next` (CM-103).
+    // Le témoin repart de zéro à chaque chargement (addInitScript) : relu
+    // après CHAQUE ouverture, une fois l'onboarding affiché (la redirection
+    // client reste dans le même document).
+    const cases: [string, RegExp][] = [
+      ["/dashboard", /\/onboarding$/],
+      ["/", /\/onboarding$/],
+      ["/duo/rejoindre?code=K7QM4P", /\/onboarding\?next=%2Fduo%2Frejoindre%3Fcode%3DK7QM4P$/],
+    ];
+    for (const [path, url] of cases) {
+      await page.goto(path);
+      // Juste après la navigation : pas d'accueil, puis l'onboarding.
+      await expect(page.getByRole("heading", { name: /^Salut,/ }), path).toHaveCount(0);
+      await expect(page, path).toHaveURL(url);
+      await expect(page.getByRole("heading", { name: /Comment on t.appelle/ }), path).toBeVisible();
+      expect(
+        await page.evaluate(() => (window as unknown as { __cmPrivateSeen?: boolean }).__cmPrivateSeen),
+        path,
+      ).toBe(false);
+    }
+    // Aucun mémo « onboarding fait » tant que ce n'est pas le cas.
+    expect(await page.evaluate(() => window.localStorage.getItem("cm_onboarded"))).toBeNull();
+  });
+
   test("un compte déjà onboardé n'est jamais redirigé vers /onboarding", async ({ page }) => {
     await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
-    for (const path of ["/", "/dashboard", "/profile", "/seances", "/history"]) {
-      await page.goto(path);
-      await expect(page, path).not.toHaveURL(/\/onboarding/);
+    // CM-89 (PR 1) : la redirection se fait dans le navigateur, après
+    // l'ouverture de la page. On attend donc le contenu de chaque écran
+    // (preuve que la décision est prise) avant de vérifier l'URL. `/` est une
+    // page client qui part vers l'accueil.
+    const screens: [string, RegExp, () => Locator][] = [
+      ["/", /\/dashboard$/, () => page.getByRole("heading", { name: /^Salut,/ })],
+      ["/dashboard", /\/dashboard$/, () => page.getByRole("heading", { name: /^Salut,/ })],
+      ["/profile", /\/profile$/, () => page.getByRole("region", { name: "Mon profil" })],
+      ["/seances", /\/seances$/, () => page.getByRole("heading", { level: 1, name: "Séances", exact: true })],
+      ["/history", /\/history$/, () => page.getByRole("link", { name: "Nouvelle séance" })],
+    ];
+    // Deux tours : profil relu à chaque écran (mémo de l'appareil effacé
+    // avant), puis mémo posé (aucune relecture).
+    for (const round of ["sans mémo", "avec mémo"]) {
+      for (const [path, url, content] of screens) {
+        if (round === "sans mémo") {
+          await page.evaluate(() => window.localStorage.removeItem("cm_onboarded"));
+        }
+        await page.goto(path);
+        await expect(content(), `${round} ${path}`).toBeVisible();
+        await expect(page, `${round} ${path}`).toHaveURL(url);
+      }
+      await expect
+        .poll(() => page.evaluate(() => window.localStorage.getItem("cm_onboarded")))
+        .toMatch(/^[0-9a-f-]{36}$/);
     }
     await page.goto("/onboarding");
     await expect(page).toHaveURL(/\/dashboard$/);

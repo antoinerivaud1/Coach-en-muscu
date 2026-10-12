@@ -5,7 +5,7 @@ import type { Database } from "@/lib/types/database";
  * CM-86 (correctif C3) : appartenance à un duo, en distinguant « solo » d'une
  * lecture en échec.
  *
- * `getDuoId` (lib/profile.ts) renvoie null aussi bien pour un compte solo que
+ * `getDuoId` (lib/queries/profiles.ts) renvoie null aussi bien pour un compte solo que
  * pour une erreur réseau. Pour un simple affichage, c'est sans gravité. Pour
  * décider OÙ écrire (bibliothèque du duo ou bibliothèque perso), une erreur
  * prise pour « solo » rangerait la séance d'Antoine ou de Léa dans une

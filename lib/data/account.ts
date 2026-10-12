@@ -74,12 +74,13 @@ export const SIGN_OUT_TIMEOUT_MS = 3_000;
  *    écouteurs), borné à `timeoutMs` : réseau mort, verrou d'auth bloqué…
  *
  * Les cookies `httpOnly` de l'app restent (illisibles en JS), sans effet :
- * - `cm_onboarded` vaut l'id du compte supprimé ; le middleware ne le lit
- *   qu'avec une session et le compare à son id : un autre compte relit son
- *   profil comme s'il était absent ;
- * - `cm_profile` (ancien sélecteur) n'est plus lu nulle part, et la connexion
- *   suivante l'efface ;
+ * - `cm_onboarded` et `cm_profile` (anciens cookies, CM-89 (PR 1)) ne sont
+ *   plus lus nulle part, et la requête suivante les efface (middleware) ;
  * - `cm_auth_cookie_v` (marqueur) ne sert qu'en présence d'une session.
+ *
+ * Le mémo `localStorage` `cm_onboarded` (OnboardingGate) garde l'id du compte
+ * supprimé : comparé à la session, il ne vaut pour aucun autre compte, qui
+ * relit donc son profil.
  *
  * `doc` est injectable pour les tests (tests/unit/accountExport.spec.ts).
  */
