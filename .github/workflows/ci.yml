@@ -146,35 +146,9 @@ jobs:
       - name: Tests e2e
         run: npm run test:e2e
 
-      # CM-59 B : le filet DATA_CLIENT=service (client service-role, RLS
-      # contournée, contrôles d'appartenance du code seuls) doit faire passer
-      # les MÊMES parcours, isolation comprise. Même build : la variable est
-      # lue à l'exécution, seul le serveur redémarre. La clé service-role est
-      # celle de la stack locale (étape « Variables Supabase locales »).
-      - name: Redémarrer l'app avec DATA_CLIENT=service
-        run: |
-          pkill -f "next start" || true
-          pkill -f "next-server" || true
-          for i in $(seq 1 20); do
-            curl -s -o /dev/null http://localhost:3000/ || break
-            sleep 1
-          done
-          DATA_CLIENT=service npm run start -- -p 3000 > next-service.log 2>&1 &
-          for i in $(seq 1 60); do
-            curl -sf -o /dev/null http://localhost:3000/ && exit 0
-            sleep 1
-          done
-          echo "L'app (filet) n'a pas répondu en 60 s" && cat next-service.log && exit 1
-
-      - name: Tests e2e (filet DATA_CLIENT=service)
-        run: npm run test:e2e
-
-      # Preuve que les parcours ci-dessus sont bien passés par le client
-      # service-role (ligne écrite par lib/supabase/server.ts).
-      - name: Vérifier que le filet a servi
-        run: |
-          grep -F "[CM-59] DATA_CLIENT=service" next-service.log \
-            || { echo "::error::le client service-role n'a jamais été utilisé" && cat next-service.log && exit 1; }
+      # CM-88 (PR 6) : plus de second passage avec DATA_CLIENT=service. Plus
+      # aucun écran ne lit ni n'écrit de données côté serveur : le filet
+      # service-role n'est plus jamais utilisé (son code part en PR 8).
 
       - name: Logs Supabase
         if: failure()
