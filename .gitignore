@@ -25,6 +25,12 @@ ios/App/App.xcworkspace/xcuserdata/
 ios/App/App.xcodeproj/xcuserdata/
 ios/DerivedData/
 
+# CM-89 (PR 3) : bundle natif généré par `npm run build:native` (export
+# statique). Placeholder versionné : capacitor/placeholder/ (voir NATIVE.md).
+/capacitor/www/
+/capacitor/.www-next/
+/capacitor/.www-old/
+
 # Supabase CLI (stack locale)
 supabase/.branches/
 supabase/.temp/

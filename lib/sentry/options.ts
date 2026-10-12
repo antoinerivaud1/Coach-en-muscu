@@ -11,6 +11,10 @@ import type { ErrorEvent } from "@sentry/nextjs";
 export const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
 export function sentryEnvironment(): string {
+  // CM-89 (PR 3) : l'app native (export statique) a son propre environnement,
+  // pour séparer ses erreurs de celles du site. Variable gravée au build
+  // natif (next.config.mjs), absente du build web.
+  if (process.env.NEXT_PUBLIC_BUILD_TARGET === "native") return "native";
   return (
     process.env.NEXT_PUBLIC_VERCEL_ENV ??
     process.env.VERCEL_ENV ??

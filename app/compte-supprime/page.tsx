@@ -1,26 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-config";
 import PurgeLocalQueues from "@/components/profile/PurgeLocalQueues";
 
 export const metadata: Metadata = { title: "Compte supprimé · Coach en Muscu" };
 
 // CM-60 : page affichée après « Supprimer mon compte ». Publique
-// (lib/auth/publicPaths.ts) : la session vient d'être fermée. Aucune requête
-// Supabase.
-export const dynamic = "force-dynamic";
-
-export default async function AccountDeletedPage() {
-  // Plus de session sur cet appareil (la suppression l'a fermée) : les files
-  // locales sont vidées. Un compte connecté qui ouvrirait cette adresse à la
-  // main garde les siennes.
-  const store = await cookies();
-  const signedOut = !hasSupabaseAuthCookie(store.getAll().map((c) => c.name));
-
+// (lib/auth/publicPaths.ts) : la session vient d'être fermée. Aucune donnée
+// lue.
+// CM-89 (PR 3) : page statique (export natif). Plus de lecture des cookies
+// côté serveur : `PurgeLocalQueues` regarde la session dans le navigateur
+// et vide les files locales s'il n'y en a plus.
+export default function AccountDeletedPage() {
   return (
     <main className="flex min-h-[100dvh] flex-col px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
-      <PurgeLocalQueues enabled={signedOut} />
+      <PurgeLocalQueues />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         <div className="mt-6 flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-energy" aria-hidden>

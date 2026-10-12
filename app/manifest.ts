@@ -1,5 +1,10 @@
 import type { MetadataRoute } from "next";
 
+// CM-89 (PR 3) : exigé par l'export statique natif (`output: "export"`) pour
+// une route de métadonnées. Sans effet sur le web : le manifeste y était
+// déjà généré au build (aucune donnée de requête).
+export const dynamic = "force-static";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Coach en Muscu",

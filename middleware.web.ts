@@ -4,7 +4,9 @@ import { LEGACY_PROFILE_COOKIE } from "@/lib/auth/core";
 import { LEGACY_ONBOARDED_COOKIE } from "@/lib/onboarding";
 
 // CM-58 : rafraîchissement de la session Supabase. Next 15 : le fichier s'appelle bien
-// `middleware.ts` (`proxy.ts` est le nom Next 16).
+// `middleware` (`proxy` est le nom Next 16).
+// CM-89 (PR 3) : suffixe `.web` : build web seulement (voir `pageExtensions`
+// dans next.config.mjs). L'export statique natif refuse tout middleware.
 export async function middleware(request: NextRequest) {
   const response = await updateSession(request);
   // CM-89 (PR 1) : anciens cookies effacés s'ils traînent encore. Web

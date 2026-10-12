@@ -1,5 +1,7 @@
 // CM-95 : page de vérification Sentry, invisible (404) tant que SENTRY_TEST_PAGE
 // ne vaut pas "1". À activer seulement le temps d'un test, sur Preview de préférence.
+// CM-89 (PR 3) : suffixe `.web`, absente du bundle natif (variable serveur
+// lue à chaque requête, impossible dans un export statique).
 import { notFound } from "next/navigation";
 import SentryTestButtons from "./SentryTestButtons";
 
