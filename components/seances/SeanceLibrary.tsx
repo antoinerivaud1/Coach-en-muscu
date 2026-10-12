@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { daysSince, formatLastDone } from "@/lib/utils/recommendation";
+import { seanceEditPath } from "@/lib/routes";
 import type { SeanceView, SeanceWriteResult } from "@/lib/data/seances";
 import { useSeanceLibraryAction, type SeanceLibraryAction } from "@/hooks/data/useSeances";
 
@@ -202,7 +203,7 @@ export default function SeanceLibrary({
               {/* Le nom se change dans l'écran de modification : plus de
                   renommage en place depuis la bibliothèque (CM-81). */}
               <Link
-                href={`/seances/${seance.id}/edit`}
+                href={seanceEditPath(seance.id)}
                 className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-fg"
               >
                 Modifier

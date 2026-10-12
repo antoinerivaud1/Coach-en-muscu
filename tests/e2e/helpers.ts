@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { seanceEditPath, sessionPath, type SessionPathOptions } from "@/lib/routes";
 
 /**
  * Outils partagés des parcours e2e qui ÉCRIVENT en base (CM-56).
@@ -36,14 +37,36 @@ export function guardWrites(): void {
   );
 }
 
-/** Id de séance extrait d'une URL `/sessions/<uuid>`. */
-const SESSION_URL = /\/sessions\/([0-9a-f-]{36})(?:[?#]|$)/;
+/**
+ * CM-89 (PR 2) : URL d'une séance, `/sessions/view?id=<uuid>` (export
+ * statique, plus de `/sessions/<uuid>`). `id` est en tête quand l'app
+ * construit l'adresse (`sessionPath`, lib/routes.ts), pas forcément après
+ * une redirection d'une ancienne adresse avec query : on l'accepte partout.
+ */
+export const SESSION_URL = /\/sessions\/view\?(?:[^#]*&)?id=([0-9a-f-]{36})(?:[&#]|$)/;
+
+/** CM-89 (PR 2) : URL d'une séance type en édition, `/seances/edit?id=<uuid>`. */
+export const SEANCE_EDIT_URL = /\/seances\/edit\?id=([0-9a-f-]{36})$/;
 
 export function sessionIdFromUrl(url: string): string {
   const id = SESSION_URL.exec(url)?.[1];
   if (!id) throw new Error(`URL de séance inattendue : ${url}`);
   return id;
 }
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * CM-89 (PR 2) : l'URL courante est EXACTEMENT celle de cette séance (et de
+ * ce mode : `edit`, `editSets`), pour `toHaveURL`.
+ */
+export function sessionUrlExact(id: string, opts?: SessionPathOptions): RegExp {
+  return new RegExp(`${escapeRe(sessionPath(id, opts))}$`);
+}
+
+export { sessionPath, seanceEditPath };
 
 /** Mot de passe des comptes de `supabase/seed.sql` (base locale uniquement). */
 export const SEED_PASSWORD = "motdepasse-de-test";
@@ -150,7 +173,7 @@ export async function openExitSheet(page: Page) {
  * Idempotent : une séance déjà supprimée (404) ne fait rien.
  */
 export async function deleteSessionViaUi(page: Page, sessionId: string): Promise<void> {
-  await page.goto(`/sessions/${sessionId}`);
+  await page.goto(sessionPath(sessionId));
 
   // CM-88 (PR 6) : écran client, une séance absente affiche « Séance
   // introuvable » (plus de 404 serveur) : rien à nettoyer.

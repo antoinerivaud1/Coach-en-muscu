@@ -9,19 +9,22 @@ import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
 import { memberAccent } from "@/lib/members";
 import { memberStyle } from "@/lib/duo";
 import type { LoggerData } from "@/lib/data/sessionDetail";
+import { isUuid } from "@/lib/auth/core";
+import { sessionPath } from "@/lib/routes";
 import SessionLogger from "./SessionLogger";
 import SessionRecap from "./SessionRecap";
 
 /**
- * Écran d'une séance (`/sessions/[id]`). CM-88 (PR 6) : lu et écrit dans le
- * navigateur, sous RLS. Deux modes, choisis par les données :
+ * Écran d'une séance (`/sessions/view?id=<uuid>`). CM-88 (PR 6) : lu et
+ * écrit dans le navigateur, sous RLS. Deux modes, choisis par les données :
  * - saisie (`SessionLogger`) : ma séance en cours, ou ma séance terminée
  *   rouverte par « Modifier » (`?edit=1`) ;
  * - récap (`SessionRecap`) : séance terminée, la mienne (`?editsets=1` pour
  *   corriger les séries) ou celle de mon partenaire de duo.
  *
- * Lit `?edit` et `?editsets` avec `useSearchParams` : la page l'entoure d'un
- * `<Suspense>`.
+ * Lit `?id`, `?edit` et `?editsets` avec `useSearchParams` : la page
+ * l'entoure d'un `<Suspense>`. CM-89 (PR 2) : l'id passe en query (plus de
+ * `[id]`, export statique Capacitor).
  *
  * Saisie ÉPINGLÉE : une fois le logger affiché, plus rien ne le démonte en
  * pleine séance (jeton à rafraîchir sans réseau, relecture qui échoue ou qui
@@ -37,10 +40,29 @@ type Pin =
   /** Séance terminée depuis ce logger : on attend la relecture du récap. */
   | { key: string; data: null; profileId: string };
 
-export default function SessionScreen({ sessionId }: { sessionId: string }) {
+export default function SessionScreen() {
   const params = useSearchParams();
+  const id = params.get("id");
   const edit = params.get("edit") === "1";
   const editSets = !edit && params.get("editsets") === "1";
+  // CM-89 (PR 2) : id absent ou mal formé, aucune lecture : « Séance
+  // introuvable » tout de suite (la base refuserait un uuid invalide, et
+  // l'écran afficherait une erreur réseau trompeuse).
+  if (!isUuid(id)) return <SessionNotFound />;
+  // `key` : une autre séance remonte l'écran, comme quand l'id était un
+  // segment d'adresse. `?edit` / `?editsets` restent gérés par l'épingle.
+  return <SessionView key={id} sessionId={id} edit={edit} editSets={editSets} />;
+}
+
+function SessionView({
+  sessionId,
+  edit,
+  editSets,
+}: {
+  sessionId: string;
+  edit: boolean;
+  editSets: boolean;
+}) {
   const pinKey = `${sessionId}:${edit ? "edit" : "run"}`;
 
   const [pin, setPin] = useState<Pin | null>(null);
@@ -50,7 +72,7 @@ export default function SessionScreen({ sessionId }: { sessionId: string }) {
   if (pin && pin.key !== pinKey) setPin(null);
   const livePin = pin?.key === pinKey ? pin : null;
 
-  const next = `/sessions/${sessionId}${edit ? "?edit=1" : editSets ? "?editsets=1" : ""}`;
+  const next = sessionPath(sessionId, { edit, editSets });
   const auth = useRequireProfileId(next, { redirect: !livePin?.data });
   const profileId = auth.profileId;
   const screen = useSessionScreen(profileId, sessionId, edit);
@@ -102,28 +124,30 @@ export default function SessionScreen({ sessionId }: { sessionId: string }) {
     );
   }
 
-  if (data.kind === "notFound") {
-    return (
-      <main className="min-h-screen p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        <div className="mx-auto flex max-w-lg flex-col items-center gap-4 pt-16 text-center">
-          <h1 className="text-xl font-extrabold text-fg">Séance introuvable</h1>
-          <p className="text-sm text-fg-muted">
-            Cette séance n&apos;existe pas ou n&apos;est pas accessible depuis ton compte.
-          </p>
-          <Link
-            href="/history"
-            className="rounded-xl bg-surface2 px-4 py-2.5 text-sm font-semibold text-fg"
-          >
-            Retour à l&apos;historique
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  if (data.kind === "notFound") return <SessionNotFound />;
 
   if (data.kind === "logger") return null; // Inatteignable : épinglé ci-dessus.
 
   return <SessionRecap data={data} profileId={profileId} editSets={editSets} />;
+}
+
+function SessionNotFound() {
+  return (
+    <main className="min-h-screen p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+      <div className="mx-auto flex max-w-lg flex-col items-center gap-4 pt-16 text-center">
+        <h1 className="text-xl font-extrabold text-fg">Séance introuvable</h1>
+        <p className="text-sm text-fg-muted">
+          Cette séance n&apos;existe pas ou n&apos;est pas accessible depuis ton compte.
+        </p>
+        <Link
+          href="/history"
+          className="rounded-xl bg-surface2 px-4 py-2.5 text-sm font-semibold text-fg"
+        >
+          Retour à l&apos;historique
+        </Link>
+      </div>
+    </main>
+  );
 }
 
 function LoggerHost({

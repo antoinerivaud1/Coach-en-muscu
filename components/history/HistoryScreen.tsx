@@ -4,6 +4,7 @@ import Link from "next/link";
 import { showsComparison, toMembers, type Member } from "@/lib/duo";
 import type { HistoryData } from "@/lib/data/sessions";
 import { formatDateLong } from "@/lib/utils/training";
+import { sessionPath } from "@/lib/routes";
 import { useRequireProfileId } from "@/hooks/useProfileId";
 import { useHistory } from "@/hooks/data/useHistory";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
@@ -86,7 +87,7 @@ function HistoryList({ data, profileId }: { data: HistoryData; profileId: string
             return (
               <li key={s.id}>
                 <Link
-                  href={`/sessions/${s.id}`}
+                  href={sessionPath(s.id)}
                   className="block rounded-xl bg-surface p-4 transition-colors hover:bg-surface2"
                 >
                   <div className="flex items-center justify-between gap-3">

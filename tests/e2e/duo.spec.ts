@@ -7,7 +7,10 @@ import {
   guardWrites,
   logSet,
   login,
+  SESSION_URL,
+  seanceEditPath,
   sessionIdFromUrl,
+  sessionPath,
 } from "./helpers";
 
 // CM-87 : duo optionnel. Solo invite, Duo2 rejoint par le lien (connexion
@@ -130,7 +133,9 @@ test.describe("Duo optionnel (CM-87)", () => {
     await expect(page.getByText("Full body").first()).toBeVisible();
     // Ses séances réalisées restent là.
     await page.goto("/history");
-    await expect(page.locator('a[href="/sessions/99999999-9999-9999-9999-000000000004"]')).toBeVisible();
+    await expect(
+      page.locator(`a[href="${sessionPath("99999999-9999-9999-9999-000000000004")}"]`),
+    ).toBeVisible();
     await expect(page.getByText(SEED_NAMES.duo2)).toHaveCount(0);
   });
 
@@ -194,7 +199,7 @@ test.describe("Garder pour moi une séance que le partenaire utilise (CM-87, C1)
       .filter({ hasText: "Bas du corps" })
       .first()
       .click();
-    await expect(page).toHaveURL(/\/sessions\//);
+    await expect(page).toHaveURL(SESSION_URL);
     const sessionId = sessionIdFromUrl(page.url());
     await logSet(page, { weight: "40", reps: "8" });
 
@@ -202,7 +207,7 @@ test.describe("Garder pour moi une séance que le partenaire utilise (CM-87, C1)
       // Théo garde « Bas du corps » pour lui depuis l'édition.
       await signOut(page);
       await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
-      await page.goto(`/seances/${BAS_DU_CORPS}/edit`);
+      await page.goto(seanceEditPath(BAS_DU_CORPS));
       const choice = page.getByRole("radiogroup", { name: "Pour qui ?" });
       await expect(choice.getByRole("radio", { name: new RegExp(`Partager avec ${SEED_NAMES.elle}`) }))
         .toHaveAttribute("aria-checked", "true");
@@ -223,7 +228,7 @@ test.describe("Garder pour moi une séance que le partenaire utilise (CM-87, C1)
       // Lina rouvre sa séance en cours (toujours accessible), puis la supprime.
       await signOut(page);
       await login(page, SEED_ACCOUNTS.elle.email, SEED_ACCOUNTS.elle.password);
-      await page.goto(`/sessions/${sessionId}`);
+      await page.goto(sessionPath(sessionId));
       await expect(page.getByRole("button", { name: "Quitter la séance" })).toBeVisible();
       await deleteSessionViaUi(page, sessionId);
     }
@@ -231,7 +236,7 @@ test.describe("Garder pour moi une séance que le partenaire utilise (CM-87, C1)
 
   test("enregistrer sans changer le choix ne déplace rien (C2)", async ({ page }) => {
     await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
-    await page.goto(`/seances/${BAS_DU_CORPS}/edit`);
+    await page.goto(seanceEditPath(BAS_DU_CORPS));
     await page.getByRole("button", { name: /Enregistrer la séance/ }).click();
     await expect(page).toHaveURL(/\/seances$/);
     await expect(page.getByRole("region", { name: "Nos séances" })).toContainText("Bas du corps");

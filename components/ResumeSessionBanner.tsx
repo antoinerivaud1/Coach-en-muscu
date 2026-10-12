@@ -11,6 +11,7 @@ import {
   type ScreenWriteResult,
 } from "@/lib/data/sessionWrites";
 import { invalidateSessions } from "@/hooks/data/useSessionScreen";
+import { sessionPath } from "@/lib/routes";
 
 /**
  * Bandeau « Séance en cours » de l'accueil (CM-83).
@@ -87,7 +88,7 @@ export default function ResumeSessionBanner({
           </span>
         </div>
         <Link
-          href={`/sessions/${sessionId}`}
+          href={sessionPath(sessionId)}
           className="shrink-0 rounded-xl bg-energy px-3 py-1.5 text-[15px] font-extrabold text-ink"
         >
           Reprendre

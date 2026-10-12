@@ -17,7 +17,7 @@ export type StartSessionResult =
 /**
  * Démarre une séance à partir d'une séance type (accueil et bibliothèque).
  * Remplace la server action `startSession` (supprimée en PR 5) : mêmes
- * vérifications et mêmes messages. L'appelant navigue vers `/sessions/<id>`
+ * vérifications et mêmes messages. L'appelant navigue vers `sessionPath(<id>)`
  * en cas de succès, ou vers `/dashboard?error=…` sinon.
  *
  * La RLS (CM-59 B) refuse déjà de démarrer la séance type d'un autre duo ; le

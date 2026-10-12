@@ -20,7 +20,7 @@ import { bestE1RM, estimatedOneRepMax, formatWeight, totalVolume } from "@/lib/u
 import { suggestFirstSet } from "@/lib/utils/prefill";
 
 /**
- * CM-88 (PR 6) : lecture de l'écran de séance (`/sessions/[id]`), côté
+ * CM-88 (PR 6) : lecture de l'écran de séance (`/sessions/view?id=`), côté
  * navigateur et sous RLS. Reprend à l'identique ce que faisait la page
  * serveur, en deux modes :
  * - `logger` : saisie (séance en cours, ou séance terminée rouverte par

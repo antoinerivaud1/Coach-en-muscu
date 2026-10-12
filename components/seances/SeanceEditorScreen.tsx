@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useRequireProfileId } from "@/hooks/useProfileId";
 import { useSeanceEditor } from "@/hooks/data/useSeances";
 import { useCatalogExercises } from "@/hooks/data/useCatalogExercises";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
 import { DUO_READ_ERROR_MESSAGE } from "@/lib/duoMembership";
+import { isUuid } from "@/lib/auth/core";
+import { seanceEditPath } from "@/lib/routes";
 import SeanceBuilder from "./SeanceBuilder";
 
 /**
@@ -19,7 +22,7 @@ import SeanceBuilder from "./SeanceBuilder";
  * rien ne révèle qu'elle existe chez un autre couple (CM-80).
  */
 export default function SeanceEditorScreen({ dayId }: { dayId: string | null }) {
-  const path = dayId ? `/seances/${dayId}/edit` : "/seances/new";
+  const path = dayId ? seanceEditPath(dayId) : "/seances/new";
   const auth = useRequireProfileId(path);
   const profileId = auth.profileId;
   const editor = useSeanceEditor(profileId, dayId);
@@ -76,24 +79,7 @@ export default function SeanceEditorScreen({ dayId }: { dayId: string | null }) 
       </main>
     );
   }
-  if (data.kind === "notFound") {
-    return (
-      <main className="min-h-screen p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        <div className="mx-auto flex max-w-lg flex-col items-center gap-4 pt-16 text-center">
-          <h1 className="text-xl font-extrabold text-fg">Séance introuvable</h1>
-          <p className="text-sm text-fg-muted">
-            Cette séance n&apos;existe pas ou n&apos;est pas accessible depuis ton compte.
-          </p>
-          <Link
-            href="/seances"
-            className="rounded-xl bg-surface2 px-4 py-2.5 text-sm font-semibold text-fg"
-          >
-            Retour à mes séances
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  if (data.kind === "notFound") return <SeanceNotFound />;
 
   return (
     <SeanceBuilder
@@ -110,6 +96,40 @@ export default function SeanceEditorScreen({ dayId }: { dayId: string | null }) 
       canCreateExercise
       backHref="/seances"
     />
+  );
+}
+
+/**
+ * CM-89 (PR 2) : `/seances/edit?id=<uuid>` (export statique, plus de
+ * `[id]`). L'id vient de la query, lue avec `useSearchParams` : la page
+ * l'entoure d'un `<Suspense>`. Absent ou mal formé : « Séance introuvable »
+ * tout de suite, sans lecture. Surtout pas un `dayId` vide ou null, qui
+ * ouvrirait l'écran de CRÉATION.
+ */
+export function SeanceEditFromQuery() {
+  const id = useSearchParams().get("id");
+  if (!isUuid(id)) return <SeanceNotFound />;
+  // `key` : une autre séance repart d'un écran neuf, comme quand l'id était
+  // un segment d'adresse.
+  return <SeanceEditorScreen key={id} dayId={id} />;
+}
+
+function SeanceNotFound() {
+  return (
+    <main className="min-h-screen p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+      <div className="mx-auto flex max-w-lg flex-col items-center gap-4 pt-16 text-center">
+        <h1 className="text-xl font-extrabold text-fg">Séance introuvable</h1>
+        <p className="text-sm text-fg-muted">
+          Cette séance n&apos;existe pas ou n&apos;est pas accessible depuis ton compte.
+        </p>
+        <Link
+          href="/seances"
+          className="rounded-xl bg-surface2 px-4 py-2.5 text-sm font-semibold text-fg"
+        >
+          Retour à mes séances
+        </Link>
+      </div>
+    </main>
   );
 }
 

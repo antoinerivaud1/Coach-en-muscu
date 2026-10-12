@@ -1,5 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
-import { SEED_ACCOUNTS, deleteSessionViaUi, guardWrites, login, sessionIdFromUrl } from "./helpers";
+import {
+  SEANCE_EDIT_URL,
+  SEED_ACCOUNTS,
+  SESSION_URL,
+  deleteSessionViaUi,
+  guardWrites,
+  login,
+  seanceEditPath,
+  sessionIdFromUrl,
+} from "./helpers";
 
 // CM-88 (PR 5) : bibliothèque et éditeur de séances types côté client. Les
 // écritures partent du navigateur (RPC save_seance, duplicate_seance,
@@ -76,7 +85,7 @@ test.describe("Séances types depuis le navigateur (CM-88, PR 5)", () => {
       // --- Modification : nom et un exercice en moins ---
       await page.goto("/seances");
       await mine.locator("section").filter({ hasText: base }).getByRole("link", { name: "Modifier" }).click();
-      await expect(page).toHaveURL(/\/seances\/[0-9a-f-]{36}\/edit$/);
+      await expect(page).toHaveURL(SEANCE_EDIT_URL);
       await page.getByRole("button", { name: "Retirer Curl haltères" }).click();
       await setName(page, renamed);
       await page.getByRole("button", { name: /Enregistrer la séance/ }).click();
@@ -113,7 +122,7 @@ test.describe("Séances types depuis le navigateur (CM-88, PR 5)", () => {
         .filter({ hasNotText: "(copie)" })
         .getByRole("button", { name: "Démarrer" })
         .click();
-      await expect(page).toHaveURL(/\/sessions\/[0-9a-f-]{36}/);
+      await expect(page).toHaveURL(SESSION_URL);
       await deleteSessionViaUi(page, sessionIdFromUrl(page.url()));
 
       // --- Suppression ---
@@ -213,7 +222,7 @@ test.describe("Séances types depuis le navigateur (CM-88, PR 5)", () => {
   test("une séance inaccessible ne s'ouvre pas dans l'éditeur", async ({ page }) => {
     // « Full body », séance perso de Solo (seed), ouverte par Théo.
     await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
-    await page.goto("/seances/99999999-9999-9999-9999-000000000002/edit");
+    await page.goto(seanceEditPath("99999999-9999-9999-9999-000000000002"));
     await expect(page.getByRole("heading", { name: "Séance introuvable" })).toBeVisible();
     await expect(page.getByText("Full body")).toHaveCount(0);
   });

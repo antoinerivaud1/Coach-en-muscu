@@ -17,6 +17,7 @@ import {
   invalidateSessionsAfterDelete,
 } from "@/hooks/data/useSessionScreen";
 import { formatDateLong, formatWeight } from "@/lib/utils/training";
+import { sessionPath } from "@/lib/routes";
 import { memberAccent, sessionExerciseLabel } from "@/lib/members";
 import { memberStyle } from "@/lib/duo";
 import ConfirmSubmit from "@/components/ConfirmSubmit";
@@ -154,7 +155,7 @@ export default function SessionRecap({
           </Link>
           {isMine && (
             <Link
-              href={editSets ? `/sessions/${sessionId}` : `/sessions/${sessionId}?editsets=1`}
+              href={sessionPath(sessionId, { editSets: !editSets })}
               className="text-sm font-semibold text-energy"
             >
               {editSets ? "Terminer" : "Corriger les séries"}
@@ -306,7 +307,7 @@ export default function SessionRecap({
         {isMine && (
           <div className="mt-6 flex gap-3">
             <Link
-              href={`/sessions/${sessionId}?edit=1`}
+              href={sessionPath(sessionId, { edit: true })}
               className="flex-1 rounded-lg bg-surface2 py-3 text-center text-sm font-semibold text-fg"
             >
               Modifier

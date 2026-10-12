@@ -64,10 +64,59 @@ test("CM-88 : la bibliothèque et l'éditeur de séances sans session renvoient 
   await page.goto("/seances/new");
   await expect(page).toHaveURL(/\/login\?next=%2Fseances%2Fnew$/);
 
-  await page.goto("/seances/55555555-5555-5555-5555-000000000001/edit");
+  // CM-89 (PR 2) : l'éditeur lit l'id en query (`/seances/edit?id=`).
+  await page.goto("/seances/edit?id=55555555-5555-5555-5555-000000000001");
   await expect(page).toHaveURL(
-    /\/login\?next=%2Fseances%2F55555555-5555-5555-5555-000000000001%2Fedit$/,
+    /\/login\?next=%2Fseances%2Fedit%3Fid%3D55555555-5555-5555-5555-000000000001$/,
   );
+});
+
+// ---- CM-89 (PR 2) : plus de route dynamique, l'id passe en query ----
+
+const OLD_ID = "55555555-5555-5555-5555-000000000001";
+
+test("CM-89 (PR 2) : une séance sans session renvoie à la connexion, id et mode conservés", async ({ page }) => {
+  await page.goto(`/sessions/view?id=${OLD_ID}&edit=1`);
+  await expect(page).toHaveURL(
+    new RegExp(`/login\\?next=%2Fsessions%2Fview%3Fid%3D${OLD_ID}%26edit%3D1$`),
+  );
+});
+
+test("CM-89 (PR 2) : web, une ancienne adresse `/sessions/<uuid>` redirige vers `/sessions/view?id=`", async ({ page }) => {
+  // Redirection de next.config.mjs (build web uniquement), temporaire.
+  const res = await page.request.get(`/sessions/${OLD_ID}`, { maxRedirects: 0 });
+  expect(res.status()).toBe(307);
+  expect(new URL(res.headers()["location"]!, "http://x.invalid").pathname).toBe("/sessions/view");
+  expect(new URL(res.headers()["location"]!, "http://x.invalid").searchParams.get("id")).toBe(OLD_ID);
+
+  // La query d'origine suit (« Modifier », « Corriger les séries »).
+  const edit = await page.request.get(`/sessions/${OLD_ID}?edit=1`, { maxRedirects: 0 });
+  const editTarget = new URL(edit.headers()["location"]!, "http://x.invalid");
+  expect(editTarget.searchParams.get("id")).toBe(OLD_ID);
+  expect(editTarget.searchParams.get("edit")).toBe("1");
+
+  // Dans le navigateur : nouvelle adresse, puis connexion avec retour prévu.
+  await page.goto(`/sessions/${OLD_ID}`);
+  await expect(page).toHaveURL(new RegExp(`/login\\?next=%2Fsessions%2Fview%3Fid%3D${OLD_ID}$`));
+});
+
+test("CM-89 (PR 2) : web, une ancienne adresse `/seances/<uuid>/edit` redirige vers `/seances/edit?id=`", async ({ page }) => {
+  const res = await page.request.get(`/seances/${OLD_ID}/edit`, { maxRedirects: 0 });
+  expect(res.status()).toBe(307);
+  const target = new URL(res.headers()["location"]!, "http://x.invalid");
+  expect(target.pathname).toBe("/seances/edit");
+  expect(target.searchParams.get("id")).toBe(OLD_ID);
+});
+
+test("CM-89 (PR 2) : un id absent ou mal formé affiche « Séance introuvable »", async ({ page }) => {
+  // Aucune lecture : rien à protéger, pas de détour par la connexion.
+  for (const url of ["/sessions/view?id=not-a-uuid", "/sessions/view", "/seances/edit?id=not-a-uuid"]) {
+    await page.goto(url);
+    await expect(page.getByRole("heading", { name: "Séance introuvable" }), url).toBeVisible();
+  }
+  // Seuls les uuid sont redirigés : un ancien chemin quelconque reste un 404.
+  const res = await page.request.get("/sessions/not-a-uuid", { maxRedirects: 0 });
+  expect(res.status()).toBe(404);
 });
 
 test("CM-88 (PR 7) : un lien d'invitation sans session passe par la connexion, code conservé", async ({ page }) => {

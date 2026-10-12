@@ -7,6 +7,8 @@ import {
   login,
   logSet,
   openExitSheet,
+  sessionPath,
+  sessionUrlExact,
   startSession,
 } from "./helpers";
 
@@ -71,11 +73,11 @@ test.describe("Progression", () => {
 
     await page.getByRole("link", { name: "← Historique" }).click();
     await expect(page).toHaveURL(/\/history$/);
-    const row = page.locator(`a[href="/sessions/${id}"]`);
+    const row = page.locator(`a[href="${sessionPath(id)}"]`);
     await expect(row).toBeVisible();
 
     await row.click();
-    await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
+    await expect(page).toHaveURL(sessionUrlExact(id));
     await page.getByRole("button", { name: "Supprimer", exact: true }).click();
     await page.getByRole("button", { name: "Oui, supprimer" }).click();
     await expect(page).toHaveURL(/\/history$/);
