@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { SIGNUP_CLOSED_MESSAGE, signOutLocal, signUpWithEmail, signupOpen } from "@/lib/data/auth";
+import { clearSessionCookies } from "@/lib/supabase/nativeSession";
 
 // CM-86 / CM-88 (PR 7) : inscription fermée, l'écran refuse AVANT tout appel
 // à Supabase. Depuis CM-88, ce n'est qu'un affichage
@@ -40,6 +41,10 @@ test.describe("signOutLocal", () => {
       },
     };
   }
+  /** Effacement web (cookies), comme `clearLocalSession` hors app native. */
+  const wipe = (doc: { cookie: string }) => () => {
+    clearSessionCookies(doc);
+  };
   const session = ["sb-127-auth-token.0", "sb-127-auth-token.1", "cm_onboarded", "autre"];
   type Client = Parameters<typeof signOutLocal>[0];
   const client = (signOut: () => Promise<{ error: unknown }>) =>
@@ -47,14 +52,14 @@ test.describe("signOutLocal", () => {
 
   test("succès : Supabase a fermé la session, aucun cookie touché ici", async () => {
     const doc = fakeDoc(session);
-    expect(await signOutLocal(client(async () => ({ error: null })), doc)).toBe(false);
+    expect(await signOutLocal(client(async () => ({ error: null })), wipe(doc))).toBe(false);
     expect(doc.written).toEqual([]);
   });
 
   test("erreur renvoyée (réseau) : cookies de session effacés, les autres gardés", async () => {
     const doc = fakeDoc(session);
     const failing = client(async () => ({ error: { name: "AuthRetryableFetchError" } }));
-    expect(await signOutLocal(failing, doc)).toBe(true);
+    expect(await signOutLocal(failing, wipe(doc))).toBe(true);
     expect([...doc.jar].sort()).toEqual(["autre", "cm_onboarded"]);
   });
 
@@ -63,15 +68,25 @@ test.describe("signOutLocal", () => {
     const throwing = client(async () => {
       throw new Error("réseau");
     });
-    expect(await signOutLocal(throwing, doc)).toBe(true);
+    expect(await signOutLocal(throwing, wipe(doc))).toBe(true);
     expect(doc.jar.has("sb-127-auth-token.0")).toBe(false);
   });
 
   test("pas de réponse : cookies effacés après le délai", async () => {
     const doc = fakeDoc(session);
     const hanging = client(() => new Promise(() => {}));
-    expect(await signOutLocal(hanging, doc, 20)).toBe(true);
+    expect(await signOutLocal(hanging, wipe(doc), 20)).toBe(true);
     expect(doc.jar.has("sb-127-auth-token.1")).toBe(false);
+  });
+
+  // CM-89 (PR 4) : dans l'app native, l'effacement vise Preferences. Une
+  // erreur du stockage ne doit jamais bloquer la déconnexion.
+  test("effacement en erreur : la déconnexion aboutit quand même", async () => {
+    const failing = client(async () => ({ error: { name: "AuthRetryableFetchError" } }));
+    const broken = async () => {
+      throw new Error("stockage indisponible");
+    };
+    expect(await signOutLocal(failing, broken)).toBe(true);
   });
 });
 

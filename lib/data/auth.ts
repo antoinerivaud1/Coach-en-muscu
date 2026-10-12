@@ -1,5 +1,5 @@
-import type { BrowserSupabase } from "@/lib/supabase/client";
-import { sessionCookieNames } from "@/lib/accountDeletion";
+import { clearLocalSession, type BrowserSupabase } from "@/lib/supabase/client";
+import { clearSessionBounded } from "@/lib/supabase/nativeSession";
 import {
   authErrorMessage,
   safeNextPath,
@@ -15,7 +15,8 @@ import {
 
 /**
  * CM-58 / CM-86 / CM-88 (PR 7) : connexion, inscription et déconnexion
- * depuis le NAVIGATEUR (client Supabase anon, session en cookie lisible).
+ * depuis le NAVIGATEUR (client Supabase anon, session en cookie lisible sur
+ * le web, dans Capacitor Preferences dans l'app native : CM-89 (PR 4)).
  * Remplacent les server actions de lib/actions/auth.ts et signup.ts.
  *
  * Mêmes validations (lib/auth/core.ts, lib/onboarding.ts) et mêmes messages
@@ -121,18 +122,21 @@ export const SIGN_OUT_TIMEOUT_MS = 3_000;
  *
  * `signOut` ne lève pas : en cas d'échec (réseau coupé, serveur Auth en
  * erreur), il renvoie `{ error }` SANS effacer la session. Dans ce cas, ou
- * s'il lève, ou s'il ne répond pas dans `timeoutMs`, les cookies de session
- * (`sb-…-auth-token*`, lisibles en JS depuis CM-88, morceaux compris) sont
- * effacés ici (`sessionCookieNames`, comme après une suppression de compte).
- * Le jeton reste valable côté serveur jusqu'à son expiration, mais cet
- * appareil n'a plus de session : c'est le sens de `scope: "local"`.
+ * s'il lève, ou s'il ne répond pas dans `timeoutMs`, la session de cet
+ * appareil est effacée ici (`clearLocalSession`, comme après une suppression
+ * de compte) : cookies `sb-…-auth-token*` sur le web, clés de session dans
+ * Preferences dans l'app native (CM-89 (PR 4)), pour qu'elle ne se rouvre
+ * pas connectée. Le jeton reste valable côté serveur jusqu'à son expiration,
+ * mais cet appareil n'a plus de session : c'est le sens de `scope: "local"`.
  *
- * Renvoie `true` si les cookies ont dû être effacés à la main.
- * `doc` est injectable pour les tests (tests/unit/signupGuard.spec.ts).
+ * Cet effacement est borné au même `timeoutMs` (`clearSessionBounded`).
+ *
+ * Renvoie `true` si la session a dû être effacée à la main.
+ * `clearSession` est injectable pour les tests (tests/unit/signupGuard.spec.ts).
  */
 export async function signOutLocal(
   supabase: AuthClient,
-  doc: { cookie: string } = document,
+  clearSession: () => unknown = clearLocalSession,
   timeoutMs: number = SIGN_OUT_TIMEOUT_MS,
 ): Promise<boolean> {
   let failed = true;
@@ -150,10 +154,8 @@ export async function signOutLocal(
   } finally {
     clearTimeout(timer);
   }
-  if (failed) {
-    for (const name of sessionCookieNames(doc.cookie)) {
-      doc.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
-    }
-  }
+  // Effacement borné lui aussi (CM-89 (PR 4)) : stockage en erreur ou bloqué,
+  // `/login` est ouvert quand même (SignOutButton).
+  if (failed) await clearSessionBounded(clearSession, timeoutMs);
   return failed;
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { inviteJoinPath } from "@/lib/duo";
+import { publicSiteOrigin } from "@/lib/siteUrl";
 
 /**
  * CM-87 : « Partager » (feuille de partage du téléphone, sinon copie du
@@ -26,7 +27,9 @@ export default function ShareInvitation({
   }
 
   async function share() {
-    const url = `${window.location.origin}${inviteJoinPath(code)}`;
+    // CM-89 (PR 4) : origine publique du site, jamais `capacitor://localhost`
+    // dans l'app native (lien inutilisable pour la personne invitée).
+    const url = `${publicSiteOrigin()}${inviteJoinPath(code)}`;
     const text = `${inviterName} t'invite à s'entraîner en duo sur Coach en Muscu. Code : ${code}`;
     if (typeof navigator.share === "function") {
       try {

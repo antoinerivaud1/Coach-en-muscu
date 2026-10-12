@@ -89,3 +89,19 @@ test("export : pages manquantes, web seulement, source maps, RSC, vercel.app", (
     "source map : _next/static/chunks/main.js.map",
   ]);
 });
+
+test("export : origine des liens partagés tolérée, tout autre vercel.app refusé", () => {
+  const origin = "https://v0-gym-workout-tracker-silk.vercel.app";
+  const files = [...completeExport(), "_next/static/chunks/a.js", "_next/static/chunks/b.js"];
+  const problems = bundleProblems(
+    files,
+    (file) =>
+      file === "_next/static/chunks/a.js"
+        ? `const PROD="${origin}";`
+        : file === "_next/static/chunks/b.js"
+          ? `fetch("${origin}/api"); fetch("https://autre.vercel.app")`
+          : "",
+    { allowedOrigins: [origin] },
+  );
+  assert.deepEqual(problems, ["référence à vercel.app : _next/static/chunks/b.js"]);
+});

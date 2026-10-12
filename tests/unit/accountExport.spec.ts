@@ -28,6 +28,7 @@ import {
 } from "@/lib/accountDeletion";
 import { AuthRetryableFetchError } from "@supabase/supabase-js";
 import type { BrowserSupabase } from "@/lib/supabase/client";
+import { clearSessionCookies } from "@/lib/supabase/nativeSession";
 import { closeDeletedAccountSession, deleteMyAccount } from "@/lib/data/account";
 import { deliverExport, exportFileName, type ExportDeps } from "@/lib/export/deliverExport";
 import { isPublicPath } from "@/lib/auth/publicPaths";
@@ -590,7 +591,7 @@ test.describe("Suppression du compte côté navigateur (CM-88)", () => {
       },
     } as unknown as Pick<BrowserSupabase, "auth">;
     const started = Date.now();
-    await closeDeletedAccountSession(supabase, doc, 50);
+    await closeDeletedAccountSession(supabase, () => clearSessionCookies(doc), 50);
     expect(Date.now() - started).toBeLessThan(1_000);
     // signOut appelé APRÈS l'effacement des deux cookies.
     expect(writesAtSignOut).toBe(2);
@@ -605,7 +606,7 @@ test.describe("Suppression du compte côté navigateur (CM-88)", () => {
     const supabase = {
       auth: { signOut: async () => Promise.reject(new Error("réseau")) },
     } as unknown as Pick<BrowserSupabase, "auth">;
-    await closeDeletedAccountSession(supabase, doc, 50);
+    await closeDeletedAccountSession(supabase, () => clearSessionCookies(doc), 50);
   });
 
   test("réseau coupé à la vérification de session : rien n'est supprimé, pas « session expirée »", async () => {

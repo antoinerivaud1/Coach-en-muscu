@@ -32,7 +32,8 @@ const DELETE_ERROR_MESSAGES: Record<string, string> = {
 /**
  * CM-88 : noms des cookies de session Supabase (`sb-<ref>-auth-token`, et ses
  * morceaux `.0`, `.1`…) présents dans `document.cookie`, à effacer après la
- * suppression du compte.
+ * suppression du compte. CM-89 (PR 4) : web seulement ; dans l'app native, la
+ * session est dans Preferences (`clearPreferencesSession`).
  */
 export function sessionCookieNames(documentCookie: string): string[] {
   return documentCookie

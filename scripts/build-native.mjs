@@ -7,8 +7,9 @@
 //    interrompu (échec, Ctrl-C) ne laisse aucun fichier à restaurer.
 // 2. Vérifie l'export (`out/`) AVANT de toucher à `capacitor/www` : pages
 //    attendues par le routeur iOS, charges RSC, aucune page web seulement,
-//    aucune source map, aucune référence à vercel.app
-//    (`bundleProblems`, scripts/lib/native-rules.mjs).
+//    aucune source map, aucune référence à vercel.app hors origine des
+//    liens partagés (`bundleProblems`, scripts/lib/native-rules.mjs ;
+//    origine : lib/siteOrigin.json et NEXT_PUBLIC_SITE_URL).
 // 3. Seulement si tout passe : remplace `capacitor/www` par échange de
 //    dossiers (renommages), jamais à moitié remplacé ni vidé.
 //
@@ -102,8 +103,21 @@ const code = await runNextBuild();
 if (code !== 0) fail(`next build a échoué (code ${code}). capacitor/www n'a pas été modifié.`);
 if (!existsSync(OUT_DIR)) fail("export introuvable : out/ manque. capacitor/www n'a pas été modifié.");
 
+/** Origines des liens partagés (lib/siteUrl.ts) : seul vercel.app toléré. */
+function sharedLinkOrigins() {
+  const origins = [JSON.parse(readFileSync(join(ROOT, "lib/siteOrigin.json"), "utf8")).prodWebOrigin];
+  try {
+    if (process.env.NEXT_PUBLIC_SITE_URL) origins.push(new URL(process.env.NEXT_PUBLIC_SITE_URL).origin);
+  } catch {
+    // URL invalide : ignorée par lib/siteUrl.ts, donc absente du bundle.
+  }
+  return origins;
+}
+
 const files = listFiles(OUT_DIR);
-const problems = bundleProblems(files, (file) => readFileSync(join(OUT_DIR, file), "utf8"));
+const problems = bundleProblems(files, (file) => readFileSync(join(OUT_DIR, file), "utf8"), {
+  allowedOrigins: sharedLinkOrigins(),
+});
 if (problems.length) {
   fail(
     `export refusé, capacitor/www n'a pas été modifié (export laissé dans out/) :\n` +

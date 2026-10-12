@@ -75,9 +75,13 @@ const TEXT_EXTENSIONS = [".html", ".txt", ".js", ".css", ".json", ".webmanifest"
  *
  * @param {string[]} files chemins relatifs, séparés par `/`
  * @param {(file: string) => string} readText
+ * @param {{ allowedOrigins?: string[] }} [options] origines exactes tolérées
+ *   dans le texte : celle des liens partagés (lib/siteUrl.ts), un texte
+ *   copié par l'utilisateur, jamais une adresse appelée par l'app.
  * @returns {string[]}
  */
-export function bundleProblems(files, readText) {
+export function bundleProblems(files, readText, options = {}) {
+  const allowed = (options.allowedOrigins ?? []).filter(Boolean);
   const problems = [];
   const set = new Set(files);
   for (const page of REQUIRED_PAGES) {
@@ -95,9 +99,12 @@ export function bundleProblems(files, readText) {
       const payload = `${file.slice(0, -".html".length)}.txt`;
       if (!set.has(payload)) problems.push(`charge RSC manquante : ${payload}`);
     }
-    // Critère de fin de CM-89 : aucun domaine vercel.app dans la coque.
+    // Critère de fin de CM-89 : aucun domaine vercel.app dans la coque, hors
+    // origines tolérées (lien d'invitation). Les tests natifs vérifient en
+    // plus qu'aucune requête ne part vers vercel.app.
     if (TEXT_EXTENSIONS.includes(extensionOf(file.split("/").pop() ?? ""))) {
-      if (readText(file).includes("vercel.app")) problems.push(`référence à vercel.app : ${file}`);
+      const text = allowed.reduce((acc, origin) => acc.split(origin).join(""), readText(file));
+      if (text.includes("vercel.app")) problems.push(`référence à vercel.app : ${file}`);
     }
   }
   return problems;
