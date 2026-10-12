@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import ConfirmSubmit from "@/components/ConfirmSubmit";
@@ -45,12 +45,15 @@ export default function ResumeSessionBanner({
 }) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
+  /** Garde synchrone : deux taps dans la même image passeraient l'état. */
+  const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const run =
     (write: () => Promise<ScreenWriteResult>) => async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (busy) return;
+      if (busyRef.current) return;
+      busyRef.current = true;
       setBusy(true);
       setError(null);
       try {
@@ -61,6 +64,7 @@ export default function ResumeSessionBanner({
       } catch {
         setError("Pas de connexion. Réessaie dans un instant.");
       } finally {
+        busyRef.current = false;
         setBusy(false);
       }
     };

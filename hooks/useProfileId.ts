@@ -46,16 +46,21 @@ export function useProfileId() {
  * vers `/login?next=<chemin>` si personne n'est connecté (équivalent client de
  * `requireProfileId(next)`). Une erreur réseau n'est PAS une déconnexion :
  * l'écran affiche son état d'erreur, sans redirection. Pas de redirection non
- * plus sur un « personne » en cache pendant qu'une relecture est en cours.
+ * plus sur un « personne » en cache pendant qu'une relecture est en cours,
+ * ni quand l'écran le demande (`redirect: false`).
  */
-export function useRequireProfileId(next: string) {
+export function useRequireProfileId(next: string, options: { redirect?: boolean } = {}) {
   const router = useRouter();
   const query = useProfileId();
   const signedOut = query.isSuccess && !query.isFetching && query.data === null;
+  // CM-88 (PR 6) : `redirect: false` pendant une séance en cours. Jamais de
+  // renvoi vers /login en pleine saisie (CM-59 B) : le logger affiche
+  // « Session expirée » et sa file attend la reconnexion.
+  const shouldRedirect = signedOut && options.redirect !== false;
 
   useEffect(() => {
-    if (signedOut) router.replace(loginPath(next));
-  }, [signedOut, router, next]);
+    if (shouldRedirect) router.replace(loginPath(next));
+  }, [shouldRedirect, router, next]);
 
   return {
     profileId: query.data ?? null,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -50,13 +50,25 @@ export default function SessionRecap({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
+  /** Garde synchrone : deux taps dans la même image passeraient l'état. */
+  const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const { sessionId, isMine } = data;
 
+  function lock(): boolean {
+    if (busyRef.current) return false;
+    busyRef.current = true;
+    setBusy(true);
+    return true;
+  }
+  function unlock(): void {
+    busyRef.current = false;
+    setBusy(false);
+  }
+
   /** Une écriture à la fois ; relecture de la séance (et des listes) ensuite. */
   async function write(run: () => Promise<ScreenWriteResult>): Promise<boolean> {
-    if (busy) return false;
-    setBusy(true);
+    if (!lock()) return false;
     setError(null);
     try {
       const result = await run();
@@ -67,7 +79,7 @@ export default function SessionRecap({
       setError(OFFLINE_TEXT);
       return false;
     } finally {
-      setBusy(false);
+      unlock();
     }
   }
 
@@ -95,14 +107,13 @@ export default function SessionRecap({
 
   async function onDeleteSession(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
-    setBusy(true);
+    if (!lock()) return;
     setError(null);
     try {
       const result = await deleteOwnSession(getSupabaseBrowserClient(), profileId, sessionId);
       if (!result.ok) {
         setError(result.error);
-        setBusy(false);
+        unlock();
         return;
       }
       // Tout est relu sauf cet écran : la séance n'existe plus, la relire
@@ -111,7 +122,7 @@ export default function SessionRecap({
       router.replace("/history");
     } catch {
       setError(OFFLINE_TEXT);
-      setBusy(false);
+      unlock();
     }
   }
 

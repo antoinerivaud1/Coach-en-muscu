@@ -22,17 +22,65 @@ import SessionRecap from "./SessionRecap";
  *
  * Lit `?edit` et `?editsets` avec `useSearchParams` : la page l'entoure d'un
  * `<Suspense>`.
+ *
+ * Saisie ÉPINGLÉE : une fois le logger affiché, plus rien ne le démonte en
+ * pleine séance (jeton à rafraîchir sans réseau, relecture qui échoue ou qui
+ * revient « introuvable », session fermée) : il perdrait ses saisies en
+ * cours, et se remonterait sur une lecture d'avant les séries déjà écrites.
+ * Seule la fin de séance réussie (`onFinished`) ou un changement d'adresse
+ * le libère.
  */
+
+type Pin =
+  /** Logger affiché pour `key`, sur cette lecture. */
+  | { key: string; data: LoggerData; profileId: string }
+  /** Séance terminée depuis ce logger : on attend la relecture du récap. */
+  | { key: string; data: null; profileId: string };
+
 export default function SessionScreen({ sessionId }: { sessionId: string }) {
   const params = useSearchParams();
   const edit = params.get("edit") === "1";
   const editSets = !edit && params.get("editsets") === "1";
+  const pinKey = `${sessionId}:${edit ? "edit" : "run"}`;
 
-  const auth = useRequireProfileId(`/sessions/${sessionId}`);
+  const [pin, setPin] = useState<Pin | null>(null);
+  const livePin = pin?.key === pinKey ? pin : null;
+
+  const next = `/sessions/${sessionId}${edit ? "?edit=1" : editSets ? "?editsets=1" : ""}`;
+  const auth = useRequireProfileId(next, { redirect: !livePin?.data });
   const profileId = auth.profileId;
   const screen = useSessionScreen(profileId, sessionId, edit);
 
-  if (auth.error || (!screen.data && screen.error)) {
+  // Épinglage : seulement sur une lecture faite APRÈS l'ouverture de l'écran
+  // (jamais un cache), et une seule fois par adresse. Mise à jour d'état
+  // pendant le rendu, gardée : React la recommande pour un état dérivé.
+  if (
+    !livePin &&
+    profileId &&
+    screen.data?.kind === "logger" &&
+    screen.isFetchedAfterMount &&
+    !screen.isFetching
+  ) {
+    setPin({ key: pinKey, data: screen.data, profileId });
+  }
+
+  if (livePin?.data) {
+    return (
+      <LoggerHost
+        key={pinKey}
+        data={livePin.data}
+        profileId={livePin.profileId}
+        onFinished={() => setPin({ key: pinKey, data: null, profileId: livePin.profileId })}
+      />
+    );
+  }
+
+  const data = screen.data;
+  // Après « Terminer » : seul un récap relu convient. La lecture d'avant
+  // (encore « saisie ») ne doit pas rouvrir le logger d'une séance terminée.
+  const waitingRecap = livePin !== null && data?.kind === "logger";
+
+  if (auth.error || (screen.error && (!data || waitingRecap))) {
     return (
       <Frame>
         <ScreenError
@@ -41,7 +89,7 @@ export default function SessionScreen({ sessionId }: { sessionId: string }) {
       </Frame>
     );
   }
-  if (!profileId || !screen.data) {
+  if (!profileId || !data || waitingRecap || (data.kind === "logger" && !livePin)) {
     return (
       <Frame>
         <ScreenSkeleton label="Chargement de la séance" />
@@ -49,7 +97,6 @@ export default function SessionScreen({ sessionId }: { sessionId: string }) {
     );
   }
 
-  const data = screen.data;
   if (data.kind === "notFound") {
     return (
       <main className="min-h-screen p-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -69,39 +116,37 @@ export default function SessionScreen({ sessionId }: { sessionId: string }) {
     );
   }
 
-  if (data.kind === "logger") {
-    // Nouvelle instance pour une autre séance ou un autre mode.
-    return <LoggerHost key={`${sessionId}:${edit ? "edit" : "run"}`} data={data} profileId={profileId} />;
-  }
+  if (data.kind === "logger") return null; // Inatteignable : épinglé ci-dessus.
 
   return <SessionRecap data={data} profileId={profileId} editSets={editSets} />;
 }
 
-/**
- * Le logger s'initialise UNE fois (séries saisies, file hors ligne,
- * exercices ajoutés) : il reçoit la PREMIÈRE lecture, figée. Une relecture
- * ultérieure (fin de séance, réseau retrouvé) ne doit ni remonter ses états
- * ni relancer la reprise de la file. Quand la séance passe terminée, la
- * relecture donne un récap et ce composant est démonté.
- */
-function LoggerHost({ data, profileId }: { data: LoggerData; profileId: string }) {
-  const [initial] = useState(data);
+function LoggerHost({
+  data,
+  profileId,
+  onFinished,
+}: {
+  data: LoggerData;
+  profileId: string;
+  onFinished: () => void;
+}) {
   return (
     <main
       className="min-h-screen p-4"
-      style={memberStyle(memberAccent({ accent_color: initial.ownerAccent }))}
+      style={memberStyle(memberAccent({ accent_color: data.ownerAccent }))}
     >
       <SessionLogger
         profileId={profileId}
-        sessionId={initial.sessionId}
-        dayName={initial.dayName}
-        startedAt={initial.startedAt}
-        finishedDurationSeconds={initial.finishedDurationSeconds}
-        initialFeedback={initial.initialFeedback}
-        exercises={initial.exercises}
-        initialSets={initial.initialSets}
-        catalog={initial.catalog}
-        canCreateExercise={initial.canCreateExercise}
+        sessionId={data.sessionId}
+        dayName={data.dayName}
+        startedAt={data.startedAt}
+        finishedDurationSeconds={data.finishedDurationSeconds}
+        initialFeedback={data.initialFeedback}
+        exercises={data.exercises}
+        initialSets={data.initialSets}
+        catalog={data.catalog}
+        canCreateExercise={data.canCreateExercise}
+        onFinished={onFinished}
       />
     </main>
   );

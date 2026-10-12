@@ -1,6 +1,13 @@
 import { test, expect } from "@playwright/test";
 import { buildInitialSets } from "@/lib/data/sessionDetail";
-import { isTransportError } from "@/lib/data/sessionWrites";
+import { AuthRetryableFetchError } from "@supabase/supabase-js";
+import {
+  deleteSessionSet,
+  isTransportError,
+  OfflineError,
+  upsertSessionSet,
+} from "@/lib/data/sessionWrites";
+import type { BrowserSupabase } from "@/lib/supabase/client";
 import type { SessionExercise } from "@/lib/utils/sessionExercises";
 import type { SessionSetRow } from "@/lib/queries/sessions";
 
@@ -62,5 +69,143 @@ test.describe("buildInitialSets", () => {
   test("exercice pas encore commencé : au moins une ligne", () => {
     const out = buildInitialSets([exercise("b", 0)], [], {}, true);
     expect(out.b).toHaveLength(1);
+  });
+});
+
+// ---- Classement refus définitif / rejouable (CM-59 B), faux client ----
+
+
+/** Requête PostgREST factice : toute méthode se chaîne, `await` rend `result`. */
+function chain(result: unknown): unknown {
+  const target = () => undefined;
+  return new Proxy(target, {
+    get(_t, prop) {
+      if (prop === "then") {
+        return (resolve: (v: unknown) => void) => resolve(result);
+      }
+      return () => chain(result);
+    },
+  });
+}
+
+type FakeOptions = {
+  /** Jetons rendus par `getSession`, appel après appel (le dernier se répète). */
+  tokens: (string | null)[];
+  userId?: string;
+  authError?: unknown;
+  write: { data?: unknown; error?: unknown };
+  /** Lecture de la séance pour le contrôle d'appartenance. */
+  owner?: string | null;
+};
+
+function fakeClient(o: FakeOptions): BrowserSupabase {
+  let call = 0;
+  return {
+    auth: {
+      getSession: async () => {
+        const token = o.tokens[Math.min(call, o.tokens.length - 1)] ?? null;
+        call += 1;
+        return {
+          data: { session: token ? { access_token: token, user: { id: o.userId ?? "me" } } : null },
+          error: o.authError ?? null,
+        };
+      },
+    },
+    from: (table: string) => {
+      if (table === "sessions") {
+        return chain({ data: o.owner ? { id: "s1", profile_id: o.owner } : null, error: null });
+      }
+      return chain({ data: o.write.data ?? null, error: o.write.error ?? null });
+    },
+  } as unknown as BrowserSupabase;
+}
+
+const SET = {
+  id: "set-1",
+  sessionId: "s1",
+  exerciseId: "ex-1",
+  setIndex: 1,
+  weightKg: 60,
+  reps: 8,
+  isWarmup: false,
+  rpe: null,
+};
+const DENIED = { code: "42501", message: "new row violates row-level security policy" };
+
+test.describe("upsertSessionSet : classement des échecs", () => {
+  test("écriture acceptée", async () => {
+    const r = await upsertSessionSet(fakeClient({ tokens: ["t1"], write: {} }), SET);
+    expect(r).toEqual({ ok: true });
+  });
+  test("sans session : expirée, rejouable", async () => {
+    const r = await upsertSessionSet(fakeClient({ tokens: [null], write: {} }), SET);
+    expect(r).toMatchObject({ ok: false, expired: true });
+  });
+  test("jeton à rafraîchir hors ligne : lève (rejoué par la file)", async () => {
+    const client = fakeClient({
+      tokens: [null],
+      authError: new AuthRetryableFetchError("Failed to fetch", 0),
+      write: {},
+    });
+    await expect(upsertSessionSet(client, SET)).rejects.toBeInstanceOf(OfflineError);
+  });
+  test("42501 sur la séance d'un autre, même jeton : refus définitif", async () => {
+    const client = fakeClient({ tokens: ["t1"], owner: "someone-else", write: { error: DENIED } });
+    expect(await upsertSessionSet(client, SET)).toMatchObject({ ok: false, refused: true });
+  });
+  test("42501 sur une séance introuvable, même jeton : refus définitif", async () => {
+    const client = fakeClient({ tokens: ["t1"], owner: null, write: { error: DENIED } });
+    expect(await upsertSessionSet(client, SET)).toMatchObject({ ok: false, refused: true });
+  });
+  test("42501 alors que le jeton a changé pendant la requête : rejouable", async () => {
+    const client = fakeClient({ tokens: ["t1", "t1", "t2"], owner: null, write: { error: DENIED } });
+    const r = await upsertSessionSet(client, SET);
+    expect(r.ok).toBe(false);
+    expect(r).not.toHaveProperty("refused");
+  });
+  test("42501 sur MA séance (grant, jeton anonyme) : rejouable", async () => {
+    const client = fakeClient({ tokens: ["t1"], owner: "me", write: { error: DENIED } });
+    const r = await upsertSessionSet(client, SET);
+    expect(r.ok).toBe(false);
+    expect(r).not.toHaveProperty("refused");
+  });
+  test("jeton refusé par PostgREST : expirée", async () => {
+    const client = fakeClient({ tokens: ["t1"], write: { error: { code: "PGRST303", message: "JWT expired" } } });
+    expect(await upsertSessionSet(client, SET)).toMatchObject({ ok: false, expired: true });
+  });
+  test("coupure réseau (code vide) : rejouable", async () => {
+    const client = fakeClient({ tokens: ["t1"], write: { error: { code: "", message: "TypeError: Failed to fetch" } } });
+    const r = await upsertSessionSet(client, SET);
+    expect(r.ok).toBe(false);
+    expect(r).not.toHaveProperty("refused");
+    expect(r).not.toHaveProperty("expired");
+  });
+});
+
+test.describe("deleteSessionSet : classement des échecs", () => {
+  test("0 ligne, même jeton : refus définitif (déjà supprimée ou pas à moi)", async () => {
+    const client = fakeClient({ tokens: ["t1"], write: { data: [] } });
+    expect(await deleteSessionSet(client, { id: "set-1", sessionId: "s1" })).toMatchObject({
+      ok: false,
+      refused: true,
+    });
+  });
+  test("0 ligne, session perdue pendant la requête : expirée", async () => {
+    const client = fakeClient({ tokens: ["t1", null], write: { data: [] } });
+    expect(await deleteSessionSet(client, { id: "set-1", sessionId: "s1" })).toMatchObject({
+      ok: false,
+      expired: true,
+    });
+  });
+  test("sans séance : refus définitif (jamais rejoué sans fin)", async () => {
+    const client = fakeClient({ tokens: ["t1"], write: { data: [] } });
+    expect(await deleteSessionSet(client, { id: "set-1", sessionId: "" })).toMatchObject({
+      ok: false,
+      refused: true,
+    });
+  });
+  test("une ligne supprimée : ok", async () => {
+    const client = fakeClient({ tokens: ["t1"], write: { data: [{ id: "set-1" }] } });
+    expect(await deleteSessionSet(client, { id: "set-1", sessionId: "s1" })).toEqual({ ok: true });
   });
 });

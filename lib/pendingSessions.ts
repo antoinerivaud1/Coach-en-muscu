@@ -36,6 +36,15 @@ export function addPending(item: FinishSessionInput): void {
   setPending(items);
 }
 
+/**
+ * CM-88 (PR 6) : clôture de cette séance enregistrée hors ligne, pas encore
+ * rejouée. L'accueil ne propose alors pas de la « Reprendre » : elle est
+ * terminée pour l'utilisateur, seule son écriture attend le réseau.
+ */
+export function hasPendingClosure(sessionId: string): boolean {
+  return getPending().some((p) => p.sessionId === sessionId);
+}
+
 export function getRefusedSessions(): FinishSessionInput[] {
   return read(REFUSED_SESSIONS_KEY);
 }

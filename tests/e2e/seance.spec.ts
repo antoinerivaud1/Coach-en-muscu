@@ -199,4 +199,26 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await expect(page).toHaveURL(/\/history$/);
     await expect(page.locator(`a[href="/sessions/${id}"]`)).toHaveCount(0);
   });
+
+  test("en pleine séance, une relecture ratée ne démonte jamais la saisie", async ({ page }) => {
+    const id = await startSession(page);
+    created.push(id);
+    await logSet(page, { weight: "20", reps: "8" });
+    await expect(page.getByRole("button", { name: "Supprimer la série 1" })).toBeVisible();
+
+    // La base « ne voit plus » la séance (jeton parti en anonyme, séance type
+    // supprimée…), puis le réseau coupe et revient : relecture automatique.
+    await page.route("**/rest/v1/sessions?*", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+    );
+    await page.context().setOffline(true);
+    await page.context().setOffline(false);
+    await page.waitForTimeout(1500);
+
+    // Toujours la saisie, avec la série 1 validée : ni « Séance introuvable »,
+    // ni logger remonté sur une lecture d'avant la série.
+    await expect(page.getByRole("heading", { name: "Séance introuvable" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Supprimer la série 1" })).toBeVisible();
+    await page.unroute("**/rest/v1/sessions?*");
+  });
 });

@@ -1,7 +1,7 @@
 import type { BrowserSupabase } from "@/lib/supabase/client";
 import { getDayWithExercises, type ProgramDayFull } from "@/lib/queries/programs";
 import { getCatalogExercises, type SystemExercise } from "@/lib/queries/exercises";
-import { getDuoId } from "@/lib/queries/profiles";
+import { readDuoId } from "@/lib/queries/profiles";
 import {
   getAllSetsForProgress,
   getLastSetsByExercise,
@@ -182,7 +182,11 @@ async function loadLogger(
 
   // Catalogue d'ajout en séance (système + persos), chargé ici pour que la
   // bottom sheet n'ait aucune requête à faire. « Dernière fois » en parallèle.
-  const duoId = await getDuoId(supabase, profileId);
+  // Lecture du duo en échec : erreur, pas « solo ». Le logger figerait sinon
+  // pour toute la séance un catalogue sans les exercices du duo.
+  const duo = await readDuoId(supabase, profileId);
+  if (!duo.ok) throw new Error(READ_ERROR);
+  const duoId = duo.duoId;
   const [lastByExercise, catalogRead] = await Promise.all([
     getLastSetsByExercise(
       supabase,

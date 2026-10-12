@@ -86,6 +86,11 @@ type Props = {
   /** Catalogue d'ajout en séance : exercices système + persos du couple. */
   catalog: SystemExercise[];
   canCreateExercise: boolean;
+  /**
+   * CM-88 (PR 6) : séance terminée avec succès. L'écran libère alors la
+   * saisie épinglée et attend le récap relu (voir `SessionScreen`).
+   */
+  onFinished: () => void;
 };
 
 /** Ligne vide, non touchée : un emplacement « à venir ». */
@@ -125,6 +130,7 @@ export default function SessionLogger({
   initialSets,
   catalog,
   canCreateExercise,
+  onFinished,
 }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -690,11 +696,17 @@ export default function SessionLogger({
         return;
       }
       setFinishExpired(false);
-      // CM-88 (PR 6) : relecture de tout ce qui lit les séances, dont cet
-      // écran : la séance terminée s'affiche en récap. En « Modifier »
-      // (`?edit=1`), retour à l'adresse du récap.
-      await invalidateSessions(queryClient, profileId);
-      router.replace(`/sessions/${sessionId}`);
+      // CM-88 (PR 6) : l'écran quitte la saisie et attend le récap. Séance
+      // en cours : cette adresse, relue avec le reste des séances. En
+      // « Modifier » (`?edit=1`) : retour à l'adresse du récap, lue à
+      // l'arrivée ; la lecture « edit » n'est pas relancée pour rien.
+      onFinished();
+      if (finishedDurationSeconds === null) {
+        await invalidateSessions(queryClient, profileId);
+      } else {
+        void invalidateSessions(queryClient, profileId, { skipDetailOf: sessionId });
+        router.replace(`/sessions/${sessionId}`);
+      }
     });
   }
 

@@ -18,6 +18,7 @@ import MemberAvatar from "@/components/onboarding/MemberAvatar";
 import DuoAvatars from "@/components/duo/DuoAvatars";
 import DuoWeekCard from "@/components/duo/DuoWeekCard";
 import PartnerActivityCard from "@/components/duo/PartnerActivityCard";
+import { hasPendingClosure } from "@/lib/pendingSessions";
 import ResumeSessionBanner from "@/components/ResumeSessionBanner";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
 import { memberStyle } from "@/lib/duo";
@@ -239,7 +240,7 @@ function Home({
 
       {/* Séance en cours : toujours visible, même si la bibliothèque est vide.
           Ne bloque rien, la grille en dessous reste tapable (CM-83). */}
-      {banner.kind === "banner" && (
+      {banner.kind === "banner" && !hasPendingClosure(banner.sessionId) && (
         <ResumeSessionBanner
           profileId={profileId}
           sessionId={banner.sessionId}

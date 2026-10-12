@@ -54,19 +54,39 @@ export class OfflineError extends Error {
 }
 
 /**
- * Une session est-elle ouverte dans ce navigateur ? Lecture LOCALE
- * (`getSession`, qui rafraîchit le jeton s'il a expiré), sans aller-retour
- * réseau par série. Ne décide d'aucun accès (la RLS le fait) : elle sert
- * seulement à classer un échec en « session expirée » (rejouable) plutôt
- * qu'en refus définitif, une requête partie sans jeton touchant 0 ligne.
- * LÈVE `OfflineError` si le jeton doit être rafraîchi et que le réseau manque.
+ * Jeton de la session ouverte dans ce navigateur, `null` sans session.
+ * Lecture LOCALE (`getSession`, qui rafraîchit le jeton s'il a expiré), sans
+ * aller-retour réseau par série. Ne décide d'aucun accès (la RLS le fait) :
+ * il sert seulement à classer un échec. LÈVE `OfflineError` si le jeton doit
+ * être rafraîchi et que le réseau manque (rejouable, pas une déconnexion).
  */
-async function hasSession(supabase: BrowserSupabase): Promise<boolean> {
+async function currentToken(supabase: BrowserSupabase): Promise<string | null> {
   const { data, error } = await supabase.auth.getSession();
-  // Jeton expiré à rafraîchir, hors ligne : ce n'est pas une déconnexion.
   if (error && isAuthRetryableFetchError(error)) throw new OfflineError();
-  return !!data.session;
+  return data.session?.access_token ?? null;
 }
+
+/**
+ * Un refus (0 ligne, séance pas à moi) n'est DÉFINITIF que si la requête est
+ * bien partie avec le jeton lu avant elle, toujours valable après. Sinon
+ * (jeton rafraîchi ou perdu entre-temps), elle a pu partir en anonyme, où la
+ * RLS ne laisse rien voir : session expirée, rejouable (règle CM-59 B).
+ */
+async function sameSessionStill(supabase: BrowserSupabase, token: string): Promise<boolean> {
+  try {
+    return (await currentToken(supabase)) === token;
+  } catch {
+    return false;
+  }
+}
+
+/** Jeton refusé par PostgREST (expiré, horloge décalée) : à rejouer après reconnexion. */
+function isJwtRejected(error: { code?: string | null }): boolean {
+  return error.code === "PGRST301" || error.code === "PGRST303";
+}
+
+const EXPIRED: ActionResult = { ok: false, error: SESSION_EXPIRED_MESSAGE, expired: true };
+const NOT_FOUND_REFUSED: ActionResult = { ok: false, error: "Séance introuvable", refused: true };
 
 // ---------------------------------------------------------------------------
 // Séries, une par une (CM-78), rejouées par `useSetPersistence`
@@ -111,10 +131,9 @@ export async function upsertSessionSet(
   if (!Number.isFinite(setIndex) || setIndex <= 0) {
     return { ok: false, error: "Numéro de série invalide" };
   }
-  if (!input.sessionId) return { ok: false, error: "Séance introuvable", refused: true };
-  if (!(await hasSession(supabase))) {
-    return { ok: false, error: SESSION_EXPIRED_MESSAGE, expired: true };
-  }
+  if (!input.sessionId) return NOT_FOUND_REFUSED;
+  const token = await currentToken(supabase);
+  if (!token) return EXPIRED;
 
   const { error } = await supabase.from("session_sets").upsert(
     {
@@ -130,8 +149,26 @@ export async function upsertSessionSet(
     { onConflict: "id" },
   );
   if (!error) return { ok: true };
-  if (isRlsDenied(error) && !(await ownsSession(supabase, input.sessionId))) {
-    return { ok: false, error: "Séance introuvable", refused: true };
+  return classifyInsertError(supabase, error, input.sessionId, token);
+}
+
+/**
+ * Échec d'un insert / upsert de série. 42501 : refus définitif seulement si
+ * la séance n'est pas à moi, vérifié avec le même jeton ; sinon rejouable.
+ */
+async function classifyInsertError(
+  supabase: BrowserSupabase,
+  error: { code?: string | null; message: string },
+  sessionId: string,
+  token: string,
+): Promise<ActionResult> {
+  if (isJwtRejected(error)) return EXPIRED;
+  if (
+    isRlsDenied(error) &&
+    (await sessionOwnership(supabase, sessionId)) === "notMine" &&
+    (await sameSessionStill(supabase, token))
+  ) {
+    return NOT_FOUND_REFUSED;
   }
   return { ok: false, error: writeErrorMessage(error) };
 }
@@ -146,38 +183,50 @@ export async function deleteSessionSet(
   input: DeleteSetInput,
 ): Promise<ActionResult> {
   if (!input.id) return { ok: false, error: "Série introuvable" };
-  if (!(await hasSession(supabase))) {
-    return { ok: false, error: SESSION_EXPIRED_MESSAGE, expired: true };
-  }
+  // Sans séance, la requête serait invalide (22P02) et rejouée sans fin.
+  if (!input.sessionId) return NOT_FOUND_REFUSED;
+  const token = await currentToken(supabase);
+  if (!token) return EXPIRED;
   const { data, error } = await supabase
     .from("session_sets")
     .delete()
     .eq("id", input.id)
     .eq("session_id", input.sessionId)
     .select("id");
-  if (error) return { ok: false, error: writeErrorMessage(error) };
-  if (!touchedRows(data)) return { ok: false, error: REFUSED_MESSAGE, refused: true };
+  if (error) return isJwtRejected(error) ? EXPIRED : { ok: false, error: writeErrorMessage(error) };
+  if (!touchedRows(data)) {
+    return (await sameSessionStill(supabase, token))
+      ? { ok: false, error: REFUSED_MESSAGE, refused: true }
+      : EXPIRED;
+  }
   return { ok: true };
 }
 
 /**
- * La séance est-elle à l'utilisateur connecté ? Ne LÈVE pas : une lecture en
- * échec répond « oui », pour que l'opération soit rejouée plutôt que mise de
- * côté à tort.
+ * La séance est-elle à l'utilisateur connecté ? Ne LÈVE pas, et ne répond
+ * « notMine » que sur une preuve : session ouverte, lecture réussie, séance
+ * absente ou à quelqu'un d'autre. Tout doute répond « unknown » (rejouable).
  */
-async function ownsSession(supabase: BrowserSupabase, sessionId: string): Promise<boolean> {
-  const [{ data: auth }, { data, error }] = await Promise.all([
-    supabase.auth.getSession(),
-    supabase
-      .from("sessions")
-      .select("id, profile_id")
-      .eq("id", sessionId)
-      .returns<{ id: string; profile_id: string }[]>()
-      .maybeSingle(),
-  ]);
-  if (error) return true;
-  const userId = auth.session?.user.id;
-  return !!data && !!userId && data.profile_id === userId;
+async function sessionOwnership(
+  supabase: BrowserSupabase,
+  sessionId: string,
+): Promise<"mine" | "notMine" | "unknown"> {
+  try {
+    const [{ data: auth, error: authError }, { data, error }] = await Promise.all([
+      supabase.auth.getSession(),
+      supabase
+        .from("sessions")
+        .select("id, profile_id")
+        .eq("id", sessionId)
+        .returns<{ id: string; profile_id: string }[]>()
+        .maybeSingle(),
+    ]);
+    const userId = auth.session?.user.id;
+    if (authError || error || !userId) return "unknown";
+    return data && data.profile_id === userId ? "mine" : "notMine";
+  } catch {
+    return "unknown";
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -219,10 +268,9 @@ export async function finishSession(
   supabase: BrowserSupabase,
   input: FinishSessionInput,
 ): Promise<FinishSessionResult> {
-  if (!input.sessionId) return { ok: false, error: "Séance introuvable", refused: true };
-  if (!(await hasSession(supabase))) {
-    return { ok: false, error: SESSION_EXPIRED_MESSAGE, expired: true };
-  }
+  if (!input.sessionId) return NOT_FOUND_REFUSED;
+  const token = await currentToken(supabase);
+  if (!token) return EXPIRED;
 
   const legacySets = (input.sets ?? []).filter(
     (s) => s.reps > 0 && s.weight_kg >= 0 && Number.isFinite(s.weight_kg),
@@ -235,7 +283,9 @@ export async function finishSession(
       .select("id", { count: "exact", head: true })
       .eq("session_id", input.sessionId);
     if (isTransportError(countError)) throw new OfflineError();
-    if (countError) return { ok: false, error: writeErrorMessage(countError) };
+    if (countError) {
+      return isJwtRejected(countError) ? EXPIRED : { ok: false, error: writeErrorMessage(countError) };
+    }
     if ((count ?? 0) === 0) {
       const { error: insertError } = await supabase.from("session_sets").insert(
         legacySets.map((s) => ({
@@ -248,18 +298,13 @@ export async function finishSession(
         })),
       );
       if (isTransportError(insertError)) throw new OfflineError();
-      if (insertError) {
-        if (isRlsDenied(insertError) && !(await ownsSession(supabase, input.sessionId))) {
-          return { ok: false, error: "Séance introuvable", refused: true };
-        }
-        return { ok: false, error: writeErrorMessage(insertError) };
-      }
+      if (insertError) return classifyInsertError(supabase, insertError, input.sessionId, token);
     }
   }
 
   // Sous RLS, un update hors de mes séances touche 0 ligne sans erreur :
-  // séance inexistante ou pas à moi, refus définitif (la session est ouverte,
-  // vérifié plus haut).
+  // séance inexistante ou pas à moi, refus définitif si la requête est bien
+  // partie avec le jeton vérifié plus haut (sinon : session expirée).
   const { data: updated, error } = await supabase
     .from("sessions")
     .update({
@@ -270,8 +315,12 @@ export async function finishSession(
     .eq("id", input.sessionId)
     .select("id");
   if (isTransportError(error)) throw new OfflineError();
-  if (error) return { ok: false, error: writeErrorMessage(error) };
-  if (!touchedRows(updated)) return { ok: false, error: REFUSED_MESSAGE, refused: true };
+  if (error) return isJwtRejected(error) ? EXPIRED : { ok: false, error: writeErrorMessage(error) };
+  if (!touchedRows(updated)) {
+    return (await sameSessionStill(supabase, token))
+      ? { ok: false, error: REFUSED_MESSAGE, refused: true }
+      : EXPIRED;
+  }
   return { ok: true };
 }
 
