@@ -75,8 +75,8 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(resumeLinkTo(page, id)).toHaveCount(0);
     // Plus rien à nettoyer : la séance n'existe plus.
-    const res = await page.goto(`/sessions/${id}`);
-    expect(res?.status()).toBe(404);
+    await page.goto(`/sessions/${id}`);
+    await expect(page.getByRole("heading", { name: "Séance introuvable" })).toBeVisible();
   });
 
   test("quitter sans terminer puis reprendre depuis l'accueil", async ({ page }) => {
@@ -126,11 +126,11 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await page.getByRole("link", { name: "Corriger les séries" }).click();
     await expect(page).toHaveURL(new RegExp(`/sessions/${id}\\?editsets=1$`));
 
-    // Correction par le formulaire du récap (server action `updateSet`, sous
-    // RLS) : on attend la réponse du POST avant de recharger.
+    // Correction par le formulaire du récap (écriture navigateur sous RLS,
+    // CM-88 PR 6) : on attend la réponse de l'update avant de recharger.
     await page.locator('input[name="weight"]').first().fill("23.5");
     const saved = page.waitForResponse(
-      (r) => r.request().method() === "POST" && r.url().includes(`/sessions/${id}`),
+      (r) => r.request().method() === "PATCH" && r.url().includes("/rest/v1/session_sets"),
     );
     await page.getByRole("button", { name: "Enregistrer" }).first().click();
     await saved;
@@ -140,5 +140,101 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await page.getByRole("link", { name: "Terminer", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
     await expect(page.getByText("23.5", { exact: true }).first()).toBeVisible();
+  });
+
+  // ---- CM-88 (PR 6) : écran de séance lu et écrit dans le navigateur ----
+
+  test("le serveur ne renvoie aucune donnée de la séance", async ({ page }) => {
+    const id = await startSession(page);
+    created.push(id);
+    await logSet(page, { weight: "20", reps: "8" });
+    const sheet = await openExitSheet(page);
+    await sheet.getByRole("button", { name: "Terminer la séance" }).click();
+    await expect(page.getByText("Volume total")).toBeVisible();
+
+    // Page statique : le HTML servi, même avec la session, ne contient ni le
+    // récap ni le logger.
+    const html = await (await page.request.get(`/sessions/${id}`)).text();
+    expect(html).not.toContain("Volume total");
+    expect(html).not.toContain("Corriger les séries");
+  });
+
+  test("« Modifier » rouvre la saisie d'une séance terminée, sans la rouvrir en base", async ({ page }) => {
+    const id = await startSession(page);
+    created.push(id);
+    await logSet(page, { weight: "20", reps: "8" });
+    const sheet = await openExitSheet(page);
+    await sheet.getByRole("button", { name: "Terminer la séance" }).click();
+
+    await page.getByRole("link", { name: "Modifier" }).click();
+    await expect(page).toHaveURL(new RegExp(`/sessions/${id}\\?edit=1$`));
+    await expect(page.getByRole("button", { name: "Quitter la séance" })).toBeVisible();
+    // Séance terminée : la croix ramène à l'accueil sans feuille de sortie.
+    await page.getByRole("button", { name: "Quitter la séance" }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.locator(`a[href="/sessions/${id}"]`).filter({ hasText: "Reprendre" })).toHaveCount(0);
+
+    await page.goto(`/sessions/${id}`);
+    await expect(page.getByText("Volume total")).toBeVisible();
+
+    // « Modifier », retour au récap, puis « Modifier » encore, dans la même
+    // page : la saisie se rouvre à chaque fois.
+    for (let i = 0; i < 2; i += 1) {
+      await page.getByRole("link", { name: "Modifier" }).click();
+      await expect(page.getByRole("button", { name: "Quitter la séance" })).toBeVisible();
+      await page.goBack();
+      await expect(page.getByText("Volume total")).toBeVisible();
+    }
+  });
+
+  test("dans le récap : supprimer une série, puis la séance (retour au Carnet)", async ({ page }) => {
+    const id = await startSession(page);
+    created.push(id);
+    await logSet(page, { weight: "20", reps: "8" });
+    const sheet = await openExitSheet(page);
+    await sheet.getByRole("button", { name: "Terminer la séance" }).click();
+    await expect(page.getByText("Volume total")).toBeVisible();
+
+    await page.getByRole("link", { name: "Corriger les séries" }).click();
+    const rows = page.locator('input[name="weight"]');
+    await expect(rows.first()).toBeVisible();
+    const before = await rows.count();
+    expect(before).toBeGreaterThan(0);
+    await page.getByRole("button", { name: "Supprimer", exact: true }).first().click();
+    await expect(rows).toHaveCount(before - 1);
+
+    await page.getByRole("link", { name: "Terminer", exact: true }).click();
+    await page.getByRole("button", { name: "Supprimer", exact: true }).click();
+    await expect(page).toHaveURL(/\/history$/);
+    await expect(page.locator(`a[href="/sessions/${id}"]`)).toHaveCount(0);
+  });
+
+  test("en pleine séance, une relecture ratée ne démonte jamais la saisie", async ({ page }) => {
+    const id = await startSession(page);
+    created.push(id);
+    await logSet(page, { weight: "20", reps: "8" });
+    await expect(page.getByRole("button", { name: "Supprimer la série 1" })).toBeVisible();
+
+    // La base « ne voit plus » la séance (jeton parti en anonyme, séance type
+    // supprimée…), puis le réseau coupe et revient : relecture automatique.
+    const pattern = "**/rest/v1/sessions?*";
+    await page.route(pattern, (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+    );
+    try {
+      const reread = page.waitForRequest((r) => r.url().includes("/rest/v1/sessions?"));
+      await page.context().setOffline(true);
+      await page.context().setOffline(false);
+      // La relecture a bien eu lieu (sinon le test ne prouverait rien).
+      await reread;
+      await page.waitForTimeout(500);
+
+      // Toujours la saisie, avec la série 1 validée : ni « Séance
+      // introuvable », ni logger remonté sur une lecture d'avant la série.
+      await expect(page.getByRole("heading", { name: "Séance introuvable" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Supprimer la série 1" })).toBeVisible();
+    } finally {
+      await page.unroute(pattern);
+    }
   });
 });

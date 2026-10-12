@@ -1,4 +1,4 @@
-import type { FinishSessionInput } from "@/app/sessions/[id]/actions";
+import type { FinishSessionInput } from "@/lib/data/sessionWrites";
 
 /** Clôtures de séance faites hors ligne, rejouées par `PendingSync`. */
 export const PENDING_SESSIONS_KEY = "cm_pending_sessions";
@@ -34,6 +34,15 @@ export function addPending(item: FinishSessionInput): void {
   const items = getPending();
   items.push(item);
   setPending(items);
+}
+
+/**
+ * CM-88 (PR 6) : clôture de cette séance enregistrée hors ligne, pas encore
+ * rejouée. L'accueil ne propose alors pas de la « Reprendre » : elle est
+ * terminée pour l'utilisateur, seule son écriture attend le réseau.
+ */
+export function hasPendingClosure(sessionId: string): boolean {
+  return getPending().some((p) => p.sessionId === sessionId);
 }
 
 export function getRefusedSessions(): FinishSessionInput[] {

@@ -224,8 +224,7 @@ test.describe("Garder pour moi une séance que le partenaire utilise (CM-87, C1)
       // Lina rouvre sa séance en cours (toujours accessible), puis la supprime.
       await signOut(page);
       await login(page, SEED_ACCOUNTS.elle.email, SEED_ACCOUNTS.elle.password);
-      const res = await page.goto(`/sessions/${sessionId}`);
-      expect(res?.status()).not.toBe(404);
+      await page.goto(`/sessions/${sessionId}`);
       await expect(page.getByRole("button", { name: "Quitter la séance" })).toBeVisible();
       await deleteSessionViaUi(page, sessionId);
     }

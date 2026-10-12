@@ -12,12 +12,10 @@ export function useDashboard(profileId: string | null) {
     queryKey: queryKeys.dashboard.all(profileId ?? ""),
     queryFn: () => fetchDashboard(getSupabaseBrowserClient(), profileId!),
     enabled: !!profileId,
-    // Les séances types s'écrivent depuis le navigateur (PR 5) et invalident
-    // `[profileId, "sessions"]`, donc ce cache. La fin de séance et l'abandon
-    // restent des server actions (PR 6) qui ne peuvent pas l'invalider :
-    // relecture à chaque ouverture de l'accueil, les données en cache
-    // s'affichent pendant ce temps. Resserré en PR 6.
-    staleTime: 0,
+    // CM-88 (PR 6) : toutes les écritures de séance (démarrage, séries, fin,
+    // abandon, séances types) se font dans le navigateur et invalident
+    // `[profileId, "sessions"]`. Réglage par défaut (30 s) : l'activité du
+    // partenaire de duo arrive au plus tard au retour au premier plan.
   });
 }
 

@@ -35,12 +35,10 @@ export function useStartSession(profileId: string | null) {
       startSessionFromDay(getSupabaseBrowserClient(), id, dayId),
     onSuccess: (result, { id }) => {
       if (result.ok) {
-        // Une séance est maintenant en cours, et la suite (fin, abandon) passe
-        // encore par des server actions qui ne peuvent pas toucher ce cache :
-        // on le RETIRE avant de quitter l'accueil, pour qu'au retour rien de
-        // périmé ne s'affiche (bandeau d'une séance déjà terminée, premier
-        // jour…). Une invalidation le relirait tout de suite, avant la fin de
-        // la séance, ce qui ne servirait à rien.
+        // Une séance est maintenant en cours : l'accueil en cache (sans son
+        // bandeau) est RETIRÉ avant de le quitter. Une invalidation le
+        // relirait tout de suite, pour rien : on le quitte. La suite (fin,
+        // abandon) invalide `[profileId, "sessions"]` (PR 6).
         queryClient.removeQueries({ queryKey: queryKeys.dashboard.all(id) });
         router.push(`/sessions/${result.sessionId}`);
         return;

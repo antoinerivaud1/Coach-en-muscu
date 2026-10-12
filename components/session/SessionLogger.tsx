@@ -3,14 +3,20 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { loginPath } from "@/lib/auth/core";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
-  discardSession,
-  finishSession,
+  deleteOwnSession,
   fetchLastForExercise,
+  finishSession,
   type FinishSessionInput,
-} from "./actions";
-import type { LastExerciseData } from "@/lib/queries/sessions";
+} from "@/lib/data/sessionWrites";
+import type { Feedback, InitialSet, LoggerExercise } from "@/lib/data/sessionDetail";
+import {
+  invalidateSessions,
+  invalidateSessionsAfterDelete,
+} from "@/hooks/data/useSessionScreen";
 import type { SystemExercise } from "@/lib/queries/exercises";
 import { isCustomExercise } from "@/lib/queries/exercises";
 import {
@@ -29,7 +35,6 @@ import {
 import {
   EXTRA_EXERCISE_DEFAULTS,
   resumeExerciseIndex,
-  type SessionExercise,
 } from "@/lib/utils/sessionExercises";
 import {
   newSetId,
@@ -52,32 +57,13 @@ import { computeSessionProgress } from "@/lib/utils/progress";
 import { ensureNotificationPermission } from "@/lib/restNotifications";
 import { elapsedSecondsSince } from "@/lib/utils/currentSession";
 
-type Feedback = "easy" | "normal" | "hard" | "failure";
-
-/**
- * Un exercice de la séance, du programme ou ajouté en cours de route (CM-62) :
- * forme unique (`SessionExercise`), plus l'historique « dernière fois ».
- */
-export type LoggerExercise = SessionExercise & {
-  last: LastExerciseData | null;
-};
-
-/**
- * Série transmise par le serveur. `id` non nul = série déjà en base (séance en
- * cours reprise, ou séance terminée rouverte en modification) ; `id` nul =
- * ligne vide ou pré-remplie, qui n'existera en base qu'à sa validation.
- */
-export type InitialSet = {
-  id: string | null;
-  setIndex: number | null;
-  weight: string;
-  reps: string;
-  isWarmup: boolean;
-};
+export type { InitialSet, LoggerExercise };
 
 type SetField = InitialSet & { touched: boolean };
 
 type Props = {
+  /** CM-88 (PR 6) : profil connecté (propriétaire de la séance). */
+  profileId: string;
   sessionId: string;
   dayName: string;
   /**
@@ -100,6 +86,13 @@ type Props = {
   /** Catalogue d'ajout en séance : exercices système + persos du couple. */
   catalog: SystemExercise[];
   canCreateExercise: boolean;
+  /**
+   * CM-88 (PR 6) : séance terminée avec succès. L'écran libère alors la
+   * saisie épinglée et attend le récap relu (voir `SessionScreen`).
+   */
+  onFinished: () => void;
+  /** Ouvert par « Modifier » (`?edit=1`) : la fin ramène à l'adresse du récap. */
+  editMode: boolean;
 };
 
 /** Ligne vide, non touchée : un emplacement « à venir ». */
@@ -129,6 +122,7 @@ function countPersisted(rows: readonly { id: string | null }[]): number {
 }
 
 export default function SessionLogger({
+  profileId,
   sessionId,
   dayName,
   startedAt,
@@ -138,8 +132,11 @@ export default function SessionLogger({
   initialSets,
   catalog,
   canCreateExercise,
+  onFinished,
+  editMode,
 }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
 
   // CM-78 : toute série validée part en base immédiatement, par cette file.
@@ -350,7 +347,12 @@ export default function SessionLogger({
     scrollToCard.current = true;
 
     startLoadLast(async () => {
-      const last = await fetchLastForExercise(exercise.id, sessionId);
+      const last = await fetchLastForExercise(
+        getSupabaseBrowserClient(),
+        profileId,
+        exercise.id,
+        sessionId,
+      );
       if (!last) return;
       setExtras((prev) =>
         prev.map((e) => (e.exerciseId === exercise.id ? { ...e, last } : e)),
@@ -679,21 +681,34 @@ export default function SessionLogger({
     const input: FinishSessionInput = { sessionId, feedback, durationSeconds };
 
     startTransition(async () => {
+      let result;
       try {
-        const result = await finishSession(input);
-        if (!result.ok) {
-          // CM-59 B : session expirée : rien n'est perdu, le bandeau propose
-          // de se reconnecter puis de revenir ici terminer la séance.
-          if (result.expired) setFinishExpired(true);
-          setError(result.error);
-          return;
-        }
-        setFinishExpired(false);
-        router.push(`/sessions/${sessionId}`);
-        router.refresh();
+        result = await finishSession(getSupabaseBrowserClient(), input);
       } catch {
+        // Requête qui n'aboutit pas (hors ligne) : clôture rangée dans la
+        // file `cm_pending_sessions`, rejouée par `PendingSync`.
         addPending(input);
         setOfflineSaved(true);
+        return;
+      }
+      if (!result.ok) {
+        // CM-59 B : session expirée : rien n'est perdu, le bandeau propose
+        // de se reconnecter puis de revenir ici terminer la séance.
+        if (result.expired) setFinishExpired(true);
+        setError(result.error);
+        return;
+      }
+      setFinishExpired(false);
+      // CM-88 (PR 6) : l'écran quitte la saisie et attend le récap. Séance
+      // en cours : cette adresse, relue avec le reste des séances. En
+      // « Modifier » (`?edit=1`) : retour à l'adresse du récap, lue à
+      // l'arrivée ; la lecture « edit » n'est pas relancée pour rien.
+      onFinished();
+      if (!editMode) {
+        await invalidateSessions(queryClient, profileId);
+      } else {
+        void invalidateSessions(queryClient, profileId, { skipDetailOf: sessionId });
+        router.replace(`/sessions/${sessionId}`);
       }
     });
   }
@@ -741,16 +756,24 @@ export default function SessionLogger({
 
   /**
    * CM-94 : suppression depuis la feuille de sortie. La file est abandonnée
-   * d'abord, pour qu'aucune série n'arrive après la suppression ; l'action
-   * redirige vers l'accueil (ne pas l'entourer d'un try/catch, qui avalerait
-   * la redirection).
+   * d'abord, pour qu'aucune série n'arrive après la suppression. Succès ou
+   * échec, retour à l'accueil ; un échec y affiche son message (`?error=`),
+   * comme du temps de la server action.
    */
   function discard() {
     startDiscard(async () => {
       await persistence.discard(3000);
-      const formData = new FormData();
-      formData.set("session_id", sessionId);
-      await discardSession(formData);
+      let message: string | null = null;
+      try {
+        const result = await deleteOwnSession(getSupabaseBrowserClient(), profileId, sessionId);
+        if (!result.ok) message = result.error;
+      } catch {
+        message = "Pas de connexion. Réessaie dans un instant.";
+      }
+      void invalidateSessionsAfterDelete(queryClient, profileId, sessionId);
+      router.replace(
+        message ? `/dashboard?error=${encodeURIComponent(message)}` : "/dashboard",
+      );
     });
   }
 
@@ -891,7 +914,12 @@ export default function SessionLogger({
     // c'est la première fois.
     for (const ex of recreated) {
       startLoadLast(async () => {
-        const fetched = await fetchLastForExercise(ex.exerciseId, sessionId);
+        const fetched = await fetchLastForExercise(
+          getSupabaseBrowserClient(),
+          profileId,
+          ex.exerciseId,
+          sessionId,
+        );
         if (!fetched) return;
         setExtras((prev) =>
           prev.map((e) =>
@@ -903,7 +931,7 @@ export default function SessionLogger({
     // `sets` et `validated` sont lus une seule fois, au montage : les relire à
     // chaque validation relancerait ce rattrapage à tort.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restoredOps, exercises, catalogState, sessionId]);
+  }, [restoredOps, exercises, catalogState, sessionId, profileId]);
 
   // On sort du mode saisie clavier dès qu'on change d'exercice ou de série.
   useEffect(() => {

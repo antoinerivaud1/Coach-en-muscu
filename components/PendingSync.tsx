@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { finishSession } from "@/app/sessions/[id]/actions";
-import type { FinishSessionInput } from "@/app/sessions/[id]/actions";
+import { useQueryClient } from "@tanstack/react-query";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { finishSession, type FinishSessionInput } from "@/lib/data/sessionWrites";
+import { readBrowserProfileId } from "@/hooks/useProfileId";
+import { invalidateSessions } from "@/hooks/data/useSessionScreen";
 import {
   addRefusedSessions,
   getPending,
@@ -14,7 +17,10 @@ import { isPublicPath } from "@/lib/auth/publicPaths";
 
 /**
  * CM-59 B : pas de rejeu sans session possible : `/login` et les pages
- * publiques (légal, support) n'appellent jamais la server action.
+ * publiques (légal, support) ne rejouent jamais la file.
+ *
+ * CM-88 (PR 6) : la clôture s'écrit depuis le navigateur ; une séance
+ * enfin enregistrée fait relire accueil, Carnet et Stats.
  */
 function isSyncablePath(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -24,6 +30,7 @@ function isSyncablePath(pathname: string | null): boolean {
 
 export default function PendingSync() {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const syncable = isSyncablePath(pathname);
   const [count, setCount] = useState(0);
   const [refused, setRefused] = useState(0);
@@ -45,9 +52,12 @@ export default function PendingSync() {
       }
       const remaining: FinishSessionInput[] = [];
       const setAside: FinishSessionInput[] = [];
+      let written = 0;
+      const supabase = getSupabaseBrowserClient();
       for (const it of items) {
         try {
-          const r = await finishSession(it);
+          const r = await finishSession(supabase, it);
+          if (r.ok) written += 1;
           // CM-59 B : refus définitif (séance introuvable ou pas à toi) : mis
           // de côté (`cm_refused_sessions`), jamais jeté. Tout le reste
           // (42501, session expirée, réseau) est rejoué plus tard.
@@ -62,6 +72,10 @@ export default function PendingSync() {
       setPending(remaining);
       setCount(remaining.length);
       setRefused(getRefusedSessions().length);
+      if (written > 0) {
+        const profileId = await readBrowserProfileId().catch(() => null);
+        if (profileId) void invalidateSessions(queryClient, profileId);
+      }
     }
 
     sync();
@@ -70,7 +84,7 @@ export default function PendingSync() {
       cancelled = true;
       window.removeEventListener("online", sync);
     };
-  }, [syncable]);
+  }, [syncable, queryClient]);
 
   if (!syncable || (count === 0 && refused === 0)) return null;
   return (

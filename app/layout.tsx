@@ -51,8 +51,10 @@ export default function RootLayout({
   return (
     <html lang="fr" className={`${archivo.variable} ${oswald.variable}`}>
       <body className="min-h-screen bg-ink font-sans text-fg antialiased">
-        <QueryProvider>{children}</QueryProvider>
-        <PendingSync />
+        <QueryProvider>
+          {children}
+          <PendingSync />
+        </QueryProvider>
         <ServiceWorkerRegister />
         <OrientationLock />
       </body>

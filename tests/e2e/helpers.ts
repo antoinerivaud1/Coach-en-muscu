@@ -150,12 +150,15 @@ export async function openExitSheet(page: Page) {
  * Idempotent : une séance déjà supprimée (404) ne fait rien.
  */
 export async function deleteSessionViaUi(page: Page, sessionId: string): Promise<void> {
-  const res = await page.goto(`/sessions/${sessionId}`);
-  if (res?.status() === 404) return;
+  await page.goto(`/sessions/${sessionId}`);
 
+  // CM-88 (PR 6) : écran client, une séance absente affiche « Séance
+  // introuvable » (plus de 404 serveur) : rien à nettoyer.
   const quit = page.getByRole("button", { name: "Quitter la séance" });
   const recapDelete = page.getByRole("button", { name: "Supprimer", exact: true });
-  await expect(quit.or(recapDelete).first()).toBeVisible();
+  const gone = page.getByRole("heading", { name: "Séance introuvable" });
+  await expect(quit.or(recapDelete).or(gone).first()).toBeVisible();
+  if (await gone.isVisible()) return;
 
   if (await quit.isVisible()) {
     const sheet = await openExitSheet(page);
