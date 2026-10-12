@@ -1,4 +1,4 @@
-import type { FinishSessionInput } from "@/app/sessions/[id]/actions";
+import type { FinishSessionInput } from "@/lib/data/sessionWrites";
 
 /** Clôtures de séance faites hors ligne, rejouées par `PendingSync`. */
 export const PENDING_SESSIONS_KEY = "cm_pending_sessions";

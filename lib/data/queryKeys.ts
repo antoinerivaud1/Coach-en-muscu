@@ -38,6 +38,13 @@ export const queryKeys = {
     /** `requested` : `?profile=` de l'URL tel quel ("" si absent), validé par la lecture. */
     progress: (profileId: string, requested: string) =>
       [profileId, "sessions", "progress", requested] as const,
+    // ---- CM-88 PR 6 : écran de séance ----
+    /** Toutes les lectures d'une séance (saisie et récap). */
+    detailAll: (profileId: string, sessionId: string) =>
+      [profileId, "sessions", "detail", sessionId] as const,
+    /** `edit` : `?edit=1` (séance terminée rouverte en saisie). */
+    detail: (profileId: string, sessionId: string, edit: boolean) =>
+      [profileId, "sessions", "detail", sessionId, edit ? "edit" : "view"] as const,
   },
 
   // ---- CM-88 PR 4 : accueil ----

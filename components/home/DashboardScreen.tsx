@@ -83,14 +83,10 @@ export default function DashboardScreen() {
   }
   if (!view || !profileId) return <DashboardShell />;
 
-  // Les données en cache peuvent dater d'avant une fin ou une suppression de
-  // séance faite par une server action (pas encore convertie, PR 6) : tant
-  // que l'accueil n'a pas été relu depuis son ouverture, ni bandeau
-  // « Reprendre » ni accueil du premier jour, qui en dépendent.
-  const fresh = dashboard.isFetchedAfterMount;
-
+  // CM-88 (PR 6) : toute écriture de séance (démarrage, fin, abandon,
+  // suppression) invalide ce cache : ses données sont à jour, le bandeau
+  // « Reprendre » et l'accueil du premier jour s'affichent sans attendre.
   if (view.kind === "firstDay") {
-    if (!fresh) return <DashboardShell />;
     return (
       <FirstDayHome
         name={view.name}
@@ -111,7 +107,6 @@ export default function DashboardScreen() {
       view={view}
       now={view.now}
       profileId={profileId}
-      showBanner={fresh}
       actionError={actionError}
       onStart={start}
     />
@@ -122,15 +117,12 @@ function Home({
   view,
   now,
   profileId,
-  showBanner,
   actionError,
   onStart,
 }: {
   view: HomeView;
   now: Date;
   profileId: string;
-  /** Faux tant que l'accueil n'a pas été relu depuis son ouverture. */
-  showBanner: boolean;
   actionError?: string;
   onStart: (dayId: string) => void;
 }) {
@@ -247,7 +239,7 @@ function Home({
 
       {/* Séance en cours : toujours visible, même si la bibliothèque est vide.
           Ne bloque rien, la grille en dessous reste tapable (CM-83). */}
-      {showBanner && banner.kind === "banner" && (
+      {banner.kind === "banner" && (
         <ResumeSessionBanner
           profileId={profileId}
           sessionId={banner.sessionId}

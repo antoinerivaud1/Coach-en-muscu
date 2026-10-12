@@ -15,9 +15,7 @@ export function useProgress(profileId: string | null, requestedProfileId: string
     queryFn: () =>
       fetchProgress(getSupabaseBrowserClient(), profileId!, requestedProfileId),
     enabled: !!profileId,
-    // Même raison que `useHistory` : tant que l'écran de séance écrit par des
-    // server actions (PR 6), relecture à chaque ouverture. À resserrer quand
-    // la PR 6 invalidera `queryKeys.sessions.all`.
-    staleTime: 0,
+    // CM-88 (PR 6) : comme `useHistory`, invalidé par les écritures de
+    // séance : réglage par défaut (30 s).
   });
 }

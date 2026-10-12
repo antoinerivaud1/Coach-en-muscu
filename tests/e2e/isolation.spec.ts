@@ -17,11 +17,10 @@ guardWrites();
 test.describe("Isolation des données (RLS, CM-59)", () => {
   test("Solo n'ouvre pas une séance du duo", async ({ page }) => {
     await login(page, SEED_ACCOUNTS.solo.email, SEED_ACCOUNTS.solo.password);
-    const res = await page.goto(`/sessions/${TOI_SESSION}`);
-    // 404, ou toute redirection hors de la séance : jamais la séance elle-même.
-    if (res?.status() !== 404) {
-      expect(page.url()).not.toContain(TOI_SESSION);
-    }
+    await page.goto(`/sessions/${TOI_SESSION}`);
+    // CM-88 (PR 6) : écran client, une séance invisible sous RLS affiche
+    // « Séance introuvable » (plus de 404 serveur).
+    await expect(page.getByRole("heading", { name: "Séance introuvable" })).toBeVisible();
     await expect(page.getByText("Séance de test (seed)")).toHaveCount(0);
     await expect(page.getByText("Développé couché barre")).toHaveCount(0);
     await expect(page.getByText("Volume total")).toHaveCount(0);
@@ -43,12 +42,25 @@ test.describe("Isolation des données (RLS, CM-59)", () => {
 
   test("le duo n'ouvre pas une séance de Solo", async ({ page }) => {
     await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
-    const res = await page.goto(`/sessions/${SOLO_SESSION}`);
-    if (res?.status() !== 404) {
-      expect(page.url()).not.toContain(SOLO_SESSION);
-    }
+    await page.goto(`/sessions/${SOLO_SESSION}`);
+    // CM-88 (PR 6) : écran client, une séance invisible sous RLS affiche
+    // « Séance introuvable » (plus de 404 serveur).
+    await expect(page.getByRole("heading", { name: "Séance introuvable" })).toBeVisible();
     await expect(page.getByText("Séance solo (seed)")).toHaveCount(0);
     await expect(page.getByText("Full body")).toHaveCount(0);
+  });
+
+  test("Lina ouvre le récap d'une séance de Théo en lecture seule (CM-88 PR 6)", async ({ page }) => {
+    await login(page, SEED_ACCOUNTS.elle.email, SEED_ACCOUNTS.elle.password);
+    await page.goto(`/sessions/${TOI_SESSION}`);
+    await expect(page.getByText("Volume total")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Corriger les séries" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Modifier" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Supprimer", exact: true })).toHaveCount(0);
+    // `?edit=1` ne rouvre pas la saisie d'une séance qui n'est pas la sienne.
+    await page.goto(`/sessions/${TOI_SESSION}?edit=1`);
+    await expect(page.getByText("Volume total")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Quitter la séance" })).toHaveCount(0);
   });
 
   test("Elle voit l'historique de son partenaire (visible_profile_ids)", async ({ page }) => {

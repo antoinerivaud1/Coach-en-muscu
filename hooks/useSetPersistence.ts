@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { upsertSet, deleteSet } from "@/lib/actions/sessionSets";
+import { useQueryClient } from "@tanstack/react-query";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { deleteSessionSet, upsertSessionSet } from "@/lib/data/sessionWrites";
+import { markSessionListsStale } from "@/hooks/data/useSessionScreen";
 import {
   backoffDelay,
   enqueueOp,
@@ -69,6 +72,7 @@ export interface SetPersistence {
  * est supprimée dès que la file est vide.
  */
 export function useSetPersistence(sessionId: string): SetPersistence {
+  const queryClient = useQueryClient();
   const queueRef = useRef<QueuedOp[]>([]);
   const [queue, setQueue] = useState<QueuedOp[]>([]);
   const [failures, setFailures] = useState(0);
@@ -156,15 +160,17 @@ export function useSetPersistence(sessionId: string): SetPersistence {
           let refused = false;
           let expired = false;
           try {
+            // CM-88 (PR 6) : écriture directe depuis le navigateur, sous RLS.
+            const supabase = getSupabaseBrowserClient();
             const result =
               op.kind === "upsert"
-                ? await upsertSet(op.set)
-                : await deleteSet({ id: op.id, sessionId: op.sessionId });
+                ? await upsertSessionSet(supabase, op.set)
+                : await deleteSessionSet(supabase, { id: op.id, sessionId: op.sessionId });
             ok = result.ok;
             refused = !result.ok && result.refused === true;
             expired = !result.ok && result.expired === true;
           } catch {
-            // Hors-ligne, ou server action injoignable : on réessaiera.
+            // Hors ligne (jeton à rafraîchir sans réseau) : on réessaiera.
             ok = false;
           }
           if (!aliveRef.current) return;
@@ -173,6 +179,9 @@ export function useSetPersistence(sessionId: string): SetPersistence {
           if (ok) {
             commit(shiftQueue(queueRef.current));
             setFailures(0);
+            // Remplace `revalidatePath` : Carnet, Stats et accueil seront
+            // relus à leur prochaine ouverture.
+            void markSessionListsStale(queryClient);
             continue;
           }
           // CM-59 B : refus définitif (séance introuvable ou pas à toi) : mis
@@ -199,7 +208,7 @@ export function useSetPersistence(sessionId: string): SetPersistence {
     } finally {
       runningRef.current = false;
     }
-  }, [clearTimer, commit, setAside]);
+  }, [clearTimer, commit, setAside, queryClient]);
 
   // Reprise de la file laissée par une session précédente de la page, puis
   // envoi immédiat. C'est ce qui rattrape une série validée hors réseau avant

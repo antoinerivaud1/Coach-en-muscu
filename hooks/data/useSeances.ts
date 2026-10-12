@@ -42,11 +42,8 @@ export function useSeanceLibrary(profileId: string | null) {
     queryKey: queryKeys.seances.library(profileId ?? ""),
     queryFn: () => fetchSeanceLibrary(getSupabaseBrowserClient(), profileId!),
     enabled: !!profileId,
-    // « Dernière fois » dépend de la fin de séance, encore une server action
-    // (PR 6) qui ne peut pas invalider ce cache : relecture à chaque
-    // ouverture, les données en cache s'affichent pendant ce temps. À
-    // resserrer avec la PR 6.
-    staleTime: 0,
+    // « Dernière fois » dépend de la fin de séance, qui invalide
+    // `[profileId, "sessions"]` depuis la PR 6 : réglage par défaut (30 s).
   });
 }
 
