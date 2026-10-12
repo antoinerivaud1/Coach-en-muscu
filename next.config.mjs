@@ -7,7 +7,7 @@ import { withSentryConfig } from "@sentry/nextjs/config";
 // navigateur ne garde pas la redirection en cache.
 // `redirects` n'existe pas avec `output: 'export'` : la PR 3 (cible native)
 // devra NE PAS les déclarer pour le build Capacitor, et les garder sur le web.
-const UUID_SEGMENT = "[0-9a-fA-F-]{36}";
+const UUID_SEGMENT = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
 function legacyIdRedirects() {
   return [
