@@ -175,23 +175,26 @@ test.describe("Onboarding solo (CM-86)", () => {
       });
     });
 
-    await page.goto("/dashboard");
-    // Juste après la navigation : pas d'accueil, puis l'onboarding.
-    await expect(page.getByRole("heading", { name: /^Salut,/ })).toHaveCount(0);
-    await expect(page).toHaveURL(/\/onboarding$/);
-    await expect(page.getByRole("heading", { name: /Comment on t.appelle/ })).toBeVisible();
-    expect(
-      await page.evaluate(() => (window as unknown as { __cmPrivateSeen?: boolean }).__cmPrivateSeen),
-    ).toBe(false);
-
     // `/` aussi, et un lien d'invitation est conservé en `next` (CM-103).
-    await page.goto("/");
-    await expect(page).toHaveURL(/\/onboarding$/);
-    await page.goto("/duo/rejoindre?code=K7QM4P");
-    await expect(page).toHaveURL(/\/onboarding\?next=%2Fduo%2Frejoindre%3Fcode%3DK7QM4P$/);
-    expect(
-      await page.evaluate(() => (window as unknown as { __cmPrivateSeen?: boolean }).__cmPrivateSeen),
-    ).toBe(false);
+    // Le témoin repart de zéro à chaque chargement (addInitScript) : relu
+    // après CHAQUE ouverture, une fois l'onboarding affiché (la redirection
+    // client reste dans le même document).
+    const cases: [string, RegExp][] = [
+      ["/dashboard", /\/onboarding$/],
+      ["/", /\/onboarding$/],
+      ["/duo/rejoindre?code=K7QM4P", /\/onboarding\?next=%2Fduo%2Frejoindre%3Fcode%3DK7QM4P$/],
+    ];
+    for (const [path, url] of cases) {
+      await page.goto(path);
+      // Juste après la navigation : pas d'accueil, puis l'onboarding.
+      await expect(page.getByRole("heading", { name: /^Salut,/ }), path).toHaveCount(0);
+      await expect(page, path).toHaveURL(url);
+      await expect(page.getByRole("heading", { name: /Comment on t.appelle/ }), path).toBeVisible();
+      expect(
+        await page.evaluate(() => (window as unknown as { __cmPrivateSeen?: boolean }).__cmPrivateSeen),
+        path,
+      ).toBe(false);
+    }
     // Aucun mémo « onboarding fait » tant que ce n'est pas le cas.
     expect(await page.evaluate(() => window.localStorage.getItem("cm_onboarded"))).toBeNull();
   });

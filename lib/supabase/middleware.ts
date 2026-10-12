@@ -23,7 +23,8 @@ import {
  * - CM-89 (PR 1) : plus aucune redirection ici. Celle vers `/onboarding`
  *   (CM-86) est faite dans le navigateur (`OnboardingGate`), seule possible
  *   dans le bundle natif sans serveur ; le cookie `cm_onboarded` n'est plus
- *   ni lu ni posé. Ce middleware n'existe que sur le web (Vercel).
+ *   ni lu ni posé (effacé s'il traîne, middleware.ts). Ce middleware
+ *   n'existe que sur le web (Vercel).
  */
 export async function updateSession(request: NextRequest) {
   // CM-93 : pages légales et support publiques. Aucun appel Supabase : elles

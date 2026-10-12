@@ -10,12 +10,17 @@ test("l'accueil sans session renvoie à la connexion", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Qui s'entraîne/i })).toHaveCount(0);
 });
 
-test("CM-89 (PR 1) : l'ancien cookie du sélecteur de profil est effacé (web)", async ({ page, baseURL }) => {
-  await page.context().addCookies([{ name: "cm_profile", value: "ancien", url: baseURL! }]);
+test("CM-89 (PR 1) : les anciens cookies `cm_profile` et `cm_onboarded` sont effacés (web)", async ({ page, baseURL }) => {
+  await page.context().addCookies([
+    { name: "cm_profile", value: "ancien", url: baseURL! },
+    { name: "cm_onboarded", value: "ancien", url: baseURL!, httpOnly: true },
+  ]);
   await page.goto("/");
   await expect(page).toHaveURL(/\/login$/);
-  // Effacé par le middleware (plus par la route serveur de `/`).
-  expect((await page.context().cookies()).some((c) => c.name === "cm_profile")).toBe(false);
+  // Effacés par le middleware (plus par la route serveur de `/`).
+  const names = (await page.context().cookies()).map((c) => c.name);
+  expect(names).not.toContain("cm_profile");
+  expect(names).not.toContain("cm_onboarded");
 });
 
 test("une page privée sans session renvoie à la connexion, avec retour prévu", async ({ page }) => {

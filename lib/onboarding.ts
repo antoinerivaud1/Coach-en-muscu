@@ -221,6 +221,41 @@ export function onboardingGateDecision(input: OnboardingGateInput): OnboardingGa
 }
 
 /**
+ * CM-89 (PR 1) : écran déjà affiché par `OnboardingGate` pour cette page
+ * (`pathname`) et ce compte (dernier id connecté vu, null si aucun).
+ */
+export type OnboardingGateLatch = { pathname: string; userId: string | null };
+
+/**
+ * CM-89 (PR 1) : une fois l'écran affiché, un `wait` passager ne le remplace
+ * plus par le squelette. Sinon une session perdue en pleine séance (jeton
+ * refusé, déconnexion dans un autre onglet : le cache est relu, la session
+ * repasse « en cours de lecture ») démonterait le logger et son état, puis le
+ * renverrait vers /login (CM-59 B : jamais de renvoi en pleine saisie, le
+ * logger affiche « Session expirée »).
+ *
+ * Le verrou tombe sur un autre chemin, ou quand un AUTRE compte se connecte
+ * (son onboarding est à vérifier). Une redirection s'applique toujours.
+ * `userId` : compte connecté actuel, null si aucun ou pas encore lu.
+ */
+export function latchOnboardingGate(
+  decision: OnboardingGateDecision,
+  latch: OnboardingGateLatch | null,
+  current: { pathname: string; userId: string | null },
+): { decision: OnboardingGateDecision; latch: OnboardingGateLatch | null } {
+  const otherUser = current.userId !== null && current.userId !== latch?.userId;
+  const kept = latch && latch.pathname === current.pathname && !otherUser ? latch : null;
+  if (decision.kind === "render") {
+    return {
+      decision,
+      latch: { pathname: current.pathname, userId: current.userId ?? kept?.userId ?? null },
+    };
+  }
+  if (decision.kind === "wait" && kept) return { decision: { kind: "render" }, latch: kept };
+  return { decision, latch: kept };
+}
+
+/**
  * CM-89 (PR 1) : mémo de confort dans `localStorage` (remplace le cookie
  * httpOnly du middleware), valeur = id du compte. Tant qu'il correspond à la
  * session, `onboarded_at` n'est pas relu : un compte onboardé n'attend jamais
@@ -229,6 +264,12 @@ export function onboardingGateDecision(input: OnboardingGateInput): OnboardingGa
  * jamais à null : le mémo n'expire pas.
  */
 export const ONBOARDED_STORAGE_KEY = "cm_onboarded";
+
+/**
+ * Ancien cookie de confort (httpOnly) que posait le middleware, même nom.
+ * Plus lu nulle part : effacé par le middleware (web) s'il traîne encore.
+ */
+export const LEGACY_ONBOARDED_COOKIE = "cm_onboarded";
 
 type MarkStorage = Pick<Storage, "getItem" | "setItem">;
 

@@ -8,6 +8,7 @@ import {
   initialOf,
   isOnboardingExemptPath,
   isSignupEnabled,
+  latchOnboardingGate,
   onboardingGateDecision,
   onboardingRedirectTarget,
   rememberOnboarded,
@@ -208,6 +209,56 @@ test.describe("OnboardingGate : décision (CM-89)", () => {
     // Les écrans renvoient eux-mêmes vers /login, ou proposent « Réessayer ».
     expect(onboardingGateDecision({ ...base, session: "signedOut" })).toEqual({ kind: "render" });
     expect(onboardingGateDecision({ ...base, session: "error" })).toEqual({ kind: "render" });
+  });
+});
+
+test.describe("OnboardingGate : écran déjà affiché (CM-89)", () => {
+  const OTHER = "22222222-2222-2222-2222-222222222222";
+  const here = { pathname: "/sessions/abc", userId: UID };
+  const wait = { kind: "wait" } as const;
+  const render = { kind: "render" } as const;
+
+  test("premier affichage : verrou posé pour ce chemin et ce compte", () => {
+    expect(latchOnboardingGate(render, null, here)).toEqual({
+      decision: render,
+      latch: { pathname: "/sessions/abc", userId: UID },
+    });
+    // Sans verrou, un `wait` reste un squelette.
+    expect(latchOnboardingGate(wait, null, here).decision).toEqual(wait);
+  });
+
+  test("session perdue en pleine séance : l'écran reste, jamais le squelette", () => {
+    const latch = { pathname: "/sessions/abc", userId: UID };
+    // Cache relu après SIGNED_OUT : session « en cours de lecture ».
+    const pending = latchOnboardingGate(wait, latch, { ...here, userId: null });
+    expect(pending).toEqual({ decision: render, latch });
+    // Puis « personne » : écran affiché, le dernier compte connu est gardé.
+    const out = latchOnboardingGate(render, pending.latch, { ...here, userId: null });
+    expect(out.latch).toEqual(latch);
+    // Reconnexion du même compte : rien n'est revérifié.
+    expect(latchOnboardingGate(wait, out.latch, here).decision).toEqual(render);
+  });
+
+  test("un autre compte ou un autre chemin : vérification relancée", () => {
+    const latch = { pathname: "/sessions/abc", userId: UID };
+    expect(latchOnboardingGate(wait, latch, { ...here, userId: OTHER })).toEqual({
+      decision: wait,
+      latch: null,
+    });
+    expect(latchOnboardingGate(wait, latch, { ...here, pathname: "/dashboard" })).toEqual({
+      decision: wait,
+      latch: null,
+    });
+    // Écran d'abord affiché sans session, puis un compte se connecte.
+    expect(
+      latchOnboardingGate(wait, { pathname: "/sessions/abc", userId: null }, here).decision,
+    ).toEqual(wait);
+  });
+
+  test("une redirection s'applique toujours, même écran déjà affiché", () => {
+    const latch = { pathname: "/sessions/abc", userId: UID };
+    const redirect = { kind: "redirect", to: "/onboarding" } as const;
+    expect(latchOnboardingGate(redirect, latch, here).decision).toEqual(redirect);
   });
 });
 

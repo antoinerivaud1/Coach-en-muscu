@@ -1,7 +1,7 @@
 import type { CookieOptionsWithName } from "@supabase/ssr";
 
 // CM-58 : réglages partagés par le client navigateur et le middleware
-// (CM-89 (PR 1) : le client d'auth serveur, lib/supabase/server.ts, est supprimé).
+// (CM-89 (PR 1) : plus de client d'auth serveur).
 // Aucun import de `next/headers` ici : ce fichier est chargé par le middleware.
 
 /**

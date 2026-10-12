@@ -11,8 +11,8 @@ import { isUuid, loginPath, resolveProfileId } from "@/lib/auth/core";
 /**
  * CM-88 : id du profil connecté, côté navigateur. `getClaims()` valide le
  * JWT, `claims.sub` est l'id du profil, sinon personne. Jamais `getSession()`
- * seul pour décider d'un accès. CM-89 (PR 1) : plus aucun écran ne lit la
- * session côté serveur (lib/profile.ts supprimé), tout passe par ici.
+ * seul pour décider d'un accès. CM-89 (PR 1) : plus aucune lecture de la
+ * session côté serveur pour les écrans, tout passe par ici.
  *
  * La sécurité reste en base (RLS) : ce hook ne sert qu'à savoir quoi afficher
  * et quand renvoyer vers `/login`.
