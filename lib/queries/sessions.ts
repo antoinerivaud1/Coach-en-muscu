@@ -257,7 +257,12 @@ export type DashboardSessionRow = {
 };
 
 /**
- * Séances terminées du profil, du plus récent au plus ancien.
+ * Séances terminées du profil, du plus récent au plus ancien, avec le groupe
+ * musculaire de chaque série.
+ *
+ * CM-89 (PR 0) : `sinceIso` limite la lecture à une fenêtre récente (semaine
+ * en cours, muscles sollicités des 7 derniers jours). Avant, l'accueil
+ * relisait TOUT l'historique, séries comprises, à chaque ouverture.
  *
  * Le `.eq("profile_id", …)` est OBLIGATOIRE : la RLS laisse lire les séances
  * du partenaire de duo (CM-59).
@@ -265,14 +270,41 @@ export type DashboardSessionRow = {
 export async function getCompletedSessionsForDashboard(
   supabase: SupabaseClient<Database>,
   profileId: string,
+  sinceIso?: string,
 ) {
-  return completedSessionsQuery(
+  let query = completedSessionsQuery(
     supabase,
     "id, performed_at, program_day_id, session_sets ( id, exercises ( muscle_group ) )",
   )
     .eq("profile_id", profileId)
-    .order("performed_at", { ascending: false })
-    .returns<DashboardSessionRow[]>();
+    .order("performed_at", { ascending: false });
+  if (sinceIso) query = query.gte("performed_at", sinceIso);
+  return query.returns<DashboardSessionRow[]>();
+}
+
+/** Une séance terminée réduite à sa date et sa séance type (CM-89, PR 0). */
+export type DoneSessionRow = {
+  id: string;
+  program_day_id: string | null;
+  performed_at: string;
+};
+
+/**
+ * TOUTES les séances terminées du profil qui ont au moins une série, sans
+ * leurs séries : une ligne légère par séance. Sert à « dernière fois » par
+ * séance type et au nombre de séances (suggestion, accueil du premier jour).
+ *
+ * `session_sets!inner` écarte les séances terminées à vide (CM-66) ; la limite
+ * à une série par séance évite de rapatrier les séries elles-mêmes.
+ */
+export async function getDoneSessions(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+) {
+  return completedSessionsQuery(supabase, "id, program_day_id, performed_at, session_sets!inner ( id )")
+    .eq("profile_id", profileId)
+    .limit(1, { referencedTable: "session_sets" })
+    .returns<(DoneSessionRow & { session_sets: { id: string }[] })[]>();
 }
 
 // ---- Séances terminées d'une fenêtre de dates (objectif hebdo, comparaison couple) ----

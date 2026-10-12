@@ -18,6 +18,7 @@ function data(over: Partial<DashboardData> = {}): DashboardData {
     partnerLive: null,
     currentSession: null,
     sessions: [],
+    doneSessions: [],
     programs: [
       {
         id: "p1",
@@ -216,5 +217,43 @@ test.describe("buildDashboardView (CM-88)", () => {
     if (view.kind !== "home") return;
     expect(view.duoWeek).toEqual([]);
     expect(view.partnerLive).toBeNull();
+  });
+
+  test("CM-89 (PR 0) : une séance ancienne hors fenêtre compte encore (dernière fois, pas de premier jour)", () => {
+    const old = { id: "old", program_day_id: "push", performed_at: "2026-08-03T17:00:00.000Z" };
+    const view = buildDashboardView(data({ doneSessions: [old] }), ME, NOW);
+    expect(view.kind).toBe("home");
+    if (view.kind !== "home") return;
+    expect(view.seances.find((c) => c.id === "push")?.lastDoneAt).toBe(old.performed_at);
+    // Hors de la semaine : rien de coché dans le strip.
+    expect(view.doneThisWeek).toEqual([]);
+  });
+
+  test("CM-89 (PR 0) : une séance présente dans les deux lectures ne compte qu'une fois", () => {
+    const recent = monday(2);
+    const light = { id: recent.id, program_day_id: "push", performed_at: recent.performed_at };
+    // Deux séances types démarrables : la suggestion ne dépend plus que du
+    // nombre de séances enregistrées.
+    const base = data();
+    const pull = {
+      ...base.programs[0]!.program_days[0]!,
+      id: "pull",
+      name: "Pull",
+      order_index: 1,
+    };
+    const programs = [{ ...base.programs[0]!, program_days: [...base.programs[0]!.program_days, pull] }];
+    const once = buildDashboardView(
+      data({ programs, sessions: [recent], doneSessions: [light] }),
+      ME,
+      NOW,
+    );
+    const twice = buildDashboardView(
+      data({ programs, sessions: [recent], doneSessions: [light, { ...light, id: "autre" }] }),
+      ME,
+      NOW,
+    );
+    // Une seule séance : pas de suggestion (MIN_HISTORY = 2) ; deux : suggestion.
+    expect(once.kind === "home" && once.recommended).toBeFalsy();
+    expect(twice.kind === "home" && twice.recommended).toBeTruthy();
   });
 });

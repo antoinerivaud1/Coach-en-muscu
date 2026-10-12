@@ -5,9 +5,11 @@ import {
   getAllSetsForProgress,
   getCompletedSessionsForDashboard,
   getCurrentSession,
+  getDoneSessions,
   purgeAbandonedEmptySessions,
   type CurrentSessionRow,
   type DashboardSessionRow,
+  type DoneSessionRow,
   type ProgressRow,
 } from "@/lib/queries/sessions";
 import { resumeBannerState, type ResumeBannerState } from "@/lib/utils/currentSession";
@@ -70,10 +72,18 @@ export type DashboardData = {
   partnerLive: { dayName: string } | null;
   /** Séance en cours du profil (bandeau de reprise, CM-83). */
   currentSession: CurrentSessionRow | null;
-  /** Séances TERMINÉES du profil, du plus récent au plus ancien. */
+  /**
+   * Séances TERMINÉES récentes du profil (fenêtre `RECENT_WINDOW_DAYS`), du
+   * plus récent au plus ancien, avec leurs séries (strip, muscles récents).
+   */
   sessions: DashboardSessionRow[];
+  /**
+   * CM-89 (PR 0) : toutes les séances terminées non vides, en version légère
+   * (« dernière fois » par séance type, nombre de séances).
+   */
+  doneSessions: DoneSessionRow[];
   programs: DashboardProgramRow[];
-  /** Séances terminées du partenaire (duo actif seulement). */
+  /** Séances terminées récentes du partenaire (duo actif seulement). */
   partnerSessions: DashboardSessionRow[];
   /** Séries du partenaire (dernier record battu, duo actif seulement). */
   partnerSets: ProgressRow[];
@@ -140,19 +150,32 @@ async function fetchExerciseNames(
   return Object.fromEntries((data ?? []).map((e) => [e.id, e.name]));
 }
 
+/**
+ * CM-89 (PR 0) : fenêtre des séances lues en détail (séries comprises). Elle
+ * couvre la semaine en cours (au plus 7 jours en arrière, lundi compris) et
+ * les muscles sollicités sur `BALANCE_WINDOW_DAYS` (7 jours), plus un jour
+ * de marge pour les fuseaux.
+ */
+export const RECENT_WINDOW_DAYS = 8;
+
 /** Toutes les lectures de l'accueil. */
 export async function fetchDashboard(
   supabase: BrowserSupabase,
   profileId: string,
 ): Promise<DashboardData> {
-  const [profile, membershipRead, currentSession, sessionsRes] = await Promise.all([
+  const since = new Date(Date.now() - RECENT_WINDOW_DAYS * 86400000).toISOString();
+  const [profile, membershipRead, currentSession, sessionsRes, doneRes] = await Promise.all([
     getProfile(supabase, profileId),
     readDuoMembership(supabase, profileId),
     getCurrentSession(supabase, profileId),
-    getCompletedSessionsForDashboard(supabase, profileId),
+    getCompletedSessionsForDashboard(supabase, profileId, since),
+    getDoneSessions(supabase, profileId),
   ]);
-  if (sessionsRes.error) {
-    throw new Error(`Impossible de charger tes séances : ${sessionsRes.error.message}`);
+  const readError = sessionsRes.error ?? doneRes.error;
+  if (readError) {
+    // Jamais de liste vide par défaut : elle ferait passer pour un premier
+    // jour un compte qui a déjà des séances.
+    throw new Error(`Impossible de charger tes séances : ${readError.message}`);
   }
   const membership = membershipRead.ok ? membershipRead.membership : null;
   const duoId = membership?.duoId ?? null;
@@ -165,8 +188,9 @@ export async function fetchDashboard(
       fetchPrograms(supabase, profileId, duoId),
       partnerId ? getProfile(supabase, partnerId) : Promise.resolve(null),
       partnerId ? fetchPartnerLive(supabase, partnerId) : Promise.resolve(null),
+      // Semaine du partenaire seulement : la fenêtre récente suffit.
       partnerId
-        ? getCompletedSessionsForDashboard(supabase, partnerId)
+        ? getCompletedSessionsForDashboard(supabase, partnerId, since)
         : Promise.resolve({ data: [] as DashboardSessionRow[] }),
       partnerId
         ? getAllSetsForProgress(supabase, partnerId)
@@ -185,6 +209,11 @@ export async function fetchDashboard(
     partnerLive,
     currentSession,
     sessions: sessionsRes.data ?? [],
+    doneSessions: (doneRes.data ?? []).map(({ id, program_day_id, performed_at }) => ({
+      id,
+      program_day_id,
+      performed_at,
+    })),
     programs,
     partnerSessions: partnerSessionsRes.data ?? [],
     partnerSets,
@@ -301,7 +330,12 @@ export function buildDashboardView(
   // ne compte pas non plus : le strip afficherait un jour « fait » sans qu'un
   // seul kilo ait été soulevé (CM-66).
   const sessions = data.sessions.filter((s) => (s.session_sets ?? []).length > 0);
-  const loggedSessionCount = sessions.length;
+  // CM-89 (PR 0) : nombre de séances et « dernière fois » sur tout
+  // l'historique léger, complété par les séances récentes (mêmes ids).
+  const done = new Map<string, DoneSessionRow>();
+  for (const s of data.doneSessions) done.set(s.id, s);
+  for (const s of sessions) done.set(s.id, s);
+  const loggedSessionCount = done.size;
 
   // Semaine ancrée sur `APP_TIME_ZONE`, comme le reste des calculs de jour :
   // sinon une séance du samedi 1 h du matin cocherait le vendredi.
@@ -314,7 +348,7 @@ export function buildDashboardView(
   }
 
   // Dernière exécution par séance type, même calcul que la bibliothèque.
-  const lastDoneByDay = buildLastDoneByDay(sessions);
+  const lastDoneByDay = buildLastDoneByDay([...done.values()]);
   const history: SessionHistoryEntry[] = sessions.map((s) => ({
     performedAt: s.performed_at,
     groups: (s.session_sets ?? [])
