@@ -3,6 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- CM-89 (PR 3) : repère lu par scripts/native-placeholder.mjs. -->
+    <meta name="cm-native-placeholder" content="1" />
     <title>Coach en Muscu</title>
     <style>
       html, body { margin: 0; height: 100%; background: #0b0b0f; color: #f2f2f5; font-family: system-ui, sans-serif; }
@@ -10,7 +12,9 @@
     </style>
   </head>
   <body>
-    <!-- Placeholder requis par Capacitor : en prod l'app charge server.url. -->
+    <!-- Placeholder requis par Capacitor tant que l'app charge server.url
+         (jamais affiché). CM-89 (PR 3) : copié dans capacitor/www par
+         scripts/native-placeholder.mjs si aucun build natif n'y est. -->
     <div class="c">Coach en Muscu</div>
   </body>
 </html>

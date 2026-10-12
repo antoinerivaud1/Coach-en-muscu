@@ -5,13 +5,15 @@
 // `resolveSiteOrigin` (tests/unit/siteUrl.spec.ts).
 
 import { Capacitor } from "@capacitor/core";
+import siteOrigin from "./siteOrigin.json";
 
 /**
  * Site web de production. Repli de l'app native quand `NEXT_PUBLIC_SITE_URL`
- * n'a pas été fournie au build. À garder synchro avec le domaine de prod
- * (voir NATIVE.md).
+ * n'a pas été fournie au build. Rangé dans `siteOrigin.json` : le contrôle
+ * de l'export natif (scripts/build-native.mjs) le lit aussi, pour tolérer
+ * cette seule origine (texte d'un lien partagé, jamais appelée par l'app).
  */
-export const PROD_WEB_ORIGIN = "https://v0-gym-workout-tracker-silk.vercel.app";
+export const PROD_WEB_ORIGIN: string = siteOrigin.prodWebOrigin;
 
 /**
  * Origine `http(s)://hôte[:port]` d'une URL configurée, sans chemin ni « / »

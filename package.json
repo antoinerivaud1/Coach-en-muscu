@@ -5,15 +5,20 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:native": "node scripts/build-native.mjs",
+    "serve:native": "node scripts/serve-native.mjs",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "cap:sync": "cap sync",
     "cap:ios": "cap open ios",
     "cap:android": "cap open android",
+    "capacitor:copy:before": "node scripts/native-placeholder.mjs",
     "assets:gen": "capacitor-assets generate",
     "test:unit": "playwright test --project=unit",
-    "test:e2e": "playwright test --project=e2e --workers=1"
+    "test:scripts": "node --test scripts/tests/native-rules.test.mjs",
+    "test:e2e": "playwright test --project=e2e --workers=1",
+    "test:native": "playwright test --project=native --workers=1"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",

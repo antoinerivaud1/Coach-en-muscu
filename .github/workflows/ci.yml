@@ -5,7 +5,8 @@
 # - `e2e` (CM-98) : parcours réels qui ÉCRIVENT en base, contre une stack
 #   Supabase LOCALE (Docker) recréée à chaque run : migrations de
 #   supabase/migrations/ + supabase/seed.sql. Aucun secret, aucune URL de prod.
-#   Voir tests/e2e/README.md.
+#   Voir tests/e2e/README.md. CM-89 (PR 3) : puis smoke de l'export natif
+#   (`npm run build:native`, projet Playwright `native`, voir NATIVE.md).
 
 name: CI
 
@@ -47,6 +48,11 @@ jobs:
 
       - name: Tests unitaires
         run: npm run test:unit
+
+      # CM-89 (PR 3) : règles de la cible native (routeur iOS, placeholder,
+      # contrôle de l'export), lanceur intégré de Node.
+      - name: Tests des scripts natifs
+        run: npm run test:scripts
 
       - name: Build (env factices)
         run: npm run build
@@ -144,6 +150,29 @@ jobs:
       - name: Tests e2e
         run: npm run test:e2e
 
+      # CM-89 (PR 3) : cible native. Export statique (mêmes variables
+      # Supabase locales, gravées au build) servi par scripts/serve-native.mjs,
+      # qui imite le routeur iOS de la PR 4. Le serveur Next est arrêté
+      # d'abord : `next build` réécrit `.next`.
+      - name: Build natif (export statique)
+        run: |
+          pkill -f "next start" || true
+          npm run build:native
+
+      - name: Servir le bundle natif
+        run: |
+          npm run serve:native -- --port 4300 > serve-native.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:4300/login && exit 0
+            sleep 1
+          done
+          echo "Le serveur statique n'a pas répondu en 30 s" && cat serve-native.log && exit 1
+
+      - name: Tests e2e natifs
+        run: npm run test:native
+        env:
+          E2E_NATIVE_BASE_URL: http://localhost:4300
+
       # CM-88 (PR 6) : plus de second passage avec DATA_CLIENT=service. Plus
       # aucun écran ne lit ni n'écrit de données côté serveur : le filet
       # service-role n'est plus jamais utilisé (son code part en PR 8).
@@ -161,5 +190,6 @@ jobs:
             playwright-report/
             test-results/
             next.log
+            serve-native.log
             supabase-rest.log
           retention-days: 7
