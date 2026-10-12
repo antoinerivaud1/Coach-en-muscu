@@ -152,18 +152,25 @@ async function fetchExerciseNames(
 
 /**
  * CM-89 (PR 0) : fenêtre des séances lues en détail (séries comprises). Elle
- * couvre la semaine en cours (au plus 7 jours en arrière, lundi compris) et
- * les muscles sollicités sur `BALANCE_WINDOW_DAYS` (7 jours), plus un jour
- * de marge pour les fuseaux.
+ * couvre la semaine en cours et les muscles sollicités sur
+ * `BALANCE_WINDOW_DAYS` (7 jours). 7 jours ne suffisent PAS : un dimanche à
+ * 23 h 59 (heure de Paris), le lundi 0 h est presque 7 jours plus tôt, et la
+ * semaine du passage à l'heure d'hiver compte une journée de 25 h. Le 8e
+ * jour est cette marge : ne pas le retirer.
  */
 export const RECENT_WINDOW_DAYS = 8;
+
+/** Début de la fenêtre détaillée, pour une lecture faite à `now`. */
+export function recentWindowStart(now: Date): Date {
+  return new Date(now.getTime() - RECENT_WINDOW_DAYS * 86400000);
+}
 
 /** Toutes les lectures de l'accueil. */
 export async function fetchDashboard(
   supabase: BrowserSupabase,
   profileId: string,
 ): Promise<DashboardData> {
-  const since = new Date(Date.now() - RECENT_WINDOW_DAYS * 86400000).toISOString();
+  const since = recentWindowStart(new Date()).toISOString();
   const [profile, membershipRead, currentSession, sessionsRes, doneRes] = await Promise.all([
     getProfile(supabase, profileId),
     readDuoMembership(supabase, profileId),

@@ -303,6 +303,9 @@ export async function getDoneSessions(
 ) {
   return completedSessionsQuery(supabase, "id, program_day_id, performed_at, session_sets!inner ( id )")
     .eq("profile_id", profileId)
+    // Plus récentes d'abord : si PostgREST tronque (max_rows), ce sont les
+    // plus anciennes qui manquent, sans effet sur « dernière fois ».
+    .order("performed_at", { ascending: false })
     .limit(1, { referencedTable: "session_sets" })
     .returns<(DoneSessionRow & { session_sets: { id: string }[] })[]>();
 }
