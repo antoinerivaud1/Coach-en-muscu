@@ -3,6 +3,7 @@ import { closeDeletedAccountSession } from "@/lib/data/account";
 import { signOutLocal } from "@/lib/data/auth";
 import {
   clearPreferencesSession,
+  clearSessionBounded,
   clearSessionCookies,
   createPreferencesStorage,
   isSessionStorageKey,
@@ -134,5 +135,43 @@ test.describe("Déconnexion et suppression dans l'app native (CM-89 (PR 4))", ()
     await closeDeletedAccountSession(supabase, () => clearPreferencesSession(prefs), 50);
     expect(keysAtSignOut).toEqual([]);
     expect(store.size).toBe(0);
+  });
+
+  test("effacement borné : fini, en erreur ou bloqué, jamais d'exception", async () => {
+    expect(await clearSessionBounded(() => undefined, 50)).toBe(true);
+    expect(await clearSessionBounded(async () => {}, 50)).toBe(true);
+    expect(
+      await clearSessionBounded(() => {
+        throw new Error("bridge");
+      }, 50),
+    ).toBe(false);
+    const started = Date.now();
+    expect(await clearSessionBounded(() => new Promise(() => {}), 20)).toBe(false);
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  test("déconnexion : Preferences bloqué, la déconnexion aboutit quand même", async () => {
+    const supabase = {
+      auth: { signOut: async () => ({ error: { name: "AuthRetryableFetchError" } }) },
+    } as unknown as Parameters<typeof signOutLocal>[0];
+    const started = Date.now();
+    expect(await signOutLocal(supabase, () => new Promise(() => {}), 20)).toBe(true);
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  test("compte supprimé : Preferences bloqué, signOut appelé et départ non bloqué", async () => {
+    let signOutCalled = false;
+    const supabase = {
+      auth: {
+        signOut: async () => {
+          signOutCalled = true;
+          return { error: null };
+        },
+      },
+    } as unknown as Parameters<typeof closeDeletedAccountSession>[0];
+    const started = Date.now();
+    await closeDeletedAccountSession(supabase, () => new Promise(() => {}), 20);
+    expect(signOutCalled).toBe(true);
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 });

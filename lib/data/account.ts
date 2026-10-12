@@ -1,5 +1,6 @@
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { clearLocalSession, type BrowserSupabase } from "@/lib/supabase/client";
+import { clearSessionBounded } from "@/lib/supabase/nativeSession";
 import {
   DELETE_CONFIRMATION_WORD,
   deleteAccountErrorMessage,
@@ -69,7 +70,8 @@ export const SIGN_OUT_TIMEOUT_MS = 3_000;
  * 1. La session de cet appareil est effacée d'abord (`clearLocalSession`) :
  *    cookies de session sur le web (lisibles en JS depuis CM-88, morceaux
  *    `.0`, `.1` compris), clés de session dans Preferences dans l'app native
- *    (CM-89 (PR 4)). La session est fermée même si la suite n'aboutit pas.
+ *    (CM-89 (PR 4)), borné à `timeoutMs`. La session est fermée même si la
+ *    suite n'aboutit pas.
  * 2. `signOut({ scope: "local" })` vide l'état du client (et prévient les
  *    écouteurs), borné à `timeoutMs` : réseau mort, verrou d'auth bloqué…
  *
@@ -89,11 +91,9 @@ export async function closeDeletedAccountSession(
   clearSession: () => unknown = clearLocalSession,
   timeoutMs: number = SIGN_OUT_TIMEOUT_MS,
 ): Promise<void> {
-  try {
-    await clearSession();
-  } catch {
-    // Stockage indisponible : `signOut` ci-dessous tente encore de l'effacer.
-  }
+  // Borné (CM-89 (PR 4)) : stockage en erreur ou bloqué, `signOut`
+  // ci-dessous tente encore de l'effacer, et le départ n'attend pas.
+  await clearSessionBounded(clearSession, timeoutMs);
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([

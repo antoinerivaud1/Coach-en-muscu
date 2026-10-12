@@ -91,8 +91,12 @@ fusionnées sur `main`.
    NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co \
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<clé anon> \
    NEXT_PUBLIC_SENTRY_DSN=<dsn, optionnel> \
+   NEXT_PUBLIC_SITE_URL=https://v0-gym-workout-tracker-silk.vercel.app \
    npm run build:native
    ```
+   `NEXT_PUBLIC_SITE_URL` : origine des liens d'invitation partagés depuis l'app
+   (`lib/siteUrl.ts`). Sans elle, l'app retombe sur le site de prod codé en dur
+   (`PROD_WEB_ORIGIN`), jamais sur `capacitor://localhost`.
    Vérifier `capacitor/www/dashboard.html`, `capacitor/www/sessions/view.html` (ou
    `dashboard/index.html` si l'export utilise `trailingSlash`).
 3. **Synchroniser** : `npx cap sync ios`. Installe le pod `CapacitorPreferences`
@@ -127,6 +131,14 @@ fusionnées sur `main`.
 - [ ] **Suppression du compte** (compte de test uniquement) : page « Compte
       supprimé », puis relance de l'app : déconnectée.
 - [ ] **Lien d'invitation duo** ouvert dans l'app : la session reste ouverte.
+- [ ] **Partage d'invitation** depuis l'app : le lien commence par
+      `https://` (site web), jamais par `capacitor://localhost`.
+
+### À savoir pour la mise à jour
+Les utilisateurs de la version Phase 5 (app chargée depuis Vercel) devront se
+reconnecter UNE fois après la mise à jour : leur session était dans les cookies
+du site, l'app embarquée la lit désormais dans Preferences. Rien n'est perdu
+côté données.
 
 ## Mise à jour de l'app
 Depuis CM-89, le contenu est EMBARQUÉ : un déploiement Vercel ne change plus
@@ -139,6 +151,8 @@ App Store). Le site web, lui, continue de se mettre à jour à chaque déploieme
 - Notifications locales natives (timer de repos) : P5-3 / CM-45 (`@capacitor/local-notifications`)
 - Signing + TestFlight (iOS) : P5-4 / CM-46
 - Signing + distribution interne (Android) : P5-5 / CM-47
+- Keychain au lieu de Preferences avant soumission App Store (session chiffrée)
+- Podfile.lock à committer après cap sync sur le Mac (pod CapacitorPreferences)
 
 ## Notes
 - `appId` : `com.antoinerivaud.coachenmuscu` (modifiable avant le premier `cap add`).

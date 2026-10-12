@@ -18,17 +18,14 @@ import Capacitor
 ///   `<chemin>/index.html` s'il existe (export avec `trailingSlash`), sinon
 ///   `/index.html`.
 ///
-/// `WebViewAssetHandler` passe `url.path` : ni query (`?id=…`) ni fragment,
-/// et sans « / » final. On les retire quand même, par sécurité si un jour
-/// l'appelant change.
+/// Le protocole `Router` de Capacitor 6 ne reçoit qu'un chemin :
+/// `WebViewAssetHandler` passe `url.path`, déjà sans query (`?id=…`) ni
+/// fragment. Seul le « / » final éventuel est retiré ici.
 struct StaticExportRouter: Router {
     var basePath: String = ""
 
     func route(for path: String) -> String {
         var cleanPath = path
-        if let cut = cleanPath.firstIndex(where: { $0 == "?" || $0 == "#" }) {
-            cleanPath = String(cleanPath[..<cut])
-        }
         while cleanPath.count > 1 && cleanPath.hasSuffix("/") {
             cleanPath.removeLast()
         }

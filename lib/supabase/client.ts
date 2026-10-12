@@ -51,6 +51,9 @@ export function createClient(): BrowserSupabase {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
+        // Comme le client web (@supabase/ssr) : même flux, et prêt pour un
+        // futur retour OAuth natif par lien profond (CM-96 / CM-100).
+        flowType: "pkce",
       },
     });
   }
@@ -76,8 +79,10 @@ let browserClient: BrowserSupabase | null = null;
  * son retour ne doit jamais viser `/duo/rejoindre…`.
  *
  * CM-89 (PR 4) : web seulement. Le client natif ne lit jamais l'URL
- * (`detectSessionInUrl` faux) et, en flux implicite (défaut de supabase-js),
- * `signUp` n'y enregistre aucun verifier : rien à purger.
+ * (`detectSessionInUrl` faux) : le verifier que `signUp` range dans
+ * Preferences (`sb-…-auth-token-code-verifier`) ne peut donc jamais être
+ * confronté au `?code=` d'une invitation. Il part avec la session à la
+ * déconnexion (`signOut`, sinon `clearPreferencesSession`).
  */
 function purgeCodeVerifierCookies(): void {
   if (typeof document === "undefined") return;

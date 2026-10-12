@@ -1,4 +1,5 @@
 import { clearLocalSession, type BrowserSupabase } from "@/lib/supabase/client";
+import { clearSessionBounded } from "@/lib/supabase/nativeSession";
 import {
   authErrorMessage,
   safeNextPath,
@@ -128,6 +129,8 @@ export const SIGN_OUT_TIMEOUT_MS = 3_000;
  * pas connectée. Le jeton reste valable côté serveur jusqu'à son expiration,
  * mais cet appareil n'a plus de session : c'est le sens de `scope: "local"`.
  *
+ * Cet effacement est borné au même `timeoutMs` (`clearSessionBounded`).
+ *
  * Renvoie `true` si la session a dû être effacée à la main.
  * `clearSession` est injectable pour les tests (tests/unit/signupGuard.spec.ts).
  */
@@ -151,12 +154,8 @@ export async function signOutLocal(
   } finally {
     clearTimeout(timer);
   }
-  if (failed) {
-    try {
-      await clearSession();
-    } catch {
-      // Stockage indisponible : `/login` est ouvert quand même (SignOutButton).
-    }
-  }
+  // Effacement borné lui aussi (CM-89 (PR 4)) : stockage en erreur ou bloqué,
+  // `/login` est ouvert quand même (SignOutButton).
+  if (failed) await clearSessionBounded(clearSession, timeoutMs);
   return failed;
 }

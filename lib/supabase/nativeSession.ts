@@ -73,6 +73,33 @@ export async function clearPreferencesSession(prefs: PreferencesLike): Promise<s
 }
 
 /**
+ * Lance un effacement de session sans jamais bloquer ni lever : rend la main
+ * dès qu'il a fini, échoué, ou au bout de `timeoutMs`. Un appel Preferences
+ * qui ne répond plus (pont natif bloqué) ne doit pas figer la déconnexion ni
+ * la suppression du compte. Renvoie `false` si l'effacement n'a pas abouti.
+ */
+export async function clearSessionBounded(
+  clearSession: () => unknown,
+  timeoutMs: number,
+): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve()
+        .then(clearSession)
+        .then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), timeoutMs);
+      }),
+    ]);
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Web : efface les cookies de session (`sb-…-auth-token*`, lisibles en JS
  * depuis CM-88, morceaux `.0`, `.1` compris). Comportement inchangé depuis
  * CM-88, déplacé ici pour être partagé par la déconnexion et la suppression
