@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { buildDashboardView, type DashboardData } from "@/lib/data/dashboard";
+import { buildDashboardView, recentWindowStart, type DashboardData } from "@/lib/data/dashboard";
 
 // CM-88 (PR 4) : calcul pur de l'accueil, ex-page serveur. Aucune base.
 // Lancer : npm run test:unit
@@ -18,6 +18,7 @@ function data(over: Partial<DashboardData> = {}): DashboardData {
     partnerLive: null,
     currentSession: null,
     sessions: [],
+    doneSessions: [],
     programs: [
       {
         id: "p1",
@@ -216,5 +217,63 @@ test.describe("buildDashboardView (CM-88)", () => {
     if (view.kind !== "home") return;
     expect(view.duoWeek).toEqual([]);
     expect(view.partnerLive).toBeNull();
+  });
+
+  test("CM-89 (PR 0) : une séance ancienne hors fenêtre compte encore (dernière fois, pas de premier jour)", () => {
+    const old = { id: "old", program_day_id: "push", performed_at: "2026-08-03T17:00:00.000Z" };
+    const view = buildDashboardView(data({ doneSessions: [old] }), ME, NOW);
+    expect(view.kind).toBe("home");
+    if (view.kind !== "home") return;
+    expect(view.seances.find((c) => c.id === "push")?.lastDoneAt).toBe(old.performed_at);
+    // Hors de la semaine : rien de coché dans le strip.
+    expect(view.doneThisWeek).toEqual([]);
+  });
+
+  test("CM-89 (PR 0) : une séance présente dans les deux lectures ne compte qu'une fois", () => {
+    const recent = monday(2);
+    const light = { id: recent.id, program_day_id: "push", performed_at: recent.performed_at };
+    // Deux séances types démarrables : la suggestion ne dépend plus que du
+    // nombre de séances enregistrées.
+    const base = data();
+    const pull = {
+      ...base.programs[0]!.program_days[0]!,
+      id: "pull",
+      name: "Pull",
+      order_index: 1,
+    };
+    const programs = [{ ...base.programs[0]!, program_days: [...base.programs[0]!.program_days, pull] }];
+    const once = buildDashboardView(
+      data({ programs, sessions: [recent], doneSessions: [light] }),
+      ME,
+      NOW,
+    );
+    const twice = buildDashboardView(
+      data({ programs, sessions: [recent], doneSessions: [light, { ...light, id: "autre" }] }),
+      ME,
+      NOW,
+    );
+    // Une seule séance : pas de suggestion (MIN_HISTORY = 2) ; deux : suggestion.
+    expect(once.kind === "home" && once.recommended).toBeFalsy();
+    expect(twice.kind === "home" && twice.recommended).toBeTruthy();
+  });
+
+  test("CM-89 (PR 0) : la fenêtre détaillée couvre toute la semaine, même un dimanche soir de changement d'heure", () => {
+    // Dimanche 25 octobre 2026, 23 h 30 à Paris (passage à l'heure d'hiver
+    // le jour même, journée de 25 h). Lundi 19 octobre 0 h 15 à Paris.
+    const sunday = new Date("2026-10-25T22:30:00.000Z");
+    const mondayEarly = "2026-10-18T22:15:00.000Z";
+    expect(new Date(mondayEarly).getTime()).toBeGreaterThanOrEqual(recentWindowStart(sunday).getTime());
+    const session = { ...monday(1), id: "early", performed_at: mondayEarly };
+    const view = buildDashboardView(data({ sessions: [session] }), ME, sunday);
+    expect(view.kind === "home" && view.doneThisWeek).toEqual([0]);
+  });
+
+  test("CM-89 (PR 0) : « dernière fois » prend la date la plus récente des deux lectures", () => {
+    const recent = monday(1);
+    const old = { id: "old", program_day_id: "push", performed_at: "2026-09-01T17:00:00.000Z" };
+    const view = buildDashboardView(data({ sessions: [recent], doneSessions: [old] }), ME, NOW);
+    expect(view.kind === "home" && view.seances.find((c) => c.id === "push")?.lastDoneAt).toBe(
+      recent.performed_at,
+    );
   });
 });
