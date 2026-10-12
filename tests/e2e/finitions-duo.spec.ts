@@ -9,7 +9,7 @@ import { SEED_ACCOUNTS, SEED_NAMES, guardWrites, login } from "./helpers";
 // - Couleur unique dans le duo : Théo ne peut pas choisir la couleur de Lina
 //   (grisée à l'écran, refusée par l'action serveur).
 // ÉCRIT en base (compte créé, duo, invitation) : garde-fou obligatoire.
-// Rejouable (la CI rejoue tout avec DATA_CLIENT=service) : email unique,
+// Rejouable sur la même base : email unique,
 // Solo remis hors duo au début et à la fin, par l'UI.
 
 guardWrites();

@@ -34,10 +34,9 @@ export type ProgramAccess =
 /**
  * Le profil courant a-t-il le droit d'agir sur ce programme ?
  *
- * CM-59 B : la RLS (client utilisateur) garantit déjà le périmètre ; ce
- * contrôle reste en place (ceinture et bretelles, et filet
- * `DATA_CLIENT=service` où la RLS est contournée). Une server action qui reçoit
- * un id arbitraire vérifie donc toujours à qui appartient la ligne visée.
+ * CM-59 B : la RLS garantit déjà le périmètre ; ce contrôle reste en place
+ * (ceinture et bretelles) : du code qui reçoit un id arbitraire vérifie
+ * toujours à qui appartient la ligne visée.
  *
  * Accès accordé si le programme est personnel et appartient au profil, ou s'il
  * est partagé et que le profil est membre de ce couple. `allowed: false`
@@ -190,36 +189,6 @@ export async function getProgramDayNames(
 }
 
 // ---- Écriture : programme partagé et ordre des séances ----
-
-export type OrderIndexResult =
-  | { ok: true; value: number }
-  | { ok: false; error: string };
-
-/**
- * `order_index` à donner à une nouvelle séance : max existant + 1.
- *
- * CM-70 : l'erreur est remontée. Elle était avalée et la fonction renvoyait
- * `0`, ce qui plaçait la nouvelle séance en doublon d'ordre en tête de liste.
- */
-export async function nextOrderIndex(
-  supabase: SupabaseClient<Database>,
-  programId: string,
-): Promise<OrderIndexResult> {
-  const { data, error } = await supabase
-    .from("program_days")
-    .select("order_index")
-    .eq("program_id", programId)
-    .order("order_index", { ascending: false })
-    .limit(1)
-    .returns<{ order_index: number }[]>();
-
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-
-  const max = data?.[0]?.order_index;
-  return { ok: true, value: typeof max === "number" ? max + 1 : 0 };
-}
 
 export type EnsureProgram =
   | { ok: true; programId: string }

@@ -27,8 +27,8 @@ import {
  * pages voient la session à jour.
  *
  * - Pas de cookie de session : rien à rafraîchir, on passe.
- * - L'accès reste contrôlé côté serveur par `requireProfileId()`
- *   (lib/profile.ts), ce qui couvre aussi les server actions.
+ * - L'accès aux données est contrôlé par la RLS (client navigateur) ; les
+ *   écrans privés renvoient vers /login sans session (`useRequireProfileId`).
  * - CM-86 : seule redirection d'ici, un compte connecté qui n'a pas terminé
  *   l'onboarding (`profiles.onboarded_at` null) est envoyé vers `/onboarding`
  *   (règle pure `onboardingRedirectTarget`, lib/onboarding.ts). C'est un

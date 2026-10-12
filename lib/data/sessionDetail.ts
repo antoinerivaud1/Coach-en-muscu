@@ -33,8 +33,8 @@ import { suggestFirstSet } from "@/lib/utils/prefill";
  * Seule la « dernière fois » reste opportuniste (pré-remplissage).
  *
  * Accès : la RLS ne laisse lire que mes séances et celles de mon partenaire
- * de duo actif (CM-59). Le navigateur n'a jamais la clé service-role : plus
- * besoin du contrôle en code qui protégeait le filet `DATA_CLIENT=service`.
+ * de duo actif (CM-59). Le navigateur n'a jamais la clé service-role : la RLS
+ * suffit, sans contrôle d'appartenance en code pour la lecture.
  * Une séance invisible ou inexistante donne `notFound`, sans distinction.
  */
 

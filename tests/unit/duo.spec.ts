@@ -10,10 +10,7 @@ import {
   isValidInviteCode,
   latestRecord,
   normalizeInviteCode,
-  STALE_DUO_MESSAGE,
   activeMembership,
-  seanceDestination,
-  shareDecision,
   showsComparison,
   toMembers,
 } from "@/lib/duo";
@@ -148,50 +145,9 @@ test.describe("membres affichés (CM-87)", () => {
   });
 });
 
-test.describe("choix Pour moi / Pour nous deux (CM-87)", () => {
-  const shared = { kind: "shared", duoId: "d" } as const;
-  const personal = { kind: "personal" } as const;
-  const error = { kind: "error", error: "lecture impossible" } as const;
-
-  test("duo illisible : refus, jamais de repli en perso (C3)", () => {
-    expect(seanceDestination(error, undefined)).toEqual({ ok: false, error: "lecture impossible" });
-    expect(seanceDestination(error, "perso")).toEqual({ ok: false, error: "lecture impossible" });
-  });
-
-  test("sans partenaire : perso ; un choix envoyé = page périmée, refus", () => {
-    expect(seanceDestination(personal, undefined)).toEqual({ ok: true, target: "perso" });
-    expect(seanceDestination(personal, null)).toEqual({ ok: true, target: "perso" });
-    expect(seanceDestination(personal, "duo")).toEqual({ ok: false, error: STALE_DUO_MESSAGE });
-    expect(seanceDestination(personal, "perso")).toEqual({ ok: false, error: STALE_DUO_MESSAGE });
-  });
-
-  test("en duo : « Pour nous deux » par défaut", () => {
-    expect(seanceDestination(shared, undefined)).toEqual({ ok: true, target: "duo" });
-    expect(seanceDestination(shared, "duo")).toEqual({ ok: true, target: "duo" });
-    expect(seanceDestination(shared, "perso")).toEqual({ ok: true, target: "perso" });
-  });
-});
-
-test.describe("partager / garder pour moi à l'édition (C2)", () => {
-  test("aucun changement du choix affiché : rien, même si l'état lu diffère", () => {
-    expect(shareDecision("perso", "perso", "duo")).toEqual({ kind: "none" });
-    expect(shareDecision(undefined, "perso", "duo")).toEqual({ kind: "none" });
-    expect(shareDecision("duo", undefined, "duo")).toEqual({ kind: "none" });
-  });
-
-  test("lecture de l'état réel en échec : refus, rien n'est basculé", () => {
-    expect(shareDecision("duo", "perso", null)).toEqual({ kind: "error" });
-  });
-
-  test("changement demandé et état réel conforme : bascule", () => {
-    expect(shareDecision("duo", "perso", "duo")).toEqual({ kind: "toggle", shared: false });
-    expect(shareDecision("perso", "duo", "perso")).toEqual({ kind: "toggle", shared: true });
-  });
-
-  test("déjà du bon côté : rien", () => {
-    expect(shareDecision("duo", "perso", "perso")).toEqual({ kind: "none" });
-  });
-});
+// Choix « Pour moi / Pour nous deux » et bascule à l'édition (C2) : règles
+// désormais dans la RPC `save_seance` (CM-88 PR 5), testées
+// par pgTAP (supabase/tests/cm88_seances.test.sql).
 
 test.describe("duo actif (CM-87)", () => {
   test("seul dans son duo (invitation en attente) = solo", () => {

@@ -53,7 +53,6 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://x.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: x
-          SUPABASE_SERVICE_ROLE_KEY: x
 
   e2e:
     name: Tests e2e (Supabase local)
@@ -85,7 +84,7 @@ jobs:
 
       # Services inutiles à l'app exclus (elle ne parle qu'à PostgREST via
       # Kong). `gotrue` reste démarré : sans lui, `supabase status` ne donne
-      # pas les clés anon / service_role.
+      # pas la clé anon.
       - name: Démarrer Supabase local
         run: supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
@@ -109,10 +108,9 @@ jobs:
           supabase status -o env \
             --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
             --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY \
-            --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
-            | grep -E '^(NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=' \
+            | grep -E '^(NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY)=' \
             | tr -d '"' > supabase.env
-          if [ "$(wc -l < supabase.env)" -ne 3 ]; then
+          if [ "$(wc -l < supabase.env)" -ne 2 ]; then
             echo "::error::supabase status n'a pas fourni URL + clés" && exit 1
           fi
           # Garde-fou : uniquement une base locale.
@@ -163,6 +161,5 @@ jobs:
             playwright-report/
             test-results/
             next.log
-            next-service.log
             supabase-rest.log
           retention-days: 7

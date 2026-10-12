@@ -5,7 +5,7 @@ import { SEED_ACCOUNTS, guardWrites, login } from "./helpers";
 // CM-60 : export des données et suppression du compte (Profil, « Mes
 // données »). La suppression vise un compte CRÉÉ par le test (inscription,
 // email unique en `.test`) : rejouable, et les comptes du seed restent en
-// place pour les autres parcours (la CI rejoue tout avec DATA_CLIENT=service).
+// place pour les autres parcours.
 // Nécessite NEXT_PUBLIC_SIGNUP_ENABLED=1 au build (job e2e de la CI).
 
 guardWrites();

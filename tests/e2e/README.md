@@ -49,9 +49,9 @@ sur `main`, sans aucun secret :
    les clés.
 2. `supabase db reset` : base recréée depuis `supabase/migrations/` puis
    `supabase/seed.sql`.
-3. `supabase status -o env` fournit `NEXT_PUBLIC_SUPABASE_URL`,
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY` et `SUPABASE_SERVICE_ROLE_KEY` (clés de démo
-   locales) ; le job refuse toute URL qui n'est pas `http://127.0.0.1:…`.
+3. `supabase status -o env` fournit `NEXT_PUBLIC_SUPABASE_URL` et
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` (clés de démo locales) ; le job refuse
+   toute URL qui n'est pas `http://127.0.0.1:…`.
 4. `npm run build` (avec `NEXT_PUBLIC_SIGNUP_ENABLED=1` : CM-86 / CM-88,
    inscription ouverte à l'affichage, variable publique gravée AU BUILD)
    puis `next start` sur le port 3000, attente de la réponse.
@@ -59,10 +59,9 @@ sur `main`, sans aucun secret :
    `E2E_SEANCE_NAME=Haut du corps` (données du seed) ; les parcours se
    connectent avec le compte « Toi » du seed.
 
-6. CM-59 B : l'app redémarre avec `DATA_CLIENT=service` (filet de
-   déploiement : client service-role, RLS contournée) et **toute la suite e2e
-   est rejouée**, isolation comprise ; la CI vérifie dans `next-service.log`
-   que le client service-role a bien servi.
+6. CM-88 : plus de second passage avec `DATA_CLIENT=service` ; le filet
+   service-role est supprimé (toutes les données passent par le navigateur,
+   sous RLS).
 
 En cas d'échec, l'artefact `playwright-report` contient le rapport HTML, les
 traces (`test-results/`), `next.log` et les logs PostgREST. Le job e2e tourne
@@ -79,8 +78,7 @@ supabase db reset
 eval "$(supabase status -o env \
   --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
   --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY \
-  --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
-  | grep -E '^(NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=' \
+  | grep -E '^(NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY)=' \
   | sed 's/^/export /')"
 
 # 3. App sur la base locale (inscription ouverte : variable lue AU BUILD,

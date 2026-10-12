@@ -13,8 +13,7 @@ import {
 // CM-87 : duo optionnel. Solo invite, Duo2 rejoint par le lien (connexion
 // au passage), les deux voient les séances du duo, puis Solo quitte et garde
 // une copie. ÉCRIT en base (duos, invitations, séances types) : garde-fou
-// obligatoire. Rejouable sur la même base (la CI rejoue tout avec
-// DATA_CLIENT=service) : chaque parcours commence par remettre Solo et Duo2
+// obligatoire. Rejouable sur la même base : chaque parcours commence par remettre Solo et Duo2
 // hors duo, par l'UI.
 
 guardWrites();
