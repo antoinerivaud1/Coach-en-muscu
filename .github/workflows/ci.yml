@@ -84,7 +84,7 @@ jobs:
 
       # Services inutiles à l'app exclus (elle ne parle qu'à PostgREST via
       # Kong). `gotrue` reste démarré : sans lui, `supabase status` ne donne
-      # pas les clés anon / service_role.
+      # pas la clé anon.
       - name: Démarrer Supabase local
         run: supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
@@ -161,6 +161,5 @@ jobs:
             playwright-report/
             test-results/
             next.log
-            next-service.log
             supabase-rest.log
           retention-days: 7

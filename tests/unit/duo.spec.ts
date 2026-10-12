@@ -146,7 +146,7 @@ test.describe("membres affichés (CM-87)", () => {
 });
 
 // Choix « Pour moi / Pour nous deux » et bascule à l'édition (C2) : règles
-// désormais dans les RPC `save_seance` / `move_seance` (CM-88 PR 5), testées
+// désormais dans la RPC `save_seance` (CM-88 PR 5), testées
 // par pgTAP (supabase/tests/cm88_seances.test.sql).
 
 test.describe("duo actif (CM-87)", () => {

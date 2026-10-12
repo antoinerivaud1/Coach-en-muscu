@@ -43,8 +43,8 @@ export function useProfileId() {
 
 /**
  * Pour les écrans privés : renvoie l'id du profil une fois connu, et redirige
- * vers `/login?next=<chemin>` si personne n'est connecté (équivalent client de
- * `requireProfileId(next)`). Une erreur réseau n'est PAS une déconnexion :
+ * vers `/login?next=<chemin>` si personne n'est connecté (remplace
+ * `requireProfileId(next)` des pages serveur, supprimé en CM-88). Une erreur réseau n'est PAS une déconnexion :
  * l'écran affiche son état d'erreur, sans redirection. Pas de redirection non
  * plus sur un « personne » en cache pendant qu'une relecture est en cours,
  * ni quand l'écran le demande (`redirect: false`).
