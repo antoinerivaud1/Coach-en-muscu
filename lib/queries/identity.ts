@@ -41,15 +41,6 @@ export async function readIdentity(
   }
 }
 
-/** Identité du profil, null si absente OU illisible (affichage seulement). */
-export async function getIdentity(
-  supabase: SupabaseClient<Database>,
-  profileId: string,
-): Promise<Identity | null> {
-  const read = await readIdentity(supabase, profileId);
-  return read.ok ? read.identity : null;
-}
-
 export type PartnerColorRead =
   | { ok: true; partner: PartnerColor | null }
   | { ok: false; error: string };

@@ -13,7 +13,6 @@
 
 import type { CSSProperties } from "react";
 import { memberAccent, type MemberColor } from "@/lib/members";
-import type { LibraryTarget } from "@/lib/duoMembership";
 
 // ---- Code d'invitation ---------------------------------------------------------
 
@@ -196,53 +195,6 @@ export type SeanceTarget = "duo" | "perso";
 /** Le choix de la page ne correspond plus à l'état réel (page périmée). */
 export const STALE_DUO_MESSAGE =
   "Ton duo a changé entre-temps. Recharge la page puis réessaie.";
-
-/**
- * Où va une NOUVELLE séance type, à partir de la lecture du duo
- * (`libraryTarget(readDuoId(…))`) et du choix « Pour moi / Pour nous deux » :
- * - duo illisible : refus (jamais de séance rangée en perso par erreur) ;
- * - sans partenaire : perso, et refus si un choix est envoyé (il n'est montré
- *   qu'en duo : la page est périmée) ;
- * - en duo : « Pour nous deux » par défaut.
- */
-export function seanceDestination(
-  library: LibraryTarget,
-  requested: SeanceTarget | null | undefined,
-): { ok: true; target: SeanceTarget } | { ok: false; error: string } {
-  if (library.kind === "error") return { ok: false, error: library.error };
-  if (library.kind === "personal") {
-    return requested ? { ok: false, error: STALE_DUO_MESSAGE } : { ok: true, target: "perso" };
-  }
-  return { ok: true, target: requested === "perso" ? "perso" : "duo" };
-}
-
-export type ShareDecision =
-  | { kind: "none" }
-  | { kind: "toggle"; shared: boolean }
-  | { kind: "stale" }
-  | { kind: "error" };
-
-/**
- * « Partager avec … » / « Garder pour moi » à l'édition (C2) : on ne bascule
- * que si l'utilisateur a CHANGÉ le choix affiché (`initial` → `requested`),
- * et seulement après avoir relu l'état réel côté serveur (`actual`, null si
- * la lecture a échoué) :
- * - pas de changement demandé : rien ;
- * - lecture en échec : refus, rien n'est basculé ;
- * - déjà du bon côté : rien ;
- * - état réel différent de celui affiché : page périmée, refus.
- */
-export function shareDecision(
-  initial: SeanceTarget | null | undefined,
-  requested: SeanceTarget | null | undefined,
-  actual: SeanceTarget | null,
-): ShareDecision {
-  if (!initial || !requested || initial === requested) return { kind: "none" };
-  if (actual === null) return { kind: "error" };
-  if (actual === requested) return { kind: "none" };
-  if (actual !== initial) return { kind: "stale" };
-  return { kind: "toggle", shared: requested === "duo" };
-}
 
 // ---- Activité du partenaire : dernier record ----------------------------------
 

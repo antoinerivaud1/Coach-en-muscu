@@ -1,34 +1,10 @@
 import { cache } from "react";
-import { redirect } from "next/navigation";
-import { isUuid, loginPath, resolveProfileId } from "@/lib/auth/core";
+import { isUuid, resolveProfileId } from "@/lib/auth/core";
 import { createAuthClient } from "@/lib/supabase/server";
 
-// CM-86 (C3) : lecture du duo qui distingue « solo » d'une erreur.
-// CM-87 : `readDuoId` exporté ICI est celui du duo ACTIF (2 membres, voir
-// plus bas) ; celui de lib/duoMembership.ts lit la ligne brute.
-export {
-  libraryTarget,
-  DUO_READ_ERROR_MESSAGE,
-  type DuoIdResult,
-  type LibraryTarget,
-} from "@/lib/duoMembership";
-export type { DuoMembership } from "@/lib/duo";
-
-// CM-88 : lectures déplacées dans lib/queries/profiles.ts (sans import serveur),
-// réexportées ici pour les pages et actions serveur existantes.
-export {
-  getProfile,
-  readDuoMembership,
-  readDuoId,
-  getDuoMembership,
-  getDuoId,
-  getDuoProfileIds,
-  readMemberProfiles,
-  getMemberProfiles,
-  type Profile,
-  type DuoMembershipRead,
-  type MemberProfilesRead,
-} from "@/lib/queries/profiles";
+// CM-88 (PR 8) : ne garde que l'état d'auth de la requête (redirection de
+// `/`, app/route.ts). Les lectures de profil et de duo sont dans
+// lib/queries/profiles.ts, appelées depuis le navigateur (lib/data/*).
 
 export type AuthState = {
   /** Id du profil courant (= id Auth de la session), null si personne. */
@@ -59,22 +35,3 @@ export const getAuthState = cache(async (): Promise<AuthState> => {
   const profileId = resolveProfileId(await readSessionUserId());
   return { profileId };
 });
-
-export async function getCurrentProfileId(): Promise<string | null> {
-  return (await getAuthState()).profileId;
-}
-
-/**
- * Renvoie l'id du profil courant, sinon redirige vers `/login`, avec
- * `?next=<chemin>` quand la page appelante connaît son chemin (retour au même
- * écran après reconnexion).
- *
- * Jamais depuis une server action appelée par le logger de séance : la
- * redirection l'éjecterait. Celles-là lisent `getCurrentProfileId()` et
- * renvoient « Session expirée », rejouable.
- */
-export async function requireProfileId(next?: string): Promise<string> {
-  const { profileId } = await getAuthState();
-  if (!profileId) redirect(loginPath(next));
-  return profileId;
-}

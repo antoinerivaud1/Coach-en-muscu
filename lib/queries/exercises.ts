@@ -22,10 +22,10 @@ export function isCustomExercise(ex: {
 /**
  * Filtre PostgREST (`or`) du catalogue visible : exercices système (`duo_id`
  * et `owner_profile_id` null), exercices perso du profil (CM-86,
- * `owner_profile_id`) et exercices du duo (CM-85). Explicite pour que le filet
- * DATA_CLIENT=service, qui contourne la RLS, ne montre jamais l'exercice perso
- * d'un autre compte. Ids interpolés : toujours des uuid de la session ou de la
- * base, jamais une saisie.
+ * `owner_profile_id`) et exercices du duo (CM-85). Explicite en plus de la
+ * RLS (ceinture et bretelles) : jamais l'exercice perso d'un autre compte, y
+ * compris celui du partenaire de duo, lisible sous RLS. Ids interpolés :
+ * toujours des uuid de la session ou de la base, jamais une saisie.
  */
 export function catalogFilter(duoId: string | null, profileId?: string | null): string {
   const branches = ["and(duo_id.is.null,owner_profile_id.is.null)"];
@@ -48,18 +48,6 @@ export async function getCatalogExercises(
     .from("exercises")
     .select("id, name, muscle_group, is_compound, duo_id, owner_profile_id")
     .or(catalogFilter(duoId, profileId))
-    .order("muscle_group")
-    .order("name")
-    .returns<SystemExercise[]>();
-}
-
-/** Exercices système uniquement (duo_id et owner_profile_id null). */
-export async function getSystemExercises(supabase: SupabaseClient<Database>) {
-  return supabase
-    .from("exercises")
-    .select("id, name, muscle_group, is_compound, duo_id, owner_profile_id")
-    .is("duo_id", null)
-    .is("owner_profile_id", null)
     .order("muscle_group")
     .order("name")
     .returns<SystemExercise[]>();
