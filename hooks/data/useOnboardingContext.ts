@@ -24,7 +24,7 @@ export type OnboardingContext =
  *   jamais), ou CM-103 la destination `next` conservée (confirmation
  *   d'invitation).
  * - C7 : profil illisible (erreur réseau) ou introuvable : `error`, l'écran
- *   affiche « Réessayer ». Surtout pas de redirection : le middleware
+ *   affiche « Réessayer ». Surtout pas de redirection : `OnboardingGate`
  *   renverrait vers /onboarding (boucle possible).
  */
 export function useOnboardingContext(path: string, next: string): OnboardingContext {

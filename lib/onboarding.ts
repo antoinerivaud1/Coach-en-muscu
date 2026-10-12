@@ -5,7 +5,9 @@
  * - drapeau d'inscription (`NEXT_PUBLIC_SIGNUP_ENABLED`, affichage seulement) ;
  * - validation du profil saisi à l'onboarding et dans « Mon profil »
  *   (prénom, couleur, objectif hebdo) ;
- * - règle de redirection vers `/onboarding` (appliquée par le middleware) ;
+ * - règle de redirection vers `/onboarding` et mémo « onboarding fait » de
+ *   l'appareil (appliqués dans le navigateur par `OnboardingGate`, CM-89
+ *   (PR 1) : plus par le middleware) ;
  * - CM-103 : destination de fin d'onboarding (`next` conservé depuis un lien
  *   d'invitation).
  */
@@ -155,7 +157,7 @@ export function isOnboardingExemptPath(pathname: string | null | undefined): boo
 }
 
 /**
- * État d'onboarding connu du middleware :
+ * État d'onboarding du compte connecté (lu par `OnboardingGate`) :
  * - `done` : `onboarded_at` renseigné ;
  * - `pending` : profil lu, `onboarded_at` null ;
  * - `unknown` : profil illisible (erreur réseau, pas de ligne). On laisse
@@ -181,28 +183,88 @@ export function onboardingRedirectTarget(
 }
 
 /**
- * Cookie de confort posé une fois l'onboarding constaté : sa valeur est l'id du
- * compte. Tant qu'il correspond à la session, le middleware ne relit pas le
- * profil à chaque requête. Ce n'est PAS un contrôle d'accès : un cookie
- * falsifié ne fait que sauter la redirection vers l'onboarding.
+ * CM-89 (PR 1) : décision de `OnboardingGate` (components/providers), qui
+ * remplace la redirection du middleware : le bundle natif (export statique,
+ * Capacitor) n'a pas de serveur.
+ * - `render` : afficher l'écran ;
+ * - `wait` : squelette neutre, état pas encore connu (un compte pas
+ *   onboardé n'entrevoit jamais un écran privé) ;
+ * - `redirect` : partir vers `to` (règle `onboardingRedirectTarget`).
+ *
+ * Mêmes principes qu'avant : sans session (les écrans renvoient eux-mêmes
+ * vers /login), session ou profil illisible, on laisse passer.
  */
-export const ONBOARDED_COOKIE = "cm_onboarded";
+export type OnboardingGateDecision =
+  | { kind: "render" }
+  | { kind: "wait" }
+  | { kind: "redirect"; to: string };
 
-/** Options du cookie de confort : un an, illisible en JS. */
-export const ONBOARDED_COOKIE_OPTIONS = {
-  path: "/",
-  sameSite: "lax" as const,
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  maxAge: 60 * 60 * 24 * 365,
+export type OnboardingGateInput = {
+  pathname: string;
+  /** Query de l'URL (`?code=…`), pour conserver un lien d'invitation. */
+  search?: string;
+  /** Session : pas encore lue, absente, illisible (réseau) ou ouverte. */
+  session: "pending" | "signedOut" | "error" | "signedIn";
+  /** Onboarding déjà constaté pour CE compte sur cet appareil (`hasOnboardedMark`). */
+  remembered: boolean;
+  /** `loading` tant que `onboarded_at` n'est pas lu. */
+  state: OnboardingState | "loading";
 };
 
-/** Le cookie atteste-t-il l'onboarding de CE compte ? */
-export function onboardedCookieMatches(
-  cookieValue: string | null | undefined,
+export function onboardingGateDecision(input: OnboardingGateInput): OnboardingGateDecision {
+  if (isOnboardingExemptPath(input.pathname)) return { kind: "render" };
+  if (input.session === "pending") return { kind: "wait" };
+  if (input.session !== "signedIn" || input.remembered) return { kind: "render" };
+  if (input.state === "loading") return { kind: "wait" };
+  const to = onboardingRedirectTarget(input.pathname, input.state, input.search);
+  return to ? { kind: "redirect", to } : { kind: "render" };
+}
+
+/**
+ * CM-89 (PR 1) : mémo de confort dans `localStorage` (remplace le cookie
+ * httpOnly du middleware), valeur = id du compte. Tant qu'il correspond à la
+ * session, `onboarded_at` n'est pas relu : un compte onboardé n'attend jamais
+ * cette lecture. Ce n'est PAS un contrôle d'accès : un mémo falsifié ne fait
+ * que sauter la redirection vers l'onboarding. `onboarded_at` ne revient
+ * jamais à null : le mémo n'expire pas.
+ */
+export const ONBOARDED_STORAGE_KEY = "cm_onboarded";
+
+type MarkStorage = Pick<Storage, "getItem" | "setItem">;
+
+/** `localStorage`, ou null (rendu serveur, stockage bloqué). */
+function deviceStorage(): MarkStorage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** Le mémo atteste-t-il l'onboarding de CE compte ? */
+export function hasOnboardedMark(
   userId: string,
+  storage: MarkStorage | null = deviceStorage(),
 ): boolean {
-  return !!cookieValue && cookieValue === userId;
+  try {
+    const value = storage?.getItem(ONBOARDED_STORAGE_KEY);
+    return !!value && value === userId;
+  } catch {
+    return false;
+  }
+}
+
+/** Mémorise l'onboarding de ce compte sur l'appareil (un seul compte à la fois). */
+export function rememberOnboarded(
+  userId: string,
+  storage: MarkStorage | null = deviceStorage(),
+): void {
+  try {
+    storage?.setItem(ONBOARDED_STORAGE_KEY, userId);
+  } catch {
+    // Stockage indisponible (navigation privée, quota) : `onboarded_at` sera
+    // relu au prochain chargement, rien de plus.
+  }
 }
 
 /** Destinations autorisées en fin d'onboarding (pas d'URL libre). */

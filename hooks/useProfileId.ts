@@ -9,9 +9,10 @@ import { queryKeys } from "@/lib/data/queryKeys";
 import { isUuid, loginPath, resolveProfileId } from "@/lib/auth/core";
 
 /**
- * CM-88 : id du profil connecté, côté navigateur. Même règle que le serveur
- * (`lib/profile.ts`) : `getClaims()` valide le JWT, `claims.sub` est l'id du
- * profil, sinon personne. Jamais `getSession()` seul pour décider d'un accès.
+ * CM-88 : id du profil connecté, côté navigateur. `getClaims()` valide le
+ * JWT, `claims.sub` est l'id du profil, sinon personne. Jamais `getSession()`
+ * seul pour décider d'un accès. CM-89 (PR 1) : plus aucun écran ne lit la
+ * session côté serveur (lib/profile.ts supprimé), tout passe par ici.
  *
  * La sécurité reste en base (RLS) : ce hook ne sert qu'à savoir quoi afficher
  * et quand renvoyer vers `/login`.
@@ -29,10 +30,15 @@ export async function readBrowserProfileId(): Promise<string | null> {
   return resolveProfileId(isUuid(sub) ? sub : null);
 }
 
-export function useProfileId() {
+/**
+ * `enabled` faux : aucune lecture (CM-89 (PR 1) : `OnboardingGate` sur les
+ * pages publiques, servies même sans Supabase).
+ */
+export function useProfileId({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.auth(),
     queryFn: readBrowserProfileId,
+    enabled,
     // Un compte connu reste valable 1 min. « Personne » est toujours revérifié
     // à l'ouverture d'un écran : la session a pu être posée entre-temps par le
     // serveur (connexion), sans que le navigateur en soit prévenu. Sinon un

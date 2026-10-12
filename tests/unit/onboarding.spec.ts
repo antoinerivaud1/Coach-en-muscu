@@ -2,12 +2,15 @@ import { test, expect } from "@playwright/test";
 import {
   DEFAULT_WEEKLY_GOAL,
   FIRST_NAME_MAX_LENGTH,
+  ONBOARDED_STORAGE_KEY,
   clampWeeklyGoal,
+  hasOnboardedMark,
   initialOf,
   isOnboardingExemptPath,
   isSignupEnabled,
-  onboardedCookieMatches,
+  onboardingGateDecision,
   onboardingRedirectTarget,
+  rememberOnboarded,
   parseWeeklyGoal,
   safeOnboardingExit,
   validateFirstName,
@@ -147,18 +150,107 @@ test.describe("Redirection vers /onboarding", () => {
     }
   });
 
-  test("le cookie de confort ne vaut que pour son compte", () => {
-    expect(onboardedCookieMatches(UID, UID)).toBe(true);
-    expect(onboardedCookieMatches("22222222-2222-2222-2222-222222222222", UID)).toBe(false);
-    expect(onboardedCookieMatches(undefined, UID)).toBe(false);
-    expect(onboardedCookieMatches("", UID)).toBe(false);
-  });
-
   test("sorties de fin d'onboarding : liste fermée", () => {
     expect(safeOnboardingExit("/seances/new")).toBe("/seances/new");
     expect(safeOnboardingExit("/dashboard")).toBe("/dashboard");
     expect(safeOnboardingExit("https://evil.example")).toBe("/dashboard");
     expect(safeOnboardingExit("//evil")).toBe("/dashboard");
     expect(safeOnboardingExit(undefined)).toBe("/dashboard");
+  });
+});
+
+// CM-89 (PR 1) : la redirection est faite dans le navigateur (OnboardingGate).
+test.describe("OnboardingGate : décision (CM-89)", () => {
+  const base = {
+    pathname: "/dashboard",
+    session: "signedIn",
+    remembered: false,
+    state: "loading",
+  } as const;
+
+  test("chemin exempté : affiché tout de suite, sans attendre la session", () => {
+    for (const pathname of ["/onboarding", "/login", "/welcome", "/legal/cgu", "/support"]) {
+      expect(onboardingGateDecision({ ...base, pathname, session: "pending" }), pathname).toEqual({
+        kind: "render",
+      });
+    }
+  });
+
+  test("session ou onboarding pas encore connus : squelette, jamais l'écran", () => {
+    expect(onboardingGateDecision({ ...base, session: "pending" })).toEqual({ kind: "wait" });
+    expect(onboardingGateDecision(base)).toEqual({ kind: "wait" });
+    expect(onboardingGateDecision({ ...base, pathname: "/" })).toEqual({ kind: "wait" });
+  });
+
+  test("pas onboardé : redirection, lien d'invitation conservé", () => {
+    expect(onboardingGateDecision({ ...base, state: "pending" })).toEqual({
+      kind: "redirect",
+      to: "/onboarding",
+    });
+    expect(
+      onboardingGateDecision({
+        ...base,
+        pathname: "/duo/rejoindre",
+        search: "?code=K7QM4P",
+        state: "pending",
+      }),
+    ).toEqual({
+      kind: "redirect",
+      to: `/onboarding?next=${encodeURIComponent("/duo/rejoindre?code=K7QM4P")}`,
+    });
+  });
+
+  test("onboardé (lu ou mémorisé), état inconnu, sans session ou erreur : écran affiché", () => {
+    expect(onboardingGateDecision({ ...base, state: "done" })).toEqual({ kind: "render" });
+    expect(onboardingGateDecision({ ...base, state: "unknown" })).toEqual({ kind: "render" });
+    // Mémo de l'appareil : pas d'attente de la lecture du profil.
+    expect(onboardingGateDecision({ ...base, remembered: true })).toEqual({ kind: "render" });
+    // Les écrans renvoient eux-mêmes vers /login, ou proposent « Réessayer ».
+    expect(onboardingGateDecision({ ...base, session: "signedOut" })).toEqual({ kind: "render" });
+    expect(onboardingGateDecision({ ...base, session: "error" })).toEqual({ kind: "render" });
+  });
+});
+
+test.describe("Mémo « onboarding fait » de l'appareil (CM-89)", () => {
+  function fakeStorage(initial: Record<string, string> = {}) {
+    const data = new Map(Object.entries(initial));
+    return {
+      data,
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+    };
+  }
+
+  test("ne vaut que pour son compte", () => {
+    const storage = fakeStorage({ [ONBOARDED_STORAGE_KEY]: UID });
+    expect(hasOnboardedMark(UID, storage)).toBe(true);
+    expect(hasOnboardedMark("22222222-2222-2222-2222-222222222222", storage)).toBe(false);
+    expect(hasOnboardedMark(UID, fakeStorage())).toBe(false);
+    expect(hasOnboardedMark(UID, fakeStorage({ [ONBOARDED_STORAGE_KEY]: "" }))).toBe(false);
+  });
+
+  test("posé pour un compte, remplacé par le suivant", () => {
+    const storage = fakeStorage();
+    rememberOnboarded(UID, storage);
+    expect(storage.data.get(ONBOARDED_STORAGE_KEY)).toBe(UID);
+    rememberOnboarded("22222222-2222-2222-2222-222222222222", storage);
+    expect(hasOnboardedMark(UID, storage)).toBe(false);
+  });
+
+  test("stockage absent ou qui lève (navigation privée) : jamais d'exception", () => {
+    const throwing = {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+    };
+    expect(hasOnboardedMark(UID, throwing)).toBe(false);
+    expect(() => rememberOnboarded(UID, throwing)).not.toThrow();
+    expect(hasOnboardedMark(UID, null)).toBe(false);
+    expect(() => rememberOnboarded(UID, null)).not.toThrow();
+    // Hors navigateur (tests, rendu serveur) : pas de `window`, rien n'est lu.
+    expect(hasOnboardedMark(UID)).toBe(false);
   });
 });

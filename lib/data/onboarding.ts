@@ -12,9 +12,9 @@ import { REFUSED_MESSAGE, touchedRows, writeErrorMessage } from "@/lib/supabase/
  *   séances PERSO et `onboarded_at` en UNE transaction, rien à moitié écrit) ;
  * - « Créer ma séance » et « Passer pour l'instant » (`markOnboarded`).
  *
- * Le cookie de confort `cm_onboarded` (httpOnly) n'est plus posé ici : le
- * middleware, qui ne le trouve pas à la requête suivante, relit
- * `onboarded_at` (déjà écrit), laisse passer et le pose (lib/supabase/middleware.ts).
+ * CM-89 (PR 1) : le mémo « onboarding fait » de l'appareil (`localStorage`,
+ * lu par `OnboardingGate`) est posé par l'écran une fois l'écriture réussie
+ * (`rememberOnboarded`, components/onboarding/TemplatePicker.tsx).
  */
 
 export type OnboardingWriteResult = { ok: true } | { ok: false; error: string };

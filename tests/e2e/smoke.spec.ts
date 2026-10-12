@@ -4,9 +4,18 @@ import { test, expect } from "@playwright/test";
 
 test("l'accueil sans session renvoie à la connexion", async ({ page }) => {
   await page.goto("/");
+  // CM-89 (PR 1) : `/` est une page client, `toHaveURL` attend la redirection.
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { name: /Connexion/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Qui s'entraîne/i })).toHaveCount(0);
+});
+
+test("CM-89 (PR 1) : l'ancien cookie du sélecteur de profil est effacé (web)", async ({ page, baseURL }) => {
+  await page.context().addCookies([{ name: "cm_profile", value: "ancien", url: baseURL! }]);
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/login$/);
+  // Effacé par le middleware (plus par la route serveur de `/`).
+  expect((await page.context().cookies()).some((c) => c.name === "cm_profile")).toBe(false);
 });
 
 test("une page privée sans session renvoie à la connexion, avec retour prévu", async ({ page }) => {

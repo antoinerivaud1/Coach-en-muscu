@@ -5,9 +5,8 @@ import { DUO_READ_ERROR_MESSAGE } from "@/lib/duoMembership";
 import { activeMembership, type DuoMembership } from "@/lib/duo";
 
 // CM-88 : lectures du profil et du duo qui prennent le client Supabase en
-// paramètre. Aucun import Next ni serveur : utilisables par les pages serveur
-// (via lib/profile.ts, qui les réexporte) ET par les écrans client
-// (client navigateur, sous RLS).
+// paramètre. Aucun import Next ni serveur : appelées par les écrans client
+// (client navigateur, sous RLS) via lib/data/*.
 
 /**
  * CM-87 : la couleur d'un membre est `accent_color` (lue par `memberAccent`).
