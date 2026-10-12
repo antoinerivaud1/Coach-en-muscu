@@ -5,6 +5,11 @@ import { useState } from "react";
 /**
  * Bouton de soumission à confirmation, en deux temps et 100 % dans le DOM.
  *
+ * RÈGLE PRODUIT (Antoine, 12/10/2026) : toute suppression d'une séance ou
+ * d'une série demande une confirmation, partout dans l'app. Ce composant (ou
+ * la même confirmation en ligne « Supprimer … ? Oui / Annuler ») est la
+ * façon de le faire ; jamais `window.confirm()` (voir CM-70 ci-dessous).
+ *
  * CM-70 : la version précédente appelait `window.confirm()` et annulait la
  * soumission quand il renvoyait `false`. Or les dialogues natifs
  * (`alert`/`confirm`/`prompt`) sont supprimés ou renvoient immédiatement
