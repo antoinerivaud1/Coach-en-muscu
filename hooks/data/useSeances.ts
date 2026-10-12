@@ -10,9 +10,11 @@ import {
   fetchSeanceLibrary,
   moveSeance,
   saveSeance,
+  shareSeance,
   type SaveSeanceInput,
   type SeanceWriteResult,
 } from "@/lib/data/seances";
+import { STALE_DUO_MESSAGE } from "@/lib/duo";
 
 /**
  * CM-88 (PR 5) : séances types (bibliothèque et éditeur), lues et écrites
@@ -79,10 +81,13 @@ export function useSaveSeance(profileId: string | null) {
 export type SeanceLibraryAction =
   | { kind: "duplicate"; dayId: string }
   | { kind: "delete"; dayId: string; name: string }
-  | { kind: "move"; dayId: string; direction: "up" | "down" };
+  | { kind: "move"; dayId: string; direction: "up" | "down" }
+  /** CM-104 : séance perso partagée avec le partenaire (duo seulement). */
+  | { kind: "share"; dayId: string; name: string };
 
 /**
- * Actions de la bibliothèque : dupliquer, supprimer, monter / descendre.
+ * Actions de la bibliothèque : dupliquer, supprimer, monter / descendre,
+ * partager (CM-104).
  * `mutateAsync` se termine une fois la bibliothèque relue : l'écran affiche
  * l'état à jour dès la fin de l'action.
  */
@@ -98,11 +103,25 @@ export function useSeanceLibraryAction(profileId: string | null) {
           return deleteSeance(supabase, action.dayId, action.name);
         case "move":
           return moveSeance(supabase, action.dayId, action.direction);
+        case "share":
+          return shareSeance(supabase, action.dayId, action.name);
       }
     },
-    onSuccess: async (result) => {
-      if (!result.ok || !profileId) return;
+    onSuccess: async (result, action) => {
+      if (!profileId) return;
+      if (!result.ok) {
+        // Partage refusé car le duo a changé : tout le profil est relu
+        // (bibliothèque, duo), le bouton « Partager avec … » disparaît.
+        if (action.kind === "share" && result.error === STALE_DUO_MESSAGE) {
+          await queryClient.invalidateQueries({ queryKey: queryKeys.all(profileId) });
+        }
+        return;
+      }
       await invalidateAfterSeanceWrite(queryClient, profileId);
+      // Partage : mes exercices perso de la séance deviennent ceux du duo.
+      if (action.kind === "share") {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.exercises.all(profileId) });
+      }
     },
   });
 }

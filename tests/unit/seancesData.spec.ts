@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import {
   SEANCE_NOT_FOUND,
   seanceRpcErrorMessage,
+  shareNameTakenMessage,
+  shareSeance,
   validateSeanceExercises,
 } from "@/lib/data/seances";
 import { STALE_DUO_MESSAGE } from "@/lib/duo";
@@ -82,5 +84,56 @@ test.describe("validateSeanceExercises", () => {
       error: "« Développé couché » : le minimum de répétitions dépasse le maximum",
     });
     expect(validateSeanceExercises([ex({ restSeconds: 601 })]).ok).toBe(false);
+  });
+});
+
+// CM-104 : raccourci « Partager avec … » (RPC set_seance_shared, p_shared = true).
+test.describe("shareSeance", () => {
+  type RpcCall = { fn: string; args: unknown };
+  function fakeClient(
+    response: { error: { message: string; code?: string } | null } | Error,
+    status: "moved" | "unchanged" = "moved",
+  ) {
+    const calls: RpcCall[] = [];
+    const client = {
+      rpc: async (fn: string, args: unknown) => {
+        calls.push({ fn, args });
+        if (response instanceof Error) throw response;
+        return { data: response.error ? null : [{ status, day_id: "d1" }], ...response };
+      },
+    };
+    // Seule `rpc` est utilisée par shareSeance.
+    return { client: client as unknown as Parameters<typeof shareSeance>[0], calls };
+  }
+
+  test("appelle set_seance_shared avec p_shared = true", async () => {
+    const { client, calls } = fakeClient({ error: null });
+    expect(await shareSeance(client, "d1", "Pec")).toEqual({ ok: true });
+    expect(calls).toEqual([{ fn: "set_seance_shared", args: { p_day_id: "d1", p_shared: true } }]);
+  });
+
+  test("nom déjà pris dans « Nos séances » : renvoi vers Modifier, nom repris", async () => {
+    const { client } = fakeClient({ error: { message: "cm87:name_taken" } });
+    const result = await shareSeance(client, "d1", "Pec");
+    expect(result).toEqual({ ok: false, error: shareNameTakenMessage("Pec") });
+    expect(shareNameTakenMessage("Pec")).toContain("« Pec » existe déjà dans « Nos séances »");
+    expect(shareNameTakenMessage("Pec")).toContain("Modifier");
+  });
+
+  test("déjà partagée ailleurs (unchanged) : succès, la relecture la place", async () => {
+    const { client } = fakeClient({ error: null }, "unchanged");
+    expect(await shareSeance(client, "d1", "Pec")).toEqual({ ok: true });
+  });
+
+  test("le partenaire a quitté le duo entre-temps : écran périmé", async () => {
+    for (const message of ["cm87:no_partner", "cm87:not_in_duo"]) {
+      const { client } = fakeClient({ error: { message } });
+      expect(await shareSeance(client, "d1", "Pec")).toEqual({ ok: false, error: STALE_DUO_MESSAGE });
+    }
+  });
+
+  test("réseau coupé : échec affichable, jamais d'exception", async () => {
+    const { client } = fakeClient(new Error("Failed to fetch"));
+    expect(await shareSeance(client, "d1", "Pec")).toEqual({ ok: false, error: "Failed to fetch" });
   });
 });

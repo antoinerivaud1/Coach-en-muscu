@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useRequireProfileId } from "@/hooks/useProfileId";
@@ -112,7 +113,9 @@ function SectionHeader({
       <div className="flex flex-none items-center gap-2.5">
         <h2
           id={id}
-          className="whitespace-nowrap text-[15px] font-extrabold uppercase tracking-[0.1em] text-fg-muted"
+          // CM-104 : reçoit le focus après un partage (la carte a changé de section).
+          tabIndex={-1}
+          className="whitespace-nowrap outline-none text-[15px] font-extrabold uppercase tracking-[0.1em] text-fg-muted"
         >
           {title}
         </h2>
@@ -166,6 +169,8 @@ export default function SeanceLibraryScreen() {
   const profileId = auth.profileId;
   const library = useSeanceLibrary(profileId);
   const start = useStartSession(profileId);
+  /** CM-104 : annonce du dernier partage réussi (la carte a changé de section). */
+  const [sharedNotice, setSharedNotice] = useState<string | null>(null);
 
   if (auth.error) {
     return (
@@ -197,6 +202,14 @@ export default function SeanceLibraryScreen() {
   const me = members.find((m) => m.isMe);
   const partner = members.find((m) => !m.isMe);
   const total = ours.length + mine.length;
+  // Profil du partenaire illisible : prénom de repli « Partenaire » (lib/duo).
+  const partnerLabel =
+    partner && partner.name !== "Partenaire" ? partner.name : "ton partenaire";
+
+  function handleShared(name: string) {
+    setSharedNotice(`« ${name} » est maintenant dans « Nos séances ».`);
+    document.getElementById("nos-seances")?.focus();
+  }
   // Heure du rendu (rendu client seulement), commune aux deux sections
   // (« Hier », « Il y a 6 jours »).
   const now = new Date();
@@ -231,6 +244,15 @@ export default function SeanceLibraryScreen() {
             className="mt-4 text-balance rounded-lg border border-energy/30 bg-energy/10 px-3 py-2.5 text-sm text-fg"
           >
             {info}
+          </p>
+        )}
+
+        {sharedNotice && (
+          <p
+            role="status"
+            className="mt-4 text-balance rounded-lg border border-energy/30 bg-energy/10 px-3 py-2.5 text-sm text-fg"
+          >
+            {sharedNotice}
           </p>
         )}
 
@@ -270,7 +292,15 @@ export default function SeanceLibraryScreen() {
                     Les séances créées «&nbsp;Pour moi&nbsp;» arrivent ici. {partner?.name ?? "Ton partenaire"} ne les voit pas.
                   </p>
                 ) : (
-                  <SeanceLibrary seances={mine} now={now} profileId={profileId} onStart={start} />
+                  <SeanceLibrary
+                    seances={mine}
+                    now={now}
+                    profileId={profileId}
+                    onStart={start}
+                    // CM-104 : raccourci de partage, seulement avec un partenaire.
+                    shareWith={partner ? { name: partnerLabel, color: partner.color } : undefined}
+                    onShared={handleShared}
+                  />
                 )}
               </div>
             </section>
