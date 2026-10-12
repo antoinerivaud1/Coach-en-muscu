@@ -19,6 +19,7 @@ import {
 import { formatDateLong, formatWeight } from "@/lib/utils/training";
 import { memberAccent, sessionExerciseLabel } from "@/lib/members";
 import { memberStyle } from "@/lib/duo";
+import ConfirmSubmit from "@/components/ConfirmSubmit";
 import PendingSetsSync from "./PendingSetsSync";
 
 const FEEDBACK_LABELS: Record<string, string> = {
@@ -273,14 +274,16 @@ export default function SessionRecap({
             >
               Modifier
             </Link>
+            {/* Confirmation en ligne (pas de `window.confirm()`, supprimé en
+                PWA iOS et dans Capacitor, CM-70), comme le bandeau de l'accueil
+                et la feuille de sortie du logger. */}
             <form onSubmit={onDeleteSession} className="flex-1">
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full rounded-lg bg-surface2 py-3 text-sm font-semibold text-red-400 disabled:opacity-60"
+              <ConfirmSubmit
+                message="Supprimer cette séance et ses séries ? C'est définitif."
+                className="w-full rounded-lg bg-surface2 py-3 text-sm font-semibold text-red-400"
               >
                 Supprimer
-              </button>
+              </ConfirmSubmit>
             </form>
           </div>
         )}

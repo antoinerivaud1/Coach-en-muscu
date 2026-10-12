@@ -77,6 +77,7 @@ test.describe("Progression", () => {
     await row.click();
     await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
     await page.getByRole("button", { name: "Supprimer", exact: true }).click();
+    await page.getByRole("button", { name: "Oui, supprimer" }).click();
     await expect(page).toHaveURL(/\/history$/);
     await expect(page.getByRole("heading", { name: "Historique", level: 1 })).toBeVisible();
     await expect(row).toHaveCount(0);

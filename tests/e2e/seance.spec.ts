@@ -204,7 +204,14 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await expect(rows).toHaveCount(before - 1);
 
     await page.getByRole("link", { name: "Terminer", exact: true }).click();
+    // Suppression de la séance : confirmation en ligne, « Annuler » la retire.
     await page.getByRole("button", { name: "Supprimer", exact: true }).click();
+    await expect(page.getByText(/C'est définitif/)).toBeVisible();
+    await page.getByRole("button", { name: "Annuler" }).click();
+    await expect(page.getByText(/C'est définitif/)).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
+    await page.getByRole("button", { name: "Supprimer", exact: true }).click();
+    await page.getByRole("button", { name: "Oui, supprimer" }).click();
     await expect(page).toHaveURL(/\/history$/);
     await expect(page.locator(`a[href="/sessions/${id}"]`)).toHaveCount(0);
   });
