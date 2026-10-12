@@ -90,13 +90,16 @@ test.describe("validateSeanceExercises", () => {
 // CM-104 : raccourci « Partager avec … » (RPC set_seance_shared, p_shared = true).
 test.describe("shareSeance", () => {
   type RpcCall = { fn: string; args: unknown };
-  function fakeClient(response: { error: { message: string; code?: string } | null } | Error) {
+  function fakeClient(
+    response: { error: { message: string; code?: string } | null } | Error,
+    status: "moved" | "unchanged" = "moved",
+  ) {
     const calls: RpcCall[] = [];
     const client = {
       rpc: async (fn: string, args: unknown) => {
         calls.push({ fn, args });
         if (response instanceof Error) throw response;
-        return { data: response.error ? null : [{ status: "moved", day_id: "d1" }], ...response };
+        return { data: response.error ? null : [{ status, day_id: "d1" }], ...response };
       },
     };
     // Seule `rpc` est utilisée par shareSeance.
@@ -117,12 +120,16 @@ test.describe("shareSeance", () => {
     expect(shareNameTakenMessage("Pec")).toContain("Modifier");
   });
 
-  test("plus de partenaire : message du duo", async () => {
-    const { client } = fakeClient({ error: { message: "cm87:no_partner" } });
-    expect(await shareSeance(client, "d1", "Pec")).toEqual({
-      ok: false,
-      error: "Ton partenaire n'a pas encore rejoint le duo.",
-    });
+  test("déjà partagée ailleurs (unchanged) : succès, la relecture la place", async () => {
+    const { client } = fakeClient({ error: null }, "unchanged");
+    expect(await shareSeance(client, "d1", "Pec")).toEqual({ ok: true });
+  });
+
+  test("le partenaire a quitté le duo entre-temps : écran périmé", async () => {
+    for (const message of ["cm87:no_partner", "cm87:not_in_duo"]) {
+      const { client } = fakeClient({ error: { message } });
+      expect(await shareSeance(client, "d1", "Pec")).toEqual({ ok: false, error: STALE_DUO_MESSAGE });
+    }
   });
 
   test("réseau coupé : échec affichable, jamais d'exception", async () => {

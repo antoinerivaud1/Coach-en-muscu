@@ -639,8 +639,14 @@ export async function shareSeance(
       p_shared: true,
     });
     if (!error) return { ok: true };
-    if (duoErrorCode(error.message) === "name_taken") {
+    const code = duoErrorCode(error.message);
+    if (code === "name_taken") {
       return { ok: false, error: shareNameTakenMessage(name) };
+    }
+    // Le partenaire a quitté le duo depuis l'affichage : écran périmé
+    // (`useSeanceLibraryAction` relit alors tout le profil).
+    if (code === "no_partner" || code === "not_in_duo") {
+      return { ok: false, error: STALE_DUO_MESSAGE };
     }
     return { ok: false, error: seanceRpcErrorMessage(error, { name }) };
   } catch (e) {

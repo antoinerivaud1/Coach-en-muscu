@@ -14,6 +14,7 @@ import {
   type SaveSeanceInput,
   type SeanceWriteResult,
 } from "@/lib/data/seances";
+import { STALE_DUO_MESSAGE } from "@/lib/duo";
 
 /**
  * CM-88 (PR 5) : séances types (bibliothèque et éditeur), lues et écrites
@@ -107,7 +108,15 @@ export function useSeanceLibraryAction(profileId: string | null) {
       }
     },
     onSuccess: async (result, action) => {
-      if (!result.ok || !profileId) return;
+      if (!profileId) return;
+      if (!result.ok) {
+        // Partage refusé car le duo a changé : tout le profil est relu
+        // (bibliothèque, duo), le bouton « Partager avec … » disparaît.
+        if (action.kind === "share" && result.error === STALE_DUO_MESSAGE) {
+          await queryClient.invalidateQueries({ queryKey: queryKeys.all(profileId) });
+        }
+        return;
+      }
       await invalidateAfterSeanceWrite(queryClient, profileId);
       // Partage : mes exercices perso de la séance deviennent ceux du duo.
       if (action.kind === "share") {

@@ -28,7 +28,16 @@ const STALE_DAYS = 5;
  * confirmation dans le DOM. Absent en solo et sur « Nos séances » : cartes
  * inchangées.
  */
-export type ShareTarget = { name: string; color: string };
+export type ShareTarget = {
+  /** Prénom du partenaire, ou « ton partenaire » si son profil est illisible. */
+  name: string;
+  color: string;
+};
+
+/** Début de phrase : « ton partenaire » devient « Ton partenaire ». */
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 type Confirming = { id: string; kind: "delete" | "share" } | null;
 
@@ -38,12 +47,15 @@ export default function SeanceLibrary({
   profileId,
   onStart,
   shareWith,
+  onShared,
 }: {
   seances: SeanceView[];
   now: Date;
   profileId: string;
   onStart: (dayId: string) => void;
   shareWith?: ShareTarget;
+  /** Partage réussi : l'écran l'annonce (la carte quitte cette liste). */
+  onShared?: (name: string) => void;
 }) {
   const libraryAction = useSeanceLibraryAction(profileId);
   const isPending = libraryAction.isPending;
@@ -82,6 +94,8 @@ export default function SeanceLibrary({
     if (!result.ok) {
       setErrorKey(key);
       setErrorMessage(result.error);
+    } else if (action.kind === "share") {
+      onShared?.(action.name);
     }
   }
 
@@ -238,6 +252,7 @@ export default function SeanceLibrary({
                 onClick={() => toggleConfirm(seance.id, "delete")}
                 disabled={isPending}
                 aria-expanded={confirming?.id === seance.id && confirming.kind === "delete"}
+                aria-controls={`confirm-delete-${seance.id}`}
                 className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-red-400 disabled:opacity-50"
               >
                 Supprimer
@@ -250,6 +265,7 @@ export default function SeanceLibrary({
                 onClick={() => toggleConfirm(seance.id, "share")}
                 disabled={isPending}
                 aria-expanded={confirming?.id === seance.id && confirming.kind === "share"}
+                aria-controls={`confirm-share-${seance.id}`}
                 className="mt-2.5 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface2 px-3 text-[15px] font-bold text-fg disabled:opacity-50"
               >
                 <span
@@ -262,10 +278,13 @@ export default function SeanceLibrary({
             )}
 
             {shareWith && confirming?.id === seance.id && confirming.kind === "share" && (
-              <div className="mt-3 rounded-xl border border-energy/40 bg-energy/10 p-3">
+              <div
+                id={`confirm-share-${seance.id}`}
+                className="mt-3 rounded-xl border border-energy/40 bg-energy/10 p-3"
+              >
                 <p className="text-balance text-sm font-semibold text-fg">
                   Partager « {seance.name} » avec {shareWith.name}&nbsp;?{" "}
-                  {shareWith.name} pourra la voir, la lancer et la modifier.
+                  {capitalize(shareWith.name)} pourra la voir, la lancer et la modifier.
                 </p>
                 <div className="mt-2.5 flex gap-2">
                   <button
@@ -291,7 +310,10 @@ export default function SeanceLibrary({
             )}
 
             {confirming?.id === seance.id && confirming.kind === "delete" && (
-              <div className="mt-3 rounded-xl border border-flame/40 bg-flame/10 p-3">
+              <div
+                id={`confirm-delete-${seance.id}`}
+                className="mt-3 rounded-xl border border-flame/40 bg-flame/10 p-3"
+              >
                 <p className="text-sm font-semibold text-flame">
                   Supprimer la séance « {seance.name} » ? Cette action est
                   définitive.
@@ -301,7 +323,7 @@ export default function SeanceLibrary({
                     type="button"
                     onClick={() => setConfirming(null)}
                     disabled={isPending}
-                    className="flex-1 rounded-lg bg-surface2 py-2 text-sm font-semibold text-fg disabled:opacity-50"
+                    className="min-h-11 flex-1 rounded-lg bg-surface2 text-sm font-semibold text-fg disabled:opacity-50"
                   >
                     Annuler
                   </button>
@@ -309,7 +331,7 @@ export default function SeanceLibrary({
                     type="button"
                     onClick={() => handleDelete(seance)}
                     disabled={isPending}
-                    className="flex-1 rounded-lg bg-flame py-2 text-sm font-extrabold text-ink disabled:opacity-50"
+                    className="min-h-11 flex-1 rounded-lg bg-flame text-sm font-extrabold text-ink disabled:opacity-50"
                   >
                     {busy ? "Suppression…" : "Oui, supprimer"}
                   </button>

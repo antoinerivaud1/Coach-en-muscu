@@ -305,52 +305,66 @@ test.describe("Raccourci « Partager avec … » (CM-104)", () => {
     await expect(page).toHaveURL(/\/seances$/);
   }
 
-  async function deleteCard(region: ReturnType<Page["getByRole"]>, name: string) {
-    const card = region.locator("section").filter({ hasText: name });
-    await card.getByRole("button", { name: "Supprimer", exact: true }).click();
-    await card.getByRole("button", { name: "Oui, supprimer" }).click();
-    await expect(region.locator("section").filter({ hasText: name })).toHaveCount(0);
+  /** Supprime par l'UI les cartes `name` de la section, s'il y en a (idempotent). */
+  async function deleteCards(page: Page, section: "Mes séances" | "Nos séances", name: string) {
+    await page.goto("/seances");
+    const region = page.getByRole("region", { name: section });
+    await expect(region).toBeVisible();
+    const cards = region.locator("section").filter({ has: page.getByRole("heading", { name, exact: true }) });
+    for (let n = await cards.count(); n > 0; n--) {
+      const card = cards.first();
+      await card.getByRole("button", { name: "Supprimer", exact: true }).click();
+      await card.getByRole("button", { name: "Oui, supprimer" }).click();
+      await expect(cards).toHaveCount(n - 1);
+    }
   }
 
   test("en duo : confirmer puis la carte passe dans « Nos séances » sans rechargement", async ({ page }) => {
     const name = `E2E partage ${Date.now().toString(36)}`;
     await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
-    await createPersonalSeance(page, name);
+    try {
+      await createPersonalSeance(page, name);
 
-    const mine = page.getByRole("region", { name: "Mes séances" });
-    const ours = page.getByRole("region", { name: "Nos séances" });
-    const card = mine.locator("section").filter({ hasText: name });
-    // Pas d'action de partage sur les cartes de « Nos séances ».
-    await expect(ours.getByRole("button", { name: /^Partager avec/ })).toHaveCount(0);
+      const mine = page.getByRole("region", { name: "Mes séances" });
+      const ours = page.getByRole("region", { name: "Nos séances" });
+      const card = mine.locator("section").filter({ hasText: name });
+      // Pas d'action de partage sur les cartes de « Nos séances ».
+      await expect(ours.getByRole("button", { name: "Dupliquer" }).first()).toBeVisible();
+      await expect(ours.getByRole("button", { name: /^Partager avec/ })).toHaveCount(0);
 
-    const rpc: string[] = [];
-    page.on("request", (req) => {
-      if (req.url().includes("/rest/v1/rpc/set_seance_shared")) rpc.push(req.url());
-    });
+      const rpc: string[] = [];
+      page.on("request", (req) => {
+        if (req.url().includes("/rest/v1/rpc/set_seance_shared")) rpc.push(req.url());
+      });
 
-    // Annuler : rien n'est envoyé.
-    await card.getByRole("button", { name: `Partager avec ${SEED_NAMES.elle}` }).click();
-    await expect(card).toContainText(`${SEED_NAMES.elle} pourra la voir, la lancer et la modifier.`);
-    await card.getByRole("button", { name: "Annuler" }).click();
-    expect(rpc).toHaveLength(0);
+      // Annuler : rien n'est envoyé.
+      await card.getByRole("button", { name: `Partager avec ${SEED_NAMES.elle}` }).click();
+      await expect(card).toContainText(`${SEED_NAMES.elle} pourra la voir, la lancer et la modifier.`);
+      await card.getByRole("button", { name: "Annuler" }).click();
+      expect(rpc).toHaveLength(0);
 
-    await card.getByRole("button", { name: `Partager avec ${SEED_NAMES.elle}` }).click();
-    await card.getByRole("button", { name: "Oui, partager" }).click();
-    await expect(mine.locator("section").filter({ hasText: name })).toHaveCount(0);
-    await expect(ours.locator("section").filter({ hasText: name })).toHaveCount(1);
-    expect(rpc).toHaveLength(1);
-
-    // Nettoyage (jamais faite) depuis « Nos séances ».
-    await deleteCard(ours, name);
+      await card.getByRole("button", { name: `Partager avec ${SEED_NAMES.elle}` }).click();
+      await card.getByRole("button", { name: "Oui, partager" }).click();
+      await expect(page.getByRole("status")).toContainText(`« ${name} » est maintenant dans « Nos séances »`);
+      await expect(mine.locator("section").filter({ hasText: name })).toHaveCount(0);
+      await expect(ours.locator("section").filter({ hasText: name })).toHaveCount(1);
+      expect(rpc).toHaveLength(1);
+    } finally {
+      // Nettoyage (jamais faite), quelle que soit la section où elle a fini.
+      await deleteCards(page, "Nos séances", name);
+      await deleteCards(page, "Mes séances", name);
+    }
   });
 
   test("nom déjà pris dans « Nos séances » : message clair, rien ne bouge", async ({ page }) => {
     // « Bas du corps » existe dans « Nos séances » (seed).
     await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
-    await createPersonalSeance(page, "Bas du corps");
-    const mine = page.getByRole("region", { name: "Mes séances" });
-    const card = mine.locator("section").filter({ hasText: "Bas du corps" });
+    // Reste d'un passage interrompu : la copie perso est retirée d'abord.
+    await deleteCards(page, "Mes séances", "Bas du corps");
     try {
+      await createPersonalSeance(page, "Bas du corps");
+      const mine = page.getByRole("region", { name: "Mes séances" });
+      const card = mine.locator("section").filter({ hasText: "Bas du corps" });
       await card.getByRole("button", { name: `Partager avec ${SEED_NAMES.elle}` }).click();
       await card.getByRole("button", { name: "Oui, partager" }).click();
       await expect(card.getByRole("alert")).toContainText(
@@ -361,15 +375,16 @@ test.describe("Raccourci « Partager avec … » (CM-104)", () => {
         page.getByRole("region", { name: "Nos séances" }).locator("section").filter({ hasText: "Bas du corps" }),
       ).toHaveCount(1);
     } finally {
-      await page.goto("/seances");
-      await deleteCard(page.getByRole("region", { name: "Mes séances" }), "Bas du corps");
+      await deleteCards(page, "Mes séances", "Bas du corps");
     }
   });
 
   test("sans duo : aucune action de partage sur les cartes", async ({ page }) => {
-    await login(page, SEED_ACCOUNTS.solo.email, SEED_ACCOUNTS.solo.password);
+    await ensureSolo(page, SEED_ACCOUNTS.solo);
     await page.goto("/seances");
     await expect(page.getByRole("heading", { name: "Mes séances", level: 1 })).toBeVisible();
+    // La bibliothèque de Solo n'est pas vide (seed) : le test ne passe pas à vide.
+    await expect(page.getByRole("button", { name: "Dupliquer" }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /^Partager avec/ })).toHaveCount(0);
   });
 });
