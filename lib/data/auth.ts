@@ -82,8 +82,8 @@ export const SIGNUP_CLOSED_MESSAGE = "Les inscriptions ouvriront bientôt.";
  * refus AVANT tout appel à Supabase. Pas de confirmation d'email (pas de
  * SMTP avant CM-97) : Supabase renvoie la session tout de suite.
  * CM-103 : `next` (lien d'invitation) conservé pour la fin de l'onboarding.
- * Un cookie `cm_onboarded` d'un autre compte sur cet appareil ne saute rien :
- * le middleware compare sa valeur à l'id de la session.
+ * Un mémo `cm_onboarded` d'un autre compte sur cet appareil ne saute rien :
+ * `OnboardingGate` compare sa valeur à l'id de la session (CM-89 (PR 1)).
  */
 export async function signUpWithEmail(
   supabase: AuthClient,

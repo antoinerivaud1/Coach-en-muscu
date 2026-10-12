@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { applyTemplate, markOnboarded, type OnboardingWriteResult } from "@/lib/data/onboarding";
-import { onboardingDestination, type OnboardingExit } from "@/lib/onboarding";
+import { onboardingDestination, rememberOnboarded, type OnboardingExit } from "@/lib/onboarding";
 
 export type TemplateCard = {
   id: string;
@@ -26,10 +26,10 @@ export type TemplateCard = {
  * CM-88 (PR 7) : écritures depuis le navigateur (lib/data/onboarding.ts ;
  * modèle et fin de l'onboarding en une transaction SQL). L'onboarding est
  * terminé AVANT de partir, puis la destination s'ouvre par RECHARGEMENT
- * COMPLET : la requête passe par le middleware, qui relit `onboarded_at`
- * (déjà posé), laisse passer et pose son cookie de confort, sans renvoyer
- * vers /onboarding ; le cache du navigateur (identité « pas onboardé »)
- * repart de zéro.
+ * COMPLET : le cache du navigateur (identité « pas onboardé ») repart de
+ * zéro. CM-89 (PR 1) : le mémo « onboarding fait » de l'appareil est posé
+ * juste avant, `OnboardingGate` laisse donc passer sans relire le profil
+ * (et sans boucle vers /onboarding).
  */
 export default function TemplatePicker({
   profileId,
@@ -60,6 +60,7 @@ export default function TemplatePicker({
       setBusy(null);
       return;
     }
+    rememberOnboarded(profileId);
     // Le bouton reste occupé jusqu'au départ de la page.
     window.location.assign(onboardingDestination(exit, next));
   }

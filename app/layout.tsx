@@ -5,6 +5,7 @@ import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import OrientationLock from "@/components/OrientationLock";
 import PendingSync from "@/components/PendingSync";
 import QueryProvider from "@/components/providers/QueryProvider";
+import OnboardingGate from "@/components/providers/OnboardingGate";
 
 // Direction Sport — Archivo (titres / interface) + Oswald (chiffres / scores)
 const archivo = Archivo({
@@ -52,7 +53,8 @@ export default function RootLayout({
     <html lang="fr" className={`${archivo.variable} ${oswald.variable}`}>
       <body className="min-h-screen bg-ink font-sans text-fg antialiased">
         <QueryProvider>
-          {children}
+          {/* CM-89 (PR 1) : redirection vers l'onboarding, côté navigateur. */}
+          <OnboardingGate>{children}</OnboardingGate>
           <PendingSync />
         </QueryProvider>
         <ServiceWorkerRegister />

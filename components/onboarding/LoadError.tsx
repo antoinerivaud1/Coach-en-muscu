@@ -1,7 +1,7 @@
 /**
  * CM-86 (C7) : écran d'erreur des étapes d'onboarding quand le profil n'a pas
- * pu être lu. « Réessayer » recharge la page (lien plein, pas de redirection
- * serveur, donc pas de boucle avec le middleware).
+ * pu être lu. « Réessayer » recharge la page (lien plein). Pas de boucle avec
+ * `OnboardingGate` : les écrans d'onboarding ne sont jamais redirigés.
  */
 export default function LoadError({ retryHref }: { retryHref: string }) {
   return (

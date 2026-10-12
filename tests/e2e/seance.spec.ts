@@ -249,4 +249,70 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
       await page.unroute(pattern);
     }
   });
+
+  test("CM-89 (PR 1) : session fermée dans un autre onglet en pleine séance, la saisie reste", async ({ page }) => {
+    const id = await startSession(page);
+    created.push(id);
+    await logSet(page, { weight: "20", reps: "8" });
+    await expect(page.getByRole("button", { name: "Supprimer la série 1" })).toBeVisible();
+    // Série arrivée en base : la déconnexion ne demandera pas de confirmation.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Object.keys(window.localStorage)
+            .filter((k) => k.startsWith("cm:pendingSets:"))
+            .every((k) => (JSON.parse(window.localStorage.getItem(k) ?? "[]") as unknown[]).length === 0),
+        ),
+      )
+      .toBe(true);
+
+    // Témoins dans l'onglet de la séance : le SIGNED_OUT diffusé par Supabase
+    // aux autres onglets (BroadcastChannel du nom de la clé de session) est
+    // bien arrivé ; la croix du logger a-t-elle disparu, même un instant ?
+    await page.evaluate(() => {
+      const w = window as unknown as { __cmSignedOut?: boolean; __cmLoggerLost?: boolean };
+      w.__cmSignedOut = false;
+      w.__cmLoggerLost = false;
+      const key = document.cookie
+        .split(";")
+        .map((c) => c.trim().split("=")[0] ?? "")
+        .find((n) => /^sb-.+-auth-token(\.\d+)?$/.test(n))
+        ?.replace(/\.\d+$/, "");
+      if (!key) throw new Error("Cookie de session introuvable");
+      const channel = new BroadcastChannel(key);
+      channel.onmessage = (e: MessageEvent<{ event?: string }>) => {
+        if (e.data?.event === "SIGNED_OUT") w.__cmSignedOut = true;
+      };
+      new MutationObserver(() => {
+        if (!document.querySelector('[aria-label="Quitter la séance"]')) w.__cmLoggerLost = true;
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+
+    // Déconnexion depuis un second onglet (même navigateur, même session).
+    const other = await page.context().newPage();
+    try {
+      await other.goto("/profile");
+      await other.getByRole("button", { name: "Se déconnecter" }).first().click();
+      await expect(other).toHaveURL(/\/login/);
+
+      await page.waitForFunction(
+        () => (window as unknown as { __cmSignedOut?: boolean }).__cmSignedOut === true,
+      );
+      // Laisse le cache se relire (session « personne ») : sans le verrou de
+      // OnboardingGate, l'écran passait au squelette, perdait la saisie puis
+      // partait vers /login.
+      await page.waitForTimeout(2000);
+
+      await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
+      await expect(page.getByRole("button", { name: "Quitter la séance" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Supprimer la série 1" })).toBeVisible();
+      expect(
+        await page.evaluate(() => (window as unknown as { __cmLoggerLost?: boolean }).__cmLoggerLost),
+      ).toBe(false);
+    } finally {
+      await other.close();
+      // Reconnexion pour le nettoyage de la séance (afterEach).
+      await login(page, E2E_ACCOUNT.email, E2E_ACCOUNT.password);
+    }
+  });
 });
