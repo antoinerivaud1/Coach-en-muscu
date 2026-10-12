@@ -200,7 +200,12 @@ test.describe("Séance : démarrer, valider, sortir (CM-94)", () => {
     await expect(rows.first()).toBeVisible();
     const before = await rows.count();
     expect(before).toBeGreaterThan(0);
-    await page.getByRole("button", { name: "Supprimer", exact: true }).first().click();
+    // Toute suppression se confirme : « Annuler » garde la série.
+    await page.getByRole("button", { name: /^Supprimer la série / }).first().click();
+    await page.getByRole("button", { name: "Annuler" }).click();
+    await expect(rows).toHaveCount(before);
+    await page.getByRole("button", { name: /^Supprimer la série / }).first().click();
+    await page.getByRole("button", { name: "Oui, supprimer" }).click();
     await expect(rows).toHaveCount(before - 1);
 
     await page.getByRole("link", { name: "Terminer", exact: true }).click();

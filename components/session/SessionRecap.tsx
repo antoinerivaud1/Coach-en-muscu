@@ -54,6 +54,8 @@ export default function SessionRecap({
   /** Garde synchrone : deux taps dans la même image passeraient l'état. */
   const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  /** Série dont la suppression attend confirmation (règle : toute suppression se confirme). */
+  const [confirmSetId, setConfirmSetId] = useState<string | null>(null);
   const { sessionId, isMine } = data;
 
   function lock(): boolean {
@@ -100,10 +102,8 @@ export default function SessionRecap({
   }
 
   function onDeleteSet(setId: string) {
-    return (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      void write(() => deleteRecapSet(getSupabaseBrowserClient(), { setId, sessionId }));
-    };
+    setConfirmSetId(null);
+    void write(() => deleteRecapSet(getSupabaseBrowserClient(), { setId, sessionId }));
   }
 
   async function onDeleteSession(event: FormEvent<HTMLFormElement>) {
@@ -206,7 +206,31 @@ export default function SessionRecap({
               </div>
               <ul className="mt-2 flex flex-wrap gap-2">
                 {ex.sets.map((r) =>
-                  editSets && isMine ? (
+                  editSets && isMine && confirmSetId === r.id ? (
+                    <li
+                      key={`${r.id}:confirm`}
+                      className="flex items-center gap-2 rounded-lg bg-surface2 px-2.5 py-1.5 text-sm"
+                    >
+                      <span className="font-semibold text-flame">
+                        Supprimer {formatWeight(r.weight_kg)} kg × {r.reps} ?
+                      </span>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onDeleteSet(r.id)}
+                        className="rounded-lg bg-flame px-2 py-1 text-[13px] font-extrabold text-ink disabled:opacity-60"
+                      >
+                        Oui, supprimer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmSetId(null)}
+                        className="rounded-lg bg-ink px-2 py-1 text-[13px] font-semibold text-fg"
+                      >
+                        Annuler
+                      </button>
+                    </li>
+                  ) : editSets && isMine ? (
                     <li
                       key={`${r.id}:${r.weight_kg}:${r.reps}`}
                       className="flex items-center gap-2 rounded-lg bg-surface2 px-2.5 py-1.5 text-sm"
@@ -236,16 +260,16 @@ export default function SessionRecap({
                           ✓
                         </button>
                       </form>
-                      <form onSubmit={onDeleteSet(r.id)}>
-                        <button
-                          type="submit"
-                          disabled={busy}
-                          className="px-1 text-fg-faint hover:text-red-400 disabled:opacity-60"
-                          aria-label="Supprimer"
-                        >
-                          ✕
-                        </button>
-                      </form>
+                      {/* Toute suppression se confirme : le ✕ ouvre « Supprimer … ? ». */}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setConfirmSetId(r.id)}
+                        className="px-1 text-fg-faint hover:text-red-400 disabled:opacity-60"
+                        aria-label={`Supprimer la série ${formatWeight(r.weight_kg)} kg × ${r.reps}`}
+                      >
+                        ✕
+                      </button>
                     </li>
                   ) : (
                     <li
