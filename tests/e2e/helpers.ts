@@ -174,5 +174,6 @@ export async function deleteSessionViaUi(page: Page, sessionId: string): Promise
   }
 
   await recapDelete.click();
+  await page.getByRole("button", { name: "Oui, supprimer" }).click();
   await expect(page).toHaveURL(/\/history$/);
 }
