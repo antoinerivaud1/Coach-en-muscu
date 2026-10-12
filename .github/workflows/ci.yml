@@ -49,6 +49,11 @@ jobs:
       - name: Tests unitaires
         run: npm run test:unit
 
+      # CM-89 (PR 3) : règles de la cible native (routeur iOS, placeholder,
+      # contrôle de l'export), lanceur intégré de Node.
+      - name: Tests des scripts natifs
+        run: npm run test:scripts
+
       - name: Build (env factices)
         run: npm run build
         env:

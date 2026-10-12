@@ -3,41 +3,34 @@
 //
 // 1. `next build` avec BUILD_TARGET=native : next.config.mjs passe en
 //    `output: "export"` et ignore les fichiers `.web` (middleware,
-//    /sentry-test). Rien n'est déplacé sur le disque : un build interrompu
-//    (échec, Ctrl-C) ne laisse aucun fichier à restaurer.
-// 2. L'export (`out/`) REMPLACE le contenu de `capacitor/www` (webDir de
-//    Capacitor, ignoré par git).
-// 3. Vérifie que les pages attendues par le routeur iOS existent.
+//    /sentry-test). Rien n'est déplacé dans les sources : un build
+//    interrompu (échec, Ctrl-C) ne laisse aucun fichier à restaurer.
+// 2. Vérifie l'export (`out/`) AVANT de toucher à `capacitor/www` : pages
+//    attendues par le routeur iOS, charges RSC, aucune page web seulement,
+//    aucune source map, aucune référence à vercel.app
+//    (`bundleProblems`, scripts/lib/native-rules.mjs).
+// 3. Seulement si tout passe : remplace `capacitor/www` par échange de
+//    dossiers (renommages), jamais à moitié remplacé ni vidé.
 //
-// Attention : `next build` réécrit `.next`. Après ce script, relancer
-// `npm run build` avant un `npm start` web.
+// Attention : `next build` réécrit `.next` (Next impose ce dossier pour un
+// export). Après ce script, relancer `npm run build` avant un `npm start` web.
 //
 // Node pur (modules intégrés), aucune dépendance en plus.
 
 import { spawn } from "node:child_process";
-import { existsSync, readdirSync, renameSync, rmSync, cpSync, statSync } from "node:fs";
+import { cpSync, existsSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { bundleProblems } from "./lib/native-rules.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_DIR = join(ROOT, "out");
-const WEB_DIR = join(ROOT, "capacitor", "www");
-
-// Pages qui DOIVENT exister dans le bundle (adresses sans extension servies
-// par le routeur iOS de la PR 4 : `/dashboard` -> `dashboard.html`).
-const REQUIRED_FILES = [
-  "index.html",
-  "login.html",
-  "dashboard.html",
-  "history.html",
-  "sessions/view.html",
-  "seances/edit.html",
-  "compte-supprime.html",
-  "manifest.webmanifest",
-];
-// Pages web seulement : jamais dans le bundle.
-const FORBIDDEN_FILES = ["sentry-test.html", "sentry-test/index.html"];
+const CAP_DIR = join(ROOT, "capacitor");
+const WEB_DIR = join(CAP_DIR, "www");
+// Dossiers de l'échange, à côté de www (même disque : renommages atomiques).
+const NEXT_WEB_DIR = join(CAP_DIR, ".www-next");
+const OLD_WEB_DIR = join(CAP_DIR, ".www-old");
 
 function fail(message) {
   console.error(`\n[build:native] ${message}`);
@@ -68,40 +61,59 @@ function runNextBuild() {
   });
 }
 
-function listFiles(dir, base = dir) {
+function listFiles(dir) {
   const files = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...listFiles(full, base));
-    else files.push(relative(base, full));
+  const walk = (current) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const full = join(current, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else files.push(relative(dir, full).split(sep).join("/"));
+    }
+  };
+  walk(dir);
+  return files.sort();
+}
+
+/** Remplace `capacitor/www` par `source` sans jamais le laisser vide ou partiel. */
+function swapWebDir(source) {
+  rmSync(NEXT_WEB_DIR, { recursive: true, force: true });
+  rmSync(OLD_WEB_DIR, { recursive: true, force: true });
+  try {
+    renameSync(source, NEXT_WEB_DIR);
+  } catch {
+    // Autre disque (EXDEV) : copie complète d'abord, www intact pendant ce temps.
+    cpSync(source, NEXT_WEB_DIR, { recursive: true });
+    rmSync(source, { recursive: true, force: true });
   }
-  return files;
+  const hadWebDir = existsSync(WEB_DIR);
+  if (hadWebDir) renameSync(WEB_DIR, OLD_WEB_DIR);
+  try {
+    renameSync(NEXT_WEB_DIR, WEB_DIR);
+  } catch (error) {
+    if (hadWebDir) renameSync(OLD_WEB_DIR, WEB_DIR);
+    throw error;
+  }
+  rmSync(OLD_WEB_DIR, { recursive: true, force: true });
 }
 
 rmSync(OUT_DIR, { recursive: true, force: true });
 
 const code = await runNextBuild();
 if (code !== 0) fail(`next build a échoué (code ${code}). capacitor/www n'a pas été modifié.`);
-if (!existsSync(join(OUT_DIR, "index.html"))) fail("export introuvable : out/index.html manque.");
+if (!existsSync(OUT_DIR)) fail("export introuvable : out/ manque. capacitor/www n'a pas été modifié.");
 
-// Remplace capacitor/www en entier (aucun fichier d'un build précédent ne
-// traîne). `rename` est atomique sur le même disque ; copie sinon.
-rmSync(WEB_DIR, { recursive: true, force: true });
-try {
-  renameSync(OUT_DIR, WEB_DIR);
-} catch {
-  cpSync(OUT_DIR, WEB_DIR, { recursive: true });
-  rmSync(OUT_DIR, { recursive: true, force: true });
+const files = listFiles(OUT_DIR);
+const problems = bundleProblems(files, (file) => readFileSync(join(OUT_DIR, file), "utf8"));
+if (problems.length) {
+  fail(
+    `export refusé, capacitor/www n'a pas été modifié (export laissé dans out/) :\n` +
+      problems.map((problem) => `  - ${problem}`).join("\n"),
+  );
 }
 
-const missing = REQUIRED_FILES.filter((file) => !existsSync(join(WEB_DIR, file)));
-if (missing.length) fail(`fichiers manquants dans capacitor/www : ${missing.join(", ")}`);
-const forbidden = FORBIDDEN_FILES.filter((file) => existsSync(join(WEB_DIR, file)));
-if (forbidden.length) fail(`pages web seulement présentes dans le bundle : ${forbidden.join(", ")}`);
+const sizeMb = files.reduce((sum, file) => sum + statSync(join(OUT_DIR, file)).size, 0) / 1e6;
+swapWebDir(OUT_DIR);
 
-const html = listFiles(WEB_DIR)
-  .filter((file) => file.endsWith(".html"))
-  .sort();
-const sizeMb = listFiles(WEB_DIR).reduce((sum, file) => sum + statSync(join(WEB_DIR, file)).size, 0) / 1e6;
+const html = files.filter((file) => file.endsWith(".html"));
 console.log(`\n[build:native] capacitor/www prêt (${sizeMb.toFixed(1)} Mo), ${html.length} pages :`);
 for (const file of html) console.log(`  ${file}`);

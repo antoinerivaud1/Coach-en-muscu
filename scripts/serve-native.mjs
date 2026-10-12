@@ -2,25 +2,23 @@
 // CM-89 (PR 3) : petit serveur statique pour `capacitor/www` (tests e2e
 // `native`, CI). Il imite le routeur iOS PRÉVU en PR 4 (Swift, dans
 // ios/App), pour attraper dès la CI une page absente de l'export ou une
-// adresse mal résolue :
+// adresse mal résolue. Règles : `resolveNativeFile`
+// (scripts/lib/native-rules.mjs), à reproduire EXACTEMENT en Swift.
 //
-// - chemin AVEC extension (`/_next/…js`, `/dashboard.txt`, `/icons/x.png`) :
-//   le fichier tel quel, 404 s'il manque ;
-// - chemin SANS extension : `<chemin>.html` s'il existe, sinon
-//   `<chemin>/index.html` s'il existe, sinon `/index.html` (racine) ;
-// - la query (`?id=`) est ignorée pour choisir le fichier.
-//
-// Le routeur Swift doit suivre EXACTEMENT ces règles (voir NATIVE.md).
-// En-tête `X-Native-File` : fichier servi (pour les tests).
+// Il ne masque aucun appel serveur : GET et HEAD seulement (405 sinon,
+// comme une coque sans serveur), et en-têtes pour les tests :
+// - `X-Native-File` : fichier servi ;
+// - `X-Native-Fallback: 1` : adresse inconnue servie par `index.html`.
 //
 // Usage : node scripts/serve-native.mjs [--port 4300] [--dir capacitor/www]
 // Node pur (modules intégrés), aucune dépendance.
 
 import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { dirname, extname, join, normalize, relative, resolve, sep } from "node:path";
+import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { resolveNativeFile } from "./lib/native-rules.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const { values } = parseArgs({
@@ -40,7 +38,6 @@ const CONTENT_TYPES = {
   ".json": "application/json; charset=utf-8",
   ".webmanifest": "application/manifest+json; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
-  ".map": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
   ".jpg": "image/jpeg",
@@ -52,24 +49,15 @@ const CONTENT_TYPES = {
   ".woff2": "font/woff2",
 };
 
-function isFile(path) {
+/** Fichier régulier DANS WEB_DIR (garde-fou contre toute sortie du dossier). */
+function isFile(relativePath) {
+  const full = resolve(WEB_DIR, relativePath);
+  if (!full.startsWith(WEB_DIR + sep)) return false;
   try {
-    return statSync(path).isFile();
+    return statSync(full).isFile();
   } catch {
     return false;
   }
-}
-
-/** Fichier à servir pour ce chemin (relatif à WEB_DIR), ou null (404). */
-function resolveNativePath(pathname) {
-  const clean = normalize(pathname).replace(/^([/\\])+/, "").replace(/[/\\]+$/, "");
-  if (clean.split(/[/\\]/).includes("..")) return null;
-  if (clean === "") return "index.html";
-  if (extname(clean) !== "") return isFile(join(WEB_DIR, clean)) ? clean : null;
-  for (const candidate of [`${clean}.html`, join(clean, "index.html")]) {
-    if (isFile(join(WEB_DIR, candidate))) return candidate;
-  }
-  return "index.html";
 }
 
 if (!existsSync(join(WEB_DIR, "index.html"))) {
@@ -78,6 +66,10 @@ if (!existsSync(join(WEB_DIR, "index.html"))) {
 }
 
 const server = createServer((req, res) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.writeHead(405, { Allow: "GET, HEAD", "Content-Type": "text/plain; charset=utf-8" }).end("405");
+    return;
+  }
   let pathname;
   try {
     pathname = decodeURIComponent(new URL(req.url ?? "/", "http://localhost").pathname);
@@ -85,17 +77,17 @@ const server = createServer((req, res) => {
     res.writeHead(400).end();
     return;
   }
-  const file = resolveNativePath(pathname);
-  const full = file ? resolve(WEB_DIR, file) : null;
-  // Garde-fou : jamais un fichier hors de WEB_DIR.
-  if (!file || !full || (full !== WEB_DIR && !full.startsWith(WEB_DIR + sep))) {
+  const resolved = resolveNativeFile(pathname, isFile);
+  if (!resolved || !isFile(resolved.file)) {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("404");
     return;
   }
+  const full = resolve(WEB_DIR, resolved.file);
   res.writeHead(200, {
     "Content-Type": CONTENT_TYPES[extname(full).toLowerCase()] ?? "application/octet-stream",
     "Cache-Control": "no-store",
-    "X-Native-File": relative(WEB_DIR, full).split(sep).join("/"),
+    "X-Native-File": resolved.file,
+    ...(resolved.fallback ? { "X-Native-Fallback": "1" } : {}),
   });
   if (req.method === "HEAD") {
     res.end();

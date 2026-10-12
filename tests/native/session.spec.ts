@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { SEED_ACCOUNTS, guardWrites, login, sessionPath } from "../e2e/helpers";
-import { forbidServerRequests, servedFile, trackDocuments } from "./helpers";
+import { guardNativeRequests, servedFile, trackDocuments } from "./helpers";
 
 // CM-89 (PR 3) : export natif avec une session (compte « Toi » du seed).
 // Ne crée rien, mais le tableau de bord purge les séances vides abandonnées
@@ -10,7 +10,7 @@ import { forbidServerRequests, servedFile, trackDocuments } from "./helpers";
 const TOI_SESSION = "77777777-7777-7777-7777-000000000001";
 
 guardWrites();
-forbidServerRequests();
+guardNativeRequests();
 
 test("la connexion mène au tableau de bord après le rechargement complet", async ({ page }) => {
   const documents = trackDocuments(page);
@@ -19,6 +19,30 @@ test("la connexion mène au tableau de bord après le rechargement complet", asy
   // (pas la racine, qui redirigerait elle-même).
   expect(documents).toContainEqual(["/dashboard", "dashboard.html"]);
   expect(documents).not.toContainEqual(["/dashboard", "index.html"]);
+});
+
+test("navigation dans l'app vers le Carnet : sans rechargement, charge RSC en 200", async ({ page }) => {
+  // Charge utile RSC du Carnet (`/history.txt?_rsc=…`), préchargée ou lue au clic.
+  const payloads: number[] = [];
+  page.on("response", (response) => {
+    if (new URL(response.url()).pathname === "/history.txt") payloads.push(response.status());
+  });
+  await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
+
+  const documents = trackDocuments(page);
+  await page.getByRole("link", { name: "Carnet" }).click();
+  await expect(page).toHaveURL(/\/history$/);
+  await expect(page.getByRole("heading", { name: "Historique", level: 1 })).toBeVisible();
+
+  // Aucun nouveau document : navigation client, toujours le document du
+  // tableau de bord.
+  expect(documents).toEqual([]);
+  const navigations = await page.evaluate(() =>
+    performance.getEntriesByType("navigation").map((entry) => new URL(entry.name).pathname),
+  );
+  expect(navigations).toEqual(["/dashboard"]);
+  expect(payloads.length).toBeGreaterThan(0);
+  expect(payloads.every((status) => status === 200)).toBe(true);
 });
 
 test("rechargement complet du Carnet : l'écran du Carnet, pas la racine", async ({ page }) => {

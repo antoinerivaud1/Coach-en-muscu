@@ -100,17 +100,27 @@ Deux cibles de build, un seul code (next.config.mjs) :
   anciennes adresses, tunnel Sentry `/monitoring`, `/sentry-test`).
 - **native** (`npm run build:native`) : `BUILD_TARGET=native`, export statique
   (`output: "export"`, `trailingSlash: false`), sans middleware, sans
-  `redirects()`, Sentry sans tunnel (envoi direct). L'export remplace tout le
-  contenu de `capacitor/www`.
+  `redirects()`, Sentry sans tunnel (envoi direct) et avec l'environnement
+  `native` (`NEXT_PUBLIC_BUILD_TARGET`, lib/sentry/options.ts).
 
 ```bash
 npm run build:native                       # out/ -> capacitor/www (liste les pages)
 npm run serve:native -- --port 4300        # serveur statique « routeur iOS »
 E2E_NATIVE_BASE_URL=http://localhost:4300 npm run test:native
+npm run test:scripts                       # règles pures (routeur, placeholder, contrôles)
 ```
-`build:native` réécrit `.next` : relancer `npm run build` avant un
-`npm start` web. Les variables `NEXT_PUBLIC_*` sont gravées au build (prod :
-celles de `.env.local`).
+`build:native` contrôle l'export (`out/`) AVANT de toucher à
+`capacitor/www` : pages attendues, charge RSC (`<page>.txt`) de chaque page,
+aucune page web seulement (`sentry-test`, `monitoring`, `api/`), aucune
+source map, aucune référence à `vercel.app`. Un seul problème : échec, et
+`capacitor/www` reste intact (export laissé dans `out/`). Sinon `www` est
+remplacé par échange de dossiers (`capacitor/.www-next`, `.www-old`), jamais
+vidé ni à moitié remplacé.
+
+`build:native` réécrit `.next` (avec un export, Next garde toujours `.next`
+pour le build : un `distDir` dédié deviendrait le dossier d'export) :
+relancer `npm run build` avant un `npm start` web. Les variables
+`NEXT_PUBLIC_*` sont gravées au build (prod : celles de `.env.local`).
 
 ### Fichiers web seulement : suffixe `.web`
 Un export statique refuse le middleware, les route handlers et les pages
@@ -130,28 +140,39 @@ lance à chaque PR (job e2e).
 ### `capacitor/www` : généré, ignoré par git
 Le placeholder versionné est `capacitor/placeholder/index.html`. Le hook
 Capacitor `capacitor:copy:before` (package.json,
-`scripts/native-placeholder.mjs`) le copie dans `capacitor/www` si ce
-dossier n'a pas d'`index.html`, **seulement tant que `server.url` est
-défini** : sur un clone neuf, `npx cap sync` fonctionne et le dossier
-`ios/App/App/public` (référencé par le projet Xcode) existe. Sans
-`server.url` (PR 4), Capacitor refuse lui-même un `capacitor/www` vide :
-lancer `npm run build:native` avant `npx cap sync`.
+`scripts/native-placeholder.mjs`, décision `placeholderAction`) :
+- avec `server.url` (jusqu'à la PR 4) : copie le placeholder si
+  `capacitor/www` n'a pas d'`index.html`. Sur un clone neuf, `npx cap sync`
+  fonctionne et le dossier `ios/App/App/public` (référencé par le projet
+  Xcode) existe ;
+- sans `server.url` (PR 4) et sans l'app (dossier absent ou placeholder
+  seul) : erreur « lance d'abord npm run build:native », code de sortie 1,
+  et suppression de `capacitor/www` (rien d'autre). Capacitor ignore le code
+  de sortie des hooks et `cap sync` continue après un échec de copie : c'est
+  la suppression qui bloque. Capacitor vide alors `ios/App/App/public` puis
+  échoue à copier, et le build Xcode échoue au lieu de livrer une app vide.
 
 ### Adresses : règles du routeur iOS (à reproduire en Swift, PR 4)
 Le serveur de fichiers de Capacitor iOS renvoie `index.html` pour toute
 adresse sans extension. Le routeur personnalisé de la PR 4 doit suivre
-exactement les règles de `scripts/serve-native.mjs` (testées par
-`tests/native/routes.spec.ts`) :
+exactement `resolveNativeFile` (scripts/lib/native-rules.mjs), utilisée par
+`scripts/serve-native.mjs` et testée par `npm run test:scripts` et
+`tests/native/routes.spec.ts` :
 1. chemin avec extension (`/_next/static/…js`, `/dashboard.txt`,
-   `/icons/…png`) : le fichier tel quel, 404 s'il manque ;
+   `/icons/…png`) : le fichier tel quel, 404 s'il manque (jamais
+   `index.html`) ;
 2. chemin sans extension : `<chemin>.html` s'il existe, sinon
-   `<chemin>/index.html` s'il existe, sinon `/index.html` ;
-3. la query (`?id=`, `?code=`) et le `/` final sont ignorés pour choisir le
-   fichier.
+   `<chemin>/index.html` s'il existe, sinon `/index.html` (repli) ;
+3. la query (`?id=`, `?code=`, `?_rsc=`) et le `/` final sont ignorés pour
+   choisir le fichier ; `..` est refusé.
 
 L'ordre compte : `duo/rejoindre.html` et le dossier `duo/rejoindre/`
 coexistent (idem `onboarding`, `seances`). Les navigations client lisent
 `<page>.txt` (charge utile RSC), servis par la règle 1.
+
+Le serveur de test ne masque aucun appel serveur : GET et HEAD seulement
+(405 sinon), en-têtes `X-Native-File` (fichier servi) et
+`X-Native-Fallback: 1` (repli de la règle 2).
 
 Pages générées : `index`, `404`, `login`, `welcome`, `signup`, `dashboard`,
 `history`, `progress`, `profile`, `guide`, `credits`, `support`,
@@ -166,6 +187,9 @@ Projet Playwright `native` (`tests/native/`), jamais lancé par
 `npm run test:e2e`. Dans le job e2e, après les e2e web : build natif sur la
 stack Supabase locale, serveur statique sur le port 4300, puis : `/login`
 servi par `login.html` ; connexion avec le compte du seed jusqu'à
-`/dashboard` (rechargement complet servi par `dashboard.html`) ;
+`/dashboard` (rechargement complet servi par `dashboard.html`) ; passage au
+Carnet par l'onglet sans nouveau document (charge RSC en 200) ;
 rechargement de `/history` et de `/sessions/view?id=` (le bon écran, pas la
-racine) ; aucune requête vers `vercel.app` ni vers `/monitoring`.
+racine). Après chaque test : aucune requête vers `vercel.app` ni vers
+`/monitoring`, aucune réponse de la même origine en erreur (>= 400), aucune
+requête de la même origine (hors document) servie par le repli.

@@ -16,6 +16,7 @@
     "capacitor:copy:before": "node scripts/native-placeholder.mjs",
     "assets:gen": "capacitor-assets generate",
     "test:unit": "playwright test --project=unit",
+    "test:scripts": "node --test scripts/tests/native-rules.test.mjs",
     "test:e2e": "playwright test --project=e2e --workers=1",
     "test:native": "playwright test --project=native --workers=1"
   },

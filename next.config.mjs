@@ -50,13 +50,17 @@ const webConfig = {
 // `dashboard/index.html`) ; le routeur iOS de la PR 4 sert `/dashboard`
 // depuis ce fichier. Pas de `images.unoptimized` : l'app n'utilise pas
 // `next/image`. Sortie dans `out/`, copiée dans `capacitor/www` par
-// scripts/build-native.mjs.
+// scripts/build-native.mjs. Pas de `distDir` dédié : avec un export, Next
+// garde `.next` pour le build et utilise `distDir` comme dossier d'export.
+// `NEXT_PUBLIC_BUILD_TARGET` : environnement Sentry « native »
+// (lib/sentry/options.ts).
 /** @type {import('next').NextConfig} */
 const nativeConfig = {
   reactStrictMode: true,
   pageExtensions: DEFAULT_PAGE_EXTENSIONS,
   output: "export",
   trailingSlash: false,
+  env: { NEXT_PUBLIC_BUILD_TARGET: "native" },
 };
 
 // CM-95 : upload des source maps vers Sentry au build Vercel, seulement si
