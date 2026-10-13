@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import {
   REQUIRED_PAGES,
   bundleProblems,
+  missingNativeEnv,
   placeholderAction,
   resolveNativeFile,
 } from "../lib/native-rules.mjs";
@@ -104,4 +105,13 @@ test("export : origine des liens partagés tolérée, tout autre vercel.app refu
     { allowedOrigins: [origin] },
   );
   assert.deepEqual(problems, ["référence à vercel.app : _next/static/chunks/b.js"]);
+});
+
+test("CM-90 : build natif refusé sans URL ou clé Supabase", () => {
+  const ok = { NEXT_PUBLIC_SUPABASE_URL: "https://abc.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "k" };
+  assert.deepEqual(missingNativeEnv(ok), []);
+  assert.deepEqual(missingNativeEnv({ ...ok, NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321" }), []);
+  assert.equal(missingNativeEnv({}).length, 2);
+  assert.match(missingNativeEnv({ ...ok, NEXT_PUBLIC_SUPABASE_URL: "pas une url" })[0], /invalide/);
+  assert.match(missingNativeEnv({ ...ok, NEXT_PUBLIC_SUPABASE_ANON_KEY: "" })[0], /ANON_KEY/);
 });

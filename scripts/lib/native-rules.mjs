@@ -109,3 +109,27 @@ export function bundleProblems(files, readText, options = {}) {
   }
   return problems;
 }
+
+/**
+ * CM-90 : variables publiques sans lesquelles l'app native plante dès
+ * l'ouverture (gravées au build, rien n'est lu à l'exécution). Renvoie les
+ * problèmes, vide si tout va bien. `env` : process.env après chargement de
+ * `.env*` (scripts/build-native.mjs).
+ */
+export function missingNativeEnv(env) {
+  const problems = [];
+  const url = env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) {
+    problems.push("NEXT_PUBLIC_SUPABASE_URL manquante");
+  } else {
+    try {
+      if (new URL(url).protocol !== "https:" && !/^http:\/\/(127\.0\.0\.1|localhost)[:/]/.test(url)) {
+        problems.push(`NEXT_PUBLIC_SUPABASE_URL invalide : ${url}`);
+      }
+    } catch {
+      problems.push(`NEXT_PUBLIC_SUPABASE_URL invalide : ${url}`);
+    }
+  }
+  if (!env.NEXT_PUBLIC_SUPABASE_ANON_KEY) problems.push("NEXT_PUBLIC_SUPABASE_ANON_KEY manquante");
+  return problems;
+}

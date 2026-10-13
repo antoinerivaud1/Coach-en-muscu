@@ -23,7 +23,7 @@ import { cpSync, existsSync, readFileSync, readdirSync, renameSync, rmSync, stat
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { bundleProblems } from "./lib/native-rules.mjs";
+import { bundleProblems, missingNativeEnv } from "./lib/native-rules.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_DIR = join(ROOT, "out");
@@ -95,6 +95,24 @@ function swapWebDir(source) {
     throw error;
   }
   rmSync(OLD_WEB_DIR, { recursive: true, force: true });
+}
+
+// CM-90 : sans variables Supabase, l'export passe mais l'app plante à
+// l'ouverture (« Oups, l'app a planté »). Même chargement des fichiers `.env*`
+// que `next build`, et refus net AVANT de construire.
+{
+  const require = createRequire(import.meta.url);
+  const nextDir = dirname(require.resolve("next/package.json", { paths: [ROOT] }));
+  const { loadEnvConfig } = require(require.resolve("@next/env", { paths: [nextDir] }));
+  loadEnvConfig(ROOT, false, { info() {}, error: console.error });
+  const missing = missingNativeEnv(process.env);
+  if (missing.length) {
+    fail(
+      `réglages absents, rien n'a été construit :\n` +
+        missing.map((problem) => `  - ${problem}`).join("\n") +
+        `\nAjoute-les dans .env.local (voir NATIVE.md), puis relance.`,
+    );
+  }
 }
 
 rmSync(OUT_DIR, { recursive: true, force: true });
