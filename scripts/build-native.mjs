@@ -113,6 +113,12 @@ function swapWebDir(source) {
         `\nAjoute-les dans .env.local (voir NATIVE.md), puis relance.`,
     );
   }
+  // Sans DSN, l'app marche mais ses plantages ne remontent pas dans Sentry.
+  if (!process.env.NEXT_PUBLIC_SENTRY_DSN) {
+    console.warn(
+      "\n[build:native] Attention : NEXT_PUBLIC_SENTRY_DSN absente, les erreurs de l'app ne seront pas signalées (voir NATIVE.md).\n",
+    );
+  }
 }
 
 rmSync(OUT_DIR, { recursive: true, force: true });

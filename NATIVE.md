@@ -94,6 +94,17 @@ fusionnées sur `main`.
    NEXT_PUBLIC_SITE_URL=https://v0-gym-workout-tracker-silk.vercel.app \
    npm run build:native
    ```
+   CM-90 : sur le Mac, ces variables vivent dans `.env.local` à la racine du
+   clone (`~/Developer/Coach-en-muscu`, hors iCloud), lu par `build:native`.
+   Valeurs publiques (déjà présentes dans le bundle web) :
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://drmmgwchoowggpsppilo.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<clé anon « legacy » du projet, Supabase > Settings > API>
+   NEXT_PUBLIC_SENTRY_DSN=https://82e278aeb0a80e69438c95ec4d848a67@o4512236778291200.ingest.de.sentry.io/4512236785434704
+   NEXT_PUBLIC_SITE_URL=https://v0-gym-workout-tracker-silk.vercel.app
+   ```
+   `build:native` refuse de construire sans URL ni clé Supabase (l'app
+   plantait à l'ouverture) et avertit sans DSN Sentry (plantages non signalés).
    `NEXT_PUBLIC_SITE_URL` : origine des liens d'invitation partagés depuis l'app
    (`lib/siteUrl.ts`). Sans elle, l'app retombe sur le site de prod codé en dur
    (`PROD_WEB_ORIGIN`), jamais sur `capacitor://localhost`.
