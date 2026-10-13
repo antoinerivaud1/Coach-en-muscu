@@ -48,6 +48,9 @@ import ExerciseMuscleSummary from "@/components/ExerciseMuscleSummary";
 import AddExerciseSheet from "@/components/AddExerciseSheet";
 import ExitSessionSheet from "@/components/ExitSessionSheet";
 import { addPending } from "@/lib/pendingSessions";
+import { hasPendingStart, removePendingStart } from "@/lib/offline/pendingStarts";
+import { queueStore } from "@/lib/offline/queueStore";
+import { dropActiveSession } from "@/lib/offline/sessionCache";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useRestTimer } from "@/hooks/useRestTimer";
 import RestTimerBar, { readSafeAreaTop } from "@/components/RestTimerBar";
@@ -682,14 +685,26 @@ export default function SessionLogger({
     const input: FinishSessionInput = { sessionId, feedback, durationSeconds };
 
     startTransition(async () => {
+      const saveOffline = () => {
+        addPending(input);
+        // CM-90 (PR 2) : séance terminée pour l'utilisateur : plus rien à
+        // rouvrir hors ligne.
+        dropActiveSession(queueStore(), sessionId);
+        setOfflineSaved(true);
+      };
+      // CM-90 (PR 2) : séance démarrée hors ligne, pas encore créée en base :
+      // la clôture suit sa création dans la file (sinon elle serait refusée).
+      if (hasPendingStart(queueStore(), sessionId)) {
+        saveOffline();
+        return;
+      }
       let result;
       try {
         result = await finishSession(getSupabaseBrowserClient(), input);
       } catch {
         // Requête qui n'aboutit pas (hors ligne) : clôture rangée dans la
         // file `cm_pending_sessions`, rejouée par `PendingSync`.
-        addPending(input);
-        setOfflineSaved(true);
+        saveOffline();
         return;
       }
       if (!result.ok) {
@@ -764,6 +779,13 @@ export default function SessionLogger({
   function discard() {
     startDiscard(async () => {
       await persistence.discard(3000);
+      dropActiveSession(queueStore(), sessionId);
+      // CM-90 (PR 2) : séance démarrée hors ligne et jamais créée en base :
+      // il suffit d'oublier son démarrage, rien à supprimer côté serveur.
+      if (removePendingStart(queueStore(), sessionId)) {
+        router.replace("/dashboard");
+        return;
+      }
       let message: string | null = null;
       try {
         const result = await deleteOwnSession(getSupabaseBrowserClient(), profileId, sessionId);

@@ -18,7 +18,7 @@ import {
   type DurableStore,
   type KeyValueStore,
 } from "@/lib/offline/durableQueues";
-import { PURGE_MARKER_KEY, isQueueKey } from "@/lib/offline/keys";
+import { PURGE_MARKER_KEY, isOfflineCacheKey, isQueueKey } from "@/lib/offline/keys";
 
 export const QUEUE_CHANGED_EVENT = "cm:queues-changed";
 
@@ -158,7 +158,9 @@ export function purgeQueueStorage(): void {
   } catch {
     // Sans marqueur, l'effacement durable ci-dessous reste tenté.
   }
-  for (const key of store.keys().filter(isQueueKey)) {
+  // CM-90 (PR 2) : le cache hors ligne (packs, séance en cours, compte) part
+  // aussi : un autre compte sur ce téléphone n'en voit rien.
+  for (const key of store.keys().filter((k) => isQueueKey(k) || isOfflineCacheKey(k))) {
     try {
       store.removeItem(key);
     } catch {

@@ -235,8 +235,9 @@ export async function fetchDashboard(
 export async function purgeDashboardSessions(
   supabase: BrowserSupabase,
   profileId: string,
+  keepIds: ReadonlySet<string> = new Set(),
 ): Promise<number> {
-  return purgeAbandonedEmptySessions(supabase, profileId, new Date());
+  return purgeAbandonedEmptySessions(supabase, profileId, new Date(), keepIds);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

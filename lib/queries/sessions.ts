@@ -400,6 +400,7 @@ export async function purgeAbandonedEmptySessions(
   supabase: SupabaseClient<Database>,
   profileId: string,
   now: Date,
+  keepIds: ReadonlySet<string> = new Set(),
 ): Promise<number> {
   const before = new Date(now.getTime() - ABANDONED_EMPTY_SESSION_MS).toISOString();
 
@@ -411,8 +412,10 @@ export async function purgeAbandonedEmptySessions(
     .lt("performed_at", before)
     .returns<{ id: string; session_sets: { id: string }[] }[]>();
 
+  // CM-90 (PR 2) : une séance dont les séries attendent encore le réseau sur
+  // ce téléphone (`keepIds`) n'est pas vide pour de vrai : jamais supprimée.
   const emptyIds = (data ?? [])
-    .filter((s) => (s.session_sets ?? []).length === 0)
+    .filter((s) => (s.session_sets ?? []).length === 0 && !keepIds.has(s.id))
     .map((s) => s.id);
   if (emptyIds.length === 0) return 0;
 

@@ -63,6 +63,18 @@ export function addPendingStart(store: KeyValueStore, start: PendingStart): void
   setPendingStarts(store, [...items, start]);
 }
 
+/**
+ * Retire un démarrage pas encore envoyé (séance supprimée avant d'avoir été
+ * créée en base). Rend vrai s'il y en avait un.
+ */
+export function removePendingStart(store: KeyValueStore, sessionId: string): boolean {
+  const items = getPendingStarts(store);
+  const kept = items.filter((s) => s.sessionId !== sessionId);
+  if (kept.length === items.length) return false;
+  setPendingStarts(store, kept);
+  return true;
+}
+
 /** Vrai tant que la séance n'existe pas encore en base. */
 export function hasPendingStart(store: KeyValueStore, sessionId: string): boolean {
   return getPendingStarts(store).some((s) => s.sessionId === sessionId);

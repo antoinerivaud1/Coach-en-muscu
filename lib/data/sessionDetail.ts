@@ -140,6 +140,48 @@ export async function fetchSessionScreen(
   return loadRecap(supabase, profileId, session, existingSets, isMine, owner);
 }
 
+/**
+ * CM-90 (PR 2) : id fictif d'une séance pas encore créée (pack séance). Un
+ * uuid valide : `getLastSetsByExercise` l'exclut sans erreur (rien ne porte
+ * cet id).
+ */
+export const PACK_SESSION_ID = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * CM-90 (PR 2) : « pack séance », préparé en ligne pour démarrer hors ligne.
+ * Exactement ce que l'écran de saisie lirait pour une séance NEUVE de cette
+ * séance type (exercices, dernière fois, pré-remplissage, catalogue), avec
+ * un id de séance fictif (`PACK_SESSION_ID`) remplacé au démarrage.
+ *
+ * `null` : séance type introuvable ou plus accessible. LÈVE si une lecture
+ * échoue (réseau) : l'ancien pack, s'il existe, est alors conservé.
+ */
+export async function fetchDayPack(
+  supabase: BrowserSupabase,
+  profileId: string,
+  dayId: string,
+  now: Date,
+): Promise<LoggerData | null> {
+  const { data: owner, error } = await supabase
+    .from("profiles")
+    .select("accent_color")
+    .eq("id", profileId)
+    .returns<{ accent_color: string }[]>()
+    .maybeSingle();
+  if (error) throw new Error(READ_ERROR);
+  const fresh: SessionRow = {
+    id: PACK_SESSION_ID,
+    profile_id: profileId,
+    program_day_id: dayId,
+    performed_at: now.toISOString(),
+    duration_seconds: null,
+    feedback: null,
+    notes: null,
+  };
+  const data = await loadLogger(supabase, profileId, fresh, [], true, owner?.accent_color ?? null);
+  return data.kind === "logger" ? data : null;
+}
+
 async function loadLogger(
   supabase: BrowserSupabase,
   profileId: string,

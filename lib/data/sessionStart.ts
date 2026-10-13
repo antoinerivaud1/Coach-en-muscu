@@ -12,7 +12,16 @@ import { SEANCE_NOT_FOUND, checkSeanceAccess } from "@/lib/data/seances";
 
 export type StartSessionResult =
   | { ok: true; sessionId: string }
-  | { ok: false; error: string };
+  /**
+   * CM-90 (PR 2) : `offline` = la requête n'a pas abouti (pas de réseau,
+   * coupure). L'appelant peut alors démarrer hors ligne avec le même id.
+   */
+  | { ok: false; error: string; offline?: true };
+
+/** Erreur sans code : requête qui n'a pas abouti (même règle que sessionWrites). */
+function isTransport(error: { code?: string | null } | null | undefined): boolean {
+  return !!error && !error.code;
+}
 
 /**
  * Démarre une séance à partir d'une séance type (accueil et bibliothèque).
@@ -28,6 +37,12 @@ export async function startSessionFromDay(
   supabase: BrowserSupabase,
   profileId: string,
   rawDayId: string,
+  /**
+   * CM-90 (PR 2) : id créé sur le téléphone. Si la requête se perd et que
+   * l'app démarre hors ligne, c'est le MÊME id qui sera rejoué : jamais deux
+   * séances pour un seul tap.
+   */
+  sessionId: string,
 ): Promise<StartSessionResult> {
   const dayId = rawDayId.trim();
   if (!dayId) {
@@ -43,7 +58,11 @@ export async function startSessionFromDay(
       .maybeSingle();
 
     if (dayError) {
-      return { ok: false, error: `Impossible de démarrer la séance : ${dayError.message}` };
+      return {
+        ok: false,
+        error: `Impossible de démarrer la séance : ${dayError.message}`,
+        ...(isTransport(dayError) ? { offline: true as const } : {}),
+      };
     }
     if (!day) {
       return { ok: false, error: `${SEANCE_NOT_FOUND} : impossible de démarrer.` };
@@ -53,22 +72,26 @@ export async function startSessionFromDay(
     const access = await checkSeanceAccess(supabase, day.program_id, profileId, "Démarrage annulé.");
     if (!access.ok) return access;
 
-    const { data: session, error } = await supabase
+    // Upsert sur l'id : un rejeu (démarrage hors ligne après une réponse
+    // perdue) ne crée rien de plus.
+    const { error } = await supabase
       .from("sessions")
-      .insert({ profile_id: profileId, program_day_id: dayId })
-      .select("id")
-      .single();
+      .upsert(
+        { id: sessionId, profile_id: profileId, program_day_id: dayId },
+        { onConflict: "id", ignoreDuplicates: true },
+      );
 
-    if (error || !session) {
+    if (error) {
       return {
         ok: false,
-        error: `Impossible de démarrer la séance : ${error ? writeErrorMessage(error) : "erreur inconnue"}`,
+        error: `Impossible de démarrer la séance : ${writeErrorMessage(error)}`,
+        ...(isTransport(error) ? { offline: true as const } : {}),
       };
     }
-    return { ok: true, sessionId: session.id };
+    return { ok: true, sessionId };
   } catch (e) {
-    // Réseau coupé : la server action aurait échoué de la même façon.
+    // Réseau coupé : démarrage hors ligne possible (CM-90).
     const message = e instanceof Error ? e.message : "erreur inconnue";
-    return { ok: false, error: `Impossible de démarrer la séance : ${message}` };
+    return { ok: false, error: `Impossible de démarrer la séance : ${message}`, offline: true };
   }
 }
