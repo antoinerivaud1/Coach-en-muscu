@@ -8,6 +8,7 @@ import { markSessionListsStale } from "@/hooks/data/useSessionScreen";
 import { hasPendingStart } from "@/lib/offline/pendingStarts";
 import { claimSessionQueue } from "@/lib/offline/queueOwners";
 import { queueStore, whenQueuesReady } from "@/lib/offline/queueStore";
+import { recordConfirmed } from "@/lib/offline/sessionCache";
 import {
   backoffDelay,
   enqueueOp,
@@ -209,6 +210,12 @@ export function useSetPersistence(sessionId: string): SetPersistence {
           setSessionExpired(expired);
 
           if (ok) {
+            // CM-90 (PR 2) : la séance rouverte hors ligne affichera cette série.
+            recordConfirmed(
+              queueStore(),
+              sessionId,
+              op.kind === "upsert" ? { kind: "upsert", set: op.set } : { kind: "delete", id: op.id },
+            );
             commit(shiftQueue(queueRef.current));
             setFailures(0);
             // Remplace `revalidatePath` : Carnet, Stats et accueil seront

@@ -45,6 +45,8 @@ export interface OutboxDeps {
   upsertSet(set: PendingSet): Promise<ActionResult>;
   deleteSet(input: { id: string; sessionId: string }): Promise<ActionResult>;
   finishSession(input: FinishSessionInput): Promise<ActionResult>;
+  /** CM-90 (PR 2) : série confirmée (journal de la séance en cache). */
+  onSetConfirmed?(sessionId: string, op: QueuedOp): void;
 }
 
 export type OutboxReport = {
@@ -162,8 +164,10 @@ export async function replayOutbox(deps: OutboxDeps): Promise<OutboxReport> {
         blocked.add(sessionId);
         break;
       }
-      if (outcome === "ok") written += 1;
-      else setAsideOp(store, sessionId, op);
+      if (outcome === "ok") {
+        written += 1;
+        deps.onSetConfirmed?.(sessionId, op);
+      } else setAsideOp(store, sessionId, op);
       // Retire l'opération envoyée : celle de tête, si elle est toujours là.
       const now = readSetQueue(store, sessionId);
       const head = now[0];

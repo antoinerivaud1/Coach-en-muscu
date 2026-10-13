@@ -5,6 +5,23 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/data/queryKeys";
 import { fetchDashboard, purgeDashboardSessions } from "@/lib/data/dashboard";
+import { sessionsWithPendingSets } from "@/lib/offline/outbox";
+import { getPendingStarts } from "@/lib/offline/pendingStarts";
+import { queueStore, whenQueuesReady } from "@/lib/offline/queueStore";
+import { getPending } from "@/lib/pendingSessions";
+
+/**
+ * CM-90 (PR 2) : séances dont une écriture attend encore le réseau sur ce
+ * téléphone (démarrage, séries, clôture) : le nettoyage ne les touche pas.
+ */
+function locallyPendingSessionIds(): Set<string> {
+  const store = queueStore();
+  return new Set([
+    ...sessionsWithPendingSets(store),
+    ...getPendingStarts(store).map((s) => s.sessionId),
+    ...getPending(store).map((p) => p.sessionId),
+  ]);
+}
 
 /** CM-88 (PR 4) : données de l'accueil, lues sous RLS. */
 export function useDashboard(profileId: string | null) {
@@ -31,7 +48,8 @@ export function useDashboard(profileId: string | null) {
 export function usePurgeAbandonedSessions(profileId: string | null) {
   const queryClient = useQueryClient();
   const { mutate } = useMutation({
-    mutationFn: (id: string) => purgeDashboardSessions(getSupabaseBrowserClient(), id),
+    mutationFn: (id: string) =>
+      purgeDashboardSessions(getSupabaseBrowserClient(), id, locallyPendingSessionIds()),
     onSuccess: (purged, id) => {
       if (purged > 0) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all(id) });
@@ -45,6 +63,7 @@ export function usePurgeAbandonedSessions(profileId: string | null) {
   useEffect(() => {
     if (!profileId || doneFor.current === profileId) return;
     doneFor.current = profileId;
-    mutate(profileId);
+    // CM-90 : files locales restaurées d'abord (iPhone), pour les protéger.
+    void whenQueuesReady().then(() => mutate(profileId));
   }, [profileId, mutate]);
 }

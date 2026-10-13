@@ -26,6 +26,27 @@ export const REFUSED_SETS_PREFIX = "cm:refusedSets:";
  */
 export const PURGE_MARKER_KEY = "cm_queues_purged_at";
 
+/** CM-90 (PR 2) : pack séance par séance type (cache, reconstructible). */
+export const OFFLINE_PACK_PREFIX = "cm_offline_pack:";
+
+/** CM-90 (PR 2) : séance en cours reconstructible hors ligne (cache). */
+export const OFFLINE_SESSION_PREFIX = "cm_offline_session:";
+
+/** CM-90 (PR 2) : dernier compte connu, pour les écrans hors ligne. */
+export const LAST_PROFILE_KEY = "cm_last_profile_id";
+
+/**
+ * Cache hors ligne du compte connecté : jamais compté comme « non envoyé »,
+ * mais effacé à la déconnexion avec les files.
+ */
+export function isOfflineCacheKey(key: string): boolean {
+  return (
+    key === LAST_PROFILE_KEY ||
+    key.startsWith(OFFLINE_PACK_PREFIX) ||
+    key.startsWith(OFFLINE_SESSION_PREFIX)
+  );
+}
+
 /** Clé d'une file (en attente OU mise de côté) liée au compte connecté. */
 export function isQueueKey(key: string): boolean {
   return (

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useRequireProfileId } from "@/hooks/useProfileId";
 import { useDashboard, usePurgeAbandonedSessions } from "@/hooks/data/useDashboard";
 import { useStartSession } from "@/hooks/data/useStartSession";
+import { useRefreshSessionPacks } from "@/hooks/data/useSessionPacks";
 import {
   buildDashboardView,
   todayLabel,
@@ -59,6 +60,13 @@ export default function DashboardScreen() {
   usePurgeAbandonedSessions(profileId);
   const dashboard = useDashboard(profileId);
   const start = useStartSession(profileId);
+  // CM-90 (PR 2) : packs séance pour démarrer hors ligne, préparés en fond.
+  const programs = dashboard.data?.programs;
+  const dayIds = useMemo(
+    () => (programs ? programs.flatMap((p) => p.program_days.map((d) => d.id)) : null),
+    [programs],
+  );
+  useRefreshSessionPacks(profileId, dashboard.isFetchedAfterMount ? dayIds : null);
 
   // Recalculé à chaque nouvelle donnée, avec l'heure courante (« Hier »,
   // semaine en cours, bandeau périmé…).

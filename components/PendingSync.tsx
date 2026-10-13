@@ -16,6 +16,7 @@ import { isPublicPath } from "@/lib/auth/publicPaths";
 import { outboxCounts, replayOutbox, type OutboxCounts } from "@/lib/offline/outbox";
 import { isSessionQueueOwned } from "@/lib/offline/queueOwners";
 import { QUEUE_CHANGED_EVENT, queueStore, whenQueuesReady } from "@/lib/offline/queueStore";
+import { recordConfirmed } from "@/lib/offline/sessionCache";
 
 /**
  * CM-59 B : pas de rejeu sans session possible : `/login` et les pages
@@ -77,6 +78,12 @@ export default function PendingSync() {
           upsertSet: (set) => upsertSessionSet(supabase, set),
           deleteSet: (input) => deleteSessionSet(supabase, input),
           finishSession: (input) => finishSession(supabase, input),
+          onSetConfirmed: (sessionId, op) =>
+            recordConfirmed(
+              queueStore(),
+              sessionId,
+              op.kind === "upsert" ? { kind: "upsert", set: op.set } : { kind: "delete", id: op.id },
+            ),
         });
         if (written > 0) {
           const profileId = await readBrowserProfileId().catch(() => null);

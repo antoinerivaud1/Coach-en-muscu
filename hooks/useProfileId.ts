@@ -7,6 +7,8 @@ import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/data/queryKeys";
 import { isUuid, loginPath, resolveProfileId } from "@/lib/auth/core";
+import { queueStore } from "@/lib/offline/queueStore";
+import { lastKnownProfileId, rememberProfileId } from "@/lib/offline/sessionCache";
 
 /**
  * CM-88 : id du profil connecté, côté navigateur. `getClaims()` valide le
@@ -21,13 +23,38 @@ import { isUuid, loginPath, resolveProfileId } from "@/lib/auth/core";
  * refusé (révoqué, compte supprimé…) vaut « personne », comme côté serveur.
  */
 export async function readBrowserProfileId(): Promise<string | null> {
-  const { data, error } = await getSupabaseBrowserClient().auth.getClaims();
+  let result: Awaited<ReturnType<ReturnType<typeof getSupabaseBrowserClient>["auth"]["getClaims"]>>;
+  try {
+    result = await getSupabaseBrowserClient().auth.getClaims();
+  } catch (e) {
+    // `TypeError` : `fetch` qui échoue (hors ligne) hors des erreurs typées.
+    if (isAuthRetryableFetchError(e) || e instanceof TypeError) return offlineFallback(e);
+    throw e;
+  }
+  const { data, error } = result;
   if (error) {
-    if (isAuthRetryableFetchError(error)) throw error;
+    if (isAuthRetryableFetchError(error)) return offlineFallback(error);
     return null;
   }
   const sub = data?.claims?.sub;
-  return resolveProfileId(isUuid(sub) ? sub : null);
+  const profileId = resolveProfileId(isUuid(sub) ? sub : null);
+  if (profileId) rememberProfileId(queueStore(), profileId);
+  return profileId;
+}
+
+/**
+ * CM-90 (PR 2) : hors ligne, la validation du jeton est impossible (clés
+ * publiques ou rafraîchissement à télécharger). On garde alors le dernier
+ * compte validé sur CE téléphone (effacé à la déconnexion), pour afficher les
+ * données locales et démarrer une séance hors ligne. Ce n'est pas une
+ * décision d'accès : rien ne part en base sans un jeton valide (RLS), les
+ * écritures attendent le réseau. Sans compte connu : l'erreur réseau remonte,
+ * l'écran propose « Réessayer », comme avant.
+ */
+function offlineFallback(error: unknown): string {
+  const last = lastKnownProfileId(queueStore());
+  if (last && isUuid(last)) return last;
+  throw error;
 }
 
 /**
