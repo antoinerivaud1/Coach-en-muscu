@@ -2,7 +2,14 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  READ_CACHE_BUSTER,
+  READ_CACHE_MAX_AGE_MS,
+  createReadCachePersister,
+  shouldPersistQuery,
+} from "@/lib/offline/readCache";
 
 /**
  * CM-88 : cache des données côté client (TanStack Query), partagé par tous les
@@ -18,18 +25,30 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
  * rechargent la page entière (`window.location.assign`), donc un cache neuf. Si
  * la session change autrement (autre onglet, jeton révoqué), l'écouteur
  * ci-dessous efface les données et relance les écrans affichés.
+ *
+ * CM-90 (PR 3) : lecture hors ligne.
+ * - `networkMode: "always"` : on tente toujours, le réseau de salle est souvent
+ *   « présent mais inutilisable ». Un échec garde les données déjà affichées
+ *   (bandeau « Hors ligne », components/OfflineBanner.tsx) ; un écran sans
+ *   données propose « Réessayer » au lieu d'un squelette sans fin.
+ * - Cache recopié dans IndexedDB et restauré au lancement
+ *   (lib/offline/readCache.ts). `gcTime` aligné sur sa durée de vie : une
+ *   lecture quittée reste en cache, donc dans la copie.
  */
 export default function QueryProvider({ children }: { children: ReactNode }) {
+  const [persister] = useState(createReadCachePersister);
   const [client] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
           queries: {
             staleTime: 30_000,
+            gcTime: READ_CACHE_MAX_AGE_MS,
             retry: 1,
             refetchOnWindowFocus: true,
+            networkMode: "always",
           },
-          mutations: { retry: 0 },
+          mutations: { retry: 0, networkMode: "always" },
         },
       }),
   );
@@ -59,5 +78,18 @@ export default function QueryProvider({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, [client]);
 
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  if (!persister) return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <PersistQueryClientProvider
+      client={client}
+      persistOptions={{
+        persister,
+        maxAge: READ_CACHE_MAX_AGE_MS,
+        buster: READ_CACHE_BUSTER,
+        dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+      }}
+    >
+      {children}
+    </PersistQueryClientProvider>
+  );
 }

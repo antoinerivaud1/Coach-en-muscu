@@ -6,6 +6,7 @@ import { daysSince, formatLastDone } from "@/lib/utils/recommendation";
 import { seanceEditPath } from "@/lib/routes";
 import type { SeanceView, SeanceWriteResult } from "@/lib/data/seances";
 import { useSeanceLibraryAction, type SeanceLibraryAction } from "@/hooks/data/useSeances";
+import { useOnline } from "@/hooks/useOnline";
 
 export type { SeanceExerciseView, SeanceView } from "@/lib/data/seances";
 
@@ -59,6 +60,9 @@ export default function SeanceLibrary({
 }) {
   const libraryAction = useSeanceLibraryAction(profileId);
   const isPending = libraryAction.isPending;
+  // CM-90 (PR 3) : hors ligne, seul « Démarrer » reste actif (packs séance).
+  const online = useOnline();
+  const locked = isPending || !online;
   /** Erreur courante, rattachée à l'id de la séance concernée. */
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -213,7 +217,7 @@ export default function SeanceLibrary({
               <button
                 type="button"
                 onClick={() => void run(seance.id, { kind: "move", dayId: seance.id, direction: "up" })}
-                disabled={index === 0 || isPending}
+                disabled={index === 0 || locked}
                 aria-label={`Monter la séance ${seance.name}`}
                 className="rounded-lg bg-surface2 px-3 py-2 text-sm font-bold text-fg disabled:opacity-30"
               >
@@ -224,7 +228,7 @@ export default function SeanceLibrary({
                 onClick={() =>
                   void run(seance.id, { kind: "move", dayId: seance.id, direction: "down" })
                 }
-                disabled={index === seances.length - 1 || isPending}
+                disabled={index === seances.length - 1 || locked}
                 aria-label={`Descendre la séance ${seance.name}`}
                 className="rounded-lg bg-surface2 px-3 py-2 text-sm font-bold text-fg disabled:opacity-30"
               >
@@ -233,16 +237,25 @@ export default function SeanceLibrary({
               <span className="flex-1" />
               {/* Le nom se change dans l'écran de modification : plus de
                   renommage en place depuis la bibliothèque (CM-81). */}
-              <Link
-                href={seanceEditPath(seance.id)}
-                className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-fg"
-              >
-                Modifier
-              </Link>
+              {online ? (
+                <Link
+                  href={seanceEditPath(seance.id)}
+                  className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-fg"
+                >
+                  Modifier
+                </Link>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-fg opacity-50"
+                >
+                  Modifier
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => void run(seance.id, { kind: "duplicate", dayId: seance.id })}
-                disabled={isPending}
+                disabled={locked}
                 className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-fg disabled:opacity-50"
               >
                 {busy ? "…" : "Dupliquer"}
@@ -250,7 +263,7 @@ export default function SeanceLibrary({
               <button
                 type="button"
                 onClick={() => toggleConfirm(seance.id, "delete")}
-                disabled={isPending}
+                disabled={locked}
                 aria-expanded={confirming?.id === seance.id && confirming.kind === "delete"}
                 aria-controls={`confirm-delete-${seance.id}`}
                 className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-red-400 disabled:opacity-50"
@@ -263,7 +276,7 @@ export default function SeanceLibrary({
               <button
                 type="button"
                 onClick={() => toggleConfirm(seance.id, "share")}
-                disabled={isPending}
+                disabled={locked}
                 aria-expanded={confirming?.id === seance.id && confirming.kind === "share"}
                 aria-controls={`confirm-share-${seance.id}`}
                 className="mt-2.5 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface2 px-3 text-[15px] font-bold text-fg disabled:opacity-50"
@@ -300,7 +313,7 @@ export default function SeanceLibrary({
                     onClick={() =>
                       void run(seance.id, { kind: "share", dayId: seance.id, name: seance.name })
                     }
-                    disabled={isPending}
+                    disabled={locked}
                     className="min-h-11 flex-1 rounded-lg bg-energy text-sm font-extrabold text-ink disabled:opacity-50"
                   >
                     {busy ? "Partage…" : "Oui, partager"}
@@ -330,7 +343,7 @@ export default function SeanceLibrary({
                   <button
                     type="button"
                     onClick={() => handleDelete(seance)}
-                    disabled={isPending}
+                    disabled={locked}
                     className="min-h-11 flex-1 rounded-lg bg-flame text-sm font-extrabold text-ink disabled:opacity-50"
                   >
                     {busy ? "Suppression…" : "Oui, supprimer"}

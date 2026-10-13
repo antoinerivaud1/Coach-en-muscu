@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnline } from "@/hooks/useOnline";
 import { useEffect, useId, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { closeDeletedAccountSession, deleteMyAccount } from "@/lib/data/account";
@@ -79,6 +80,8 @@ export default function DeleteAccountSheet({
   profileId: string;
   onDeleted?: () => void;
 }) {
+  // CM-90 (PR 3) : action en ligne seulement, désactivée hors ligne.
+  const online = useOnline();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [word, setWord] = useState("");
@@ -188,7 +191,8 @@ export default function DeleteAccountSheet({
       <button
         type="button"
         onClick={openSheet}
-        className="flex min-h-[64px] w-full items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition-colors hover:border-white/20"
+        disabled={!online}
+        className="flex min-h-[64px] w-full items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition-colors hover:border-white/20 disabled:opacity-50"
       >
         <span className="flex-1">
           <span className="block font-extrabold text-[#FF6B6B]">Supprimer mon compte</span>

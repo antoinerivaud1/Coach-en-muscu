@@ -1,5 +1,7 @@
 "use client";
 
+import { useOnline } from "@/hooks/useOnline";
+
 /**
  * CM-88 : états communs des écrans client. Les pages ne sont plus rendues par
  * le serveur : à la première ouverture d'un écran, un squelette s'affiche le
@@ -20,14 +22,25 @@ export function ScreenSkeleton({ rows = 6, label = "Chargement" }: { rows?: numb
   );
 }
 
-/** Lecture en échec : message en français et bouton « Réessayer ». */
+/** CM-90 (PR 3) : hors ligne, sans copie locale de cet écran. */
+export const OFFLINE_NO_DATA_MESSAGE =
+  "Pas de réseau, et cet écran n'a pas encore été ouvert sur ce téléphone. Il s'affichera au retour du réseau.";
+
+/**
+ * Lecture en échec : message en français et bouton « Réessayer ». Sans
+ * message imposé et hors ligne : explique qu'aucune copie locale n'existe.
+ */
 export function ScreenError({
-  message = "Impossible de charger cet écran. Vérifie ta connexion.",
+  message,
   onRetry,
 }: {
   message?: string;
   onRetry?: () => void;
 }) {
+  const online = useOnline();
+  message ??= online
+    ? "Impossible de charger cet écran. Vérifie ta connexion."
+    : OFFLINE_NO_DATA_MESSAGE;
   return (
     <div role="alert" className="rounded-2xl bg-surface p-4">
       <p className="text-base">{message}</p>

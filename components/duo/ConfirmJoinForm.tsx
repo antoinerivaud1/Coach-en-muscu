@@ -1,5 +1,7 @@
 "use client";
 
+import { useOnline } from "@/hooks/useOnline";
+import { OnlineOnlyHint } from "@/components/OfflineBanner";
 import { useState } from "react";
 import Link from "next/link";
 import { MEMBER_COLORS, isMemberColor, DEFAULT_MEMBER_COLOR, type MemberColor } from "@/lib/members";
@@ -28,6 +30,8 @@ export default function ConfirmJoinForm({
   myColor: string;
   colorConflict: boolean;
 }) {
+  // CM-90 (PR 3) : action en ligne seulement, désactivée hors ligne.
+  const online = useOnline();
   const { run, pending, error } = useAcceptInvitation();
   const initial: MemberColor = colorConflict
     ? (MEMBER_COLORS.find((c) => c.value !== inviterColor)?.value ?? DEFAULT_MEMBER_COLOR)
@@ -53,7 +57,7 @@ export default function ConfirmJoinForm({
       onSubmit={(e) => {
         e.preventDefault();
         // Couleur envoyée seulement en cas de conflit (sinon la sienne est gardée).
-        if (!pending && !sameAsInviter) run(code, colorConflict ? color : null);
+        if (!pending && !sameAsInviter && online) run(code, colorConflict ? color : null);
       }}
       className="flex flex-1 flex-col"
     >
@@ -116,11 +120,13 @@ export default function ConfirmJoinForm({
         </p>
       )}
 
+      <OnlineOnlyHint className="mt-3" />
+
       <div className="flex-1" />
 
       <button
         type="submit"
-        disabled={pending || sameAsInviter}
+        disabled={pending || sameAsInviter || !online}
         className="mt-6 h-14 rounded-2xl bg-energy text-[17px] font-extrabold text-ink disabled:opacity-40"
       >
         {pending ? "Un instant…" : "Rejoindre le duo"}

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { showsComparison, toMembers, type Member } from "@/lib/duo";
 import type { HistoryData } from "@/lib/data/sessions";
@@ -8,6 +9,7 @@ import { sessionPath } from "@/lib/routes";
 import { useRequireProfileId } from "@/hooks/useProfileId";
 import { useHistory } from "@/hooks/data/useHistory";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
+import OfflineBanner from "@/components/OfflineBanner";
 
 const FEEDBACK_LABELS: Record<string, string> = {
   easy: "Facile",
@@ -24,7 +26,9 @@ export default function HistoryScreen() {
   const auth = useRequireProfileId("/history");
   const history = useHistory(auth.profileId);
 
-  if (auth.error || history.error) {
+  // CM-90 (PR 3) : un rafraîchissement en échec garde les données (bandeau
+  // « Hors ligne »), seule une lecture sans données affiche l'erreur.
+  if (auth.error || (history.error && !history.data)) {
     return (
       <div className="mx-auto max-w-lg">
         <h1 className="text-2xl font-bold">Historique</h1>
@@ -37,7 +41,7 @@ export default function HistoryScreen() {
     );
   }
 
-  if (auth.isPending || history.isPending) {
+  if (auth.isPending || !history.data) {
     return (
       <div className="mx-auto max-w-lg">
         <h1 className="text-2xl font-bold">Historique</h1>
@@ -48,10 +52,24 @@ export default function HistoryScreen() {
     );
   }
 
-  return <HistoryList data={history.data} profileId={auth.profileId!} />;
+  return (
+    <HistoryList
+      data={history.data}
+      profileId={auth.profileId!}
+      notice={<OfflineBanner sources={[history]} className="mt-3" />}
+    />
+  );
 }
 
-function HistoryList({ data, profileId }: { data: HistoryData; profileId: string }) {
+function HistoryList({
+  data,
+  profileId,
+  notice,
+}: {
+  data: HistoryData;
+  profileId: string;
+  notice: ReactNode;
+}) {
   // CM-87 : sans duo, aucun nom affiché (rien à comparer).
   const members = toMembers(data.profiles, profileId);
   const byId: Record<string, Member> = {};
@@ -66,6 +84,7 @@ function HistoryList({ data, profileId }: { data: HistoryData; profileId: string
         {sessions.length} séance{sessions.length > 1 ? "s" : ""} enregistrée
         {sessions.length > 1 ? "s" : ""}
       </p>
+      {notice}
 
       {sessions.length === 0 ? (
         <div className="mt-6 rounded-xl bg-surface p-6 text-center">
