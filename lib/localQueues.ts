@@ -8,6 +8,7 @@
 
 import { isQueueKey } from "@/lib/offline/keys";
 import { purgeQueueStorage, queueStore } from "@/lib/offline/queueStore";
+import { purgeReadCache } from "@/lib/offline/readCache";
 
 function entryCount(key: string): number {
   try {
@@ -32,7 +33,11 @@ export function unsyncedLocalCount(): number {
   return keys.filter(isQueueKey).reduce((n, key) => n + entryCount(key), 0);
 }
 
-/** Efface toutes les files locales du compte. */
+/**
+ * Efface toutes les files locales du compte, et (CM-90 PR 3) sa copie
+ * hors ligne des écrans.
+ */
 export function purgeLocalQueues(): void {
   purgeQueueStorage();
+  purgeReadCache();
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useOnline } from "@/hooks/useOnline";
+import { OnlineOnlyHint } from "@/components/OfflineBanner";
 import { useState } from "react";
 import { useCreateExercise } from "@/hooks/data/useCatalogExercises";
 import type { SystemExercise } from "@/lib/queries/exercises";
@@ -23,6 +25,8 @@ export default function CreateExerciseForm({
   onCreated: (exercise: SystemExercise) => void;
   onCancel: () => void;
 }) {
+  // CM-90 (PR 3) : action en ligne seulement, désactivée hors ligne.
+  const online = useOnline();
   const create = useCreateExercise();
   const isCreating = create.isPending;
   const [name, setName] = useState("");
@@ -75,6 +79,7 @@ export default function CreateExerciseForm({
         ))}
       </select>
       {error && <p className="text-xs text-red-400">{error}</p>}
+      <OnlineOnlyHint className="text-xs" />
       <div className="flex gap-2">
         <button
           type="button"
@@ -90,7 +95,7 @@ export default function CreateExerciseForm({
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={isCreating}
+          disabled={isCreating || !online}
           className="flex-1 rounded bg-member py-2 text-xs font-semibold text-white disabled:opacity-50"
         >
           {isCreating ? "Création…" : submitLabel}

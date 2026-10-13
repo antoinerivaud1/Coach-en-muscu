@@ -7,6 +7,8 @@ import { useRequireProfileId } from "@/hooks/useProfileId";
 import { useSeanceLibrary } from "@/hooks/data/useSeances";
 import { useStartSession } from "@/hooks/data/useStartSession";
 import { ScreenSkeleton } from "@/components/ScreenState";
+import OfflineBanner, { OnlineOnlyHint } from "@/components/OfflineBanner";
+import { useOnline } from "@/hooks/useOnline";
 import type { Member } from "@/lib/duo";
 import SeanceLibrary from "./SeanceLibrary";
 
@@ -72,14 +74,26 @@ function Message({
 
 /** CTA collant, identique sous la liste et sous l'état vide. */
 function NewSeanceCta() {
+  // CM-90 (PR 3) : créer une séance type demande le réseau.
+  const online = useOnline();
   return (
     <div className="sticky bottom-0 mt-6 bg-ink/90 pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
-      <Link
-        href="/seances/new"
-        className="block rounded-2xl bg-energy py-4 text-center text-[18px] font-extrabold text-ink"
-      >
-        + Nouvelle séance
-      </Link>
+      {online ? (
+        <Link
+          href="/seances/new"
+          className="block rounded-2xl bg-energy py-4 text-center text-[18px] font-extrabold text-ink"
+        >
+          + Nouvelle séance
+        </Link>
+      ) : (
+        <span
+          aria-disabled="true"
+          className="block rounded-2xl bg-energy py-4 text-center text-[18px] font-extrabold text-ink opacity-40"
+        >
+          + Nouvelle séance
+        </span>
+      )}
+      <OnlineOnlyHint className="mt-2 text-center" />
     </div>
   );
 }
@@ -228,6 +242,9 @@ export default function SeanceLibraryScreen() {
           {total} séance{total > 1 ? "s" : ""} type
           {total > 1 ? "s" : ""} · réordonne avec les flèches
         </p>
+
+        {/* CM-90 (PR 3) : bibliothèque lue depuis la copie locale. */}
+        <OfflineBanner sources={[library]} className="mt-4" />
 
         {actionError && (
           <p

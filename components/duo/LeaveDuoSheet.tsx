@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnline } from "@/hooks/useOnline";
 import { useEffect, useId, useState } from "react";
 import { useLeaveDuo } from "@/hooks/data/useDuoActions";
 
@@ -10,6 +11,8 @@ import { useLeaveDuo } from "@/hooks/data/useDuoActions";
  * complet du Profil (`useLeaveDuo`).
  */
 export default function LeaveDuoSheet({ partnerName }: { partnerName: string }) {
+  // CM-90 (PR 3) : action en ligne seulement, désactivée hors ligne.
+  const online = useOnline();
   const [open, setOpen] = useState(false);
   const { run, pending, error } = useLeaveDuo();
   const titleId = useId();
@@ -35,7 +38,8 @@ export default function LeaveDuoSheet({ partnerName }: { partnerName: string }) 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="min-h-11 self-center px-3 text-base font-bold text-[#FF6B6B]"
+        disabled={!online}
+        className="min-h-11 self-center px-3 text-base font-bold text-[#FF6B6B] disabled:opacity-50"
       >
         Quitter le duo
       </button>

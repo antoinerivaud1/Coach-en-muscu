@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
 import { useRequireProfileId } from "@/hooks/useProfileId";
@@ -17,6 +17,7 @@ import MemberAvatar from "@/components/onboarding/MemberAvatar";
 import DuoSection from "@/components/profile/DuoSection";
 import DataSection from "@/components/profile/DataSection";
 import type { DeleteAccountDuo } from "@/components/profile/DeleteAccountSheet";
+import OfflineBanner from "@/components/OfflineBanner";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
 
 function Row({ href, title, sub }: { href: string; title: string; sub: string }) {
@@ -63,7 +64,9 @@ function ProfileContent({ onAccountDeleted }: { onAccountDeleted: () => void }) 
   const auth = useRequireProfileId("/profile");
   const profileId = auth.profileId;
   const identity = useIdentity(profileId);
-  const weeklyGoal = identity.isSuccess ? (identity.data?.weekly_goal ?? 4) : null;
+  // CM-90 (PR 3) : données présentes, même si leur rafraîchissement a échoué
+  // (hors ligne) : sinon les badges ne seraient jamais relus du cache.
+  const weeklyGoal = identity.data !== undefined ? (identity.data?.weekly_goal ?? 4) : null;
   const badges = useBadges(profileId, weeklyGoal);
   const duo = useDuoState(profileId);
 
@@ -100,6 +103,7 @@ function ProfileContent({ onAccountDeleted }: { onAccountDeleted: () => void }) 
 
   return (
     <ProfileView
+      notice={<OfflineBanner sources={[identity, badges, duo]} className="mt-5" />}
       profileId={profileId}
       identity={identity.data}
       badges={badges.data}
@@ -110,12 +114,14 @@ function ProfileContent({ onAccountDeleted }: { onAccountDeleted: () => void }) 
 }
 
 function ProfileView({
+  notice,
   profileId,
   identity,
   badges: { badges, earnedCount },
   duo,
   onAccountDeleted,
 }: {
+  notice: ReactNode;
   profileId: string;
   identity: Identity | null;
   badges: { badges: Badge[]; earnedCount: number };
@@ -156,6 +162,7 @@ function ProfileView({
 
   return (
     <>
+      {notice}
       <div className="mt-5 flex items-center gap-3.5 rounded-3xl border border-line bg-surface p-[18px]">
         <MemberAvatar name={me.name} color={me.color} size={56} />
         <div className="min-w-0">

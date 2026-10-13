@@ -1,5 +1,7 @@
 "use client";
 
+import { useOnline } from "@/hooks/useOnline";
+import { OnlineOnlyHint } from "@/components/OfflineBanner";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -61,6 +63,8 @@ export default function IdentitySection({
   /** Partenaire de duo actif (prénom, couleur), null en solo. */
   partner?: PartnerColor | null;
 }) {
+  // CM-90 (PR 3) : action en ligne seulement, désactivée hors ligne.
+  const online = useOnline();
   const queryClient = useQueryClient();
   const save = useMutation({
     mutationFn: (values: { displayName: string; accentColor: string; weeklyGoal: string }) =>
@@ -220,6 +224,7 @@ export default function IdentitySection({
             </p>
           )}
 
+          <OnlineOnlyHint />
           <div className="flex gap-2">
             <button
               type="button"
@@ -230,7 +235,7 @@ export default function IdentitySection({
             </button>
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || !online}
               className="h-12 flex-1 rounded-2xl bg-energy text-base font-extrabold text-ink disabled:opacity-60"
             >
               {pending ? "Enregistrement…" : "Enregistrer"}

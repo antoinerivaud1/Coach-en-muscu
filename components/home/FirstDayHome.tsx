@@ -31,6 +31,7 @@ export default function FirstDayHome({
   todayMinutes,
   seances,
   error,
+  notice,
   onStart,
 }: {
   name: string;
@@ -41,6 +42,8 @@ export default function FirstDayHome({
   todayMinutes: number;
   seances: FirstDaySeance[];
   error?: string;
+  /** CM-90 (PR 3) : bandeau « Hors ligne », sous l'en-tête. */
+  notice?: React.ReactNode;
   /** Démarre la séance type `dayId` (navigation vers la séance). */
   onStart: (dayId: string) => void;
 }) {
@@ -58,6 +61,8 @@ export default function FirstDayHome({
         </h1>
         <MemberAvatar name={name} color={accent} size={44} />
       </header>
+
+      {notice}
 
       {error && (
         <p role="alert" className="mt-5 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-sm text-red-400">

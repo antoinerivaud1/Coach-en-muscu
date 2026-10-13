@@ -5,6 +5,7 @@ import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
 import { useRequireProfileId } from "@/hooks/useProfileId";
 import { useCatalogExercises } from "@/hooks/data/useCatalogExercises";
 import ExerciseInfo from "@/components/ExerciseInfo";
+import OfflineBanner from "@/components/OfflineBanner";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
 
 const GROUP_ORDER = [
@@ -40,12 +41,16 @@ export default function GuideScreen() {
       <div className="mt-6">
         {auth.error ? (
           <ScreenError onRetry={() => void auth.refetch()} />
-        ) : catalog.error ? (
+        ) : catalog.error && !catalog.data ? (
           <ScreenError onRetry={() => void catalog.refetch()} />
-        ) : auth.isPending || catalog.isPending ? (
+        ) : auth.isPending || !catalog.data ? (
           <ScreenSkeleton label="Chargement des exercices" />
         ) : (
-          <ExerciseGroups exercises={catalog.data} />
+          <>
+            {/* CM-90 (PR 3) : rafraîchissement en échec, données gardées. */}
+            <OfflineBanner sources={[catalog]} className="mb-4" />
+            <ExerciseGroups exercises={catalog.data} />
+          </>
         )}
       </div>
     </div>

@@ -37,9 +37,17 @@ function legacyIdRedirects() {
   ];
 }
 
+// CM-90 (PR 3) : identifiant du build. Le cache de lecture hors ligne écrit
+// par une version précédente de l'app n'est jamais restauré
+// (lib/offline/readCache.ts). Posé dans l'environnement : les processus de
+// build lancés ensuite par Next en héritent, même valeur partout.
+process.env.NEXT_PUBLIC_READ_CACHE_BUSTER ??= String(Date.now());
+const READ_CACHE_BUSTER = process.env.NEXT_PUBLIC_READ_CACHE_BUSTER;
+
 /** @type {import('next').NextConfig} */
 const webConfig = {
   reactStrictMode: true,
+  env: { NEXT_PUBLIC_READ_CACHE_BUSTER: READ_CACHE_BUSTER },
   pageExtensions: [...DEFAULT_PAGE_EXTENSIONS, ...WEB_ONLY_PAGE_EXTENSIONS],
   async redirects() {
     return legacyIdRedirects();
@@ -60,7 +68,7 @@ const nativeConfig = {
   pageExtensions: DEFAULT_PAGE_EXTENSIONS,
   output: "export",
   trailingSlash: false,
-  env: { NEXT_PUBLIC_BUILD_TARGET: "native" },
+  env: { NEXT_PUBLIC_BUILD_TARGET: "native", NEXT_PUBLIC_READ_CACHE_BUSTER: READ_CACHE_BUSTER },
 };
 
 // CM-95 : upload des source maps vers Sentry au build Vercel, seulement si

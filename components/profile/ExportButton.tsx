@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnline } from "@/hooks/useOnline";
 import { useState } from "react";
 import { deliverExport } from "@/lib/export/deliverExport";
 import { buildAccountExportZip } from "@/lib/data/accountExport";
@@ -32,6 +33,8 @@ export default function ExportButton({
   variant: "row" | "sheet";
   profileId: string;
 }) {
+  // CM-90 (PR 3) : action en ligne seulement, désactivée hors ligne.
+  const online = useOnline();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,7 +79,7 @@ export default function ExportButton({
         <button
           type="button"
           onClick={onClick}
-          disabled={pending}
+          disabled={pending || !online}
           aria-busy={pending}
           className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-energy/40 text-[17px] font-bold text-energy disabled:opacity-60"
         >
@@ -93,7 +96,7 @@ export default function ExportButton({
       <button
         type="button"
         onClick={onClick}
-        disabled={pending}
+        disabled={pending || !online}
         aria-busy={pending}
         className="flex min-h-[64px] w-full items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition-colors hover:border-white/20 disabled:opacity-60"
       >

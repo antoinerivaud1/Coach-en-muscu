@@ -22,6 +22,7 @@ import PartnerActivityCard from "@/components/duo/PartnerActivityCard";
 import { hasPendingClosure } from "@/lib/pendingSessions";
 import ResumeSessionBanner from "@/components/ResumeSessionBanner";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
+import OfflineBanner from "@/components/OfflineBanner";
 import { memberStyle } from "@/lib/duo";
 import { deriveMuscleTags, splitVisibleTags } from "@/lib/utils/seances";
 import { formatLastDone } from "@/lib/utils/recommendation";
@@ -92,6 +93,9 @@ export default function DashboardScreen() {
   }
   if (!view || !profileId) return <DashboardShell />;
 
+  // CM-90 (PR 3) : accueil affiché depuis la copie locale.
+  const notice = <OfflineBanner sources={[dashboard]} className="mt-4" />;
+
   // CM-88 (PR 6) : toute écriture de séance (démarrage, fin, abandon,
   // suppression) invalide ce cache : ses données sont à jour, le bandeau
   // « Reprendre » et l'accueil du premier jour s'affichent sans attendre.
@@ -106,6 +110,7 @@ export default function DashboardScreen() {
         todayMinutes={view.todayMinutes}
         seances={view.seances}
         error={actionError}
+        notice={notice}
         onStart={start}
       />
     );
@@ -117,6 +122,7 @@ export default function DashboardScreen() {
       now={view.now}
       profileId={profileId}
       actionError={actionError}
+      notice={notice}
       onStart={start}
     />
   );
@@ -127,12 +133,14 @@ function Home({
   now,
   profileId,
   actionError,
+  notice,
   onStart,
 }: {
   view: HomeView;
   now: Date;
   profileId: string;
   actionError?: string;
+  notice: React.ReactNode;
   onStart: (dayId: string) => void;
 }) {
   const {
@@ -169,6 +177,8 @@ function Home({
           <MemberAvatar name={me.name} color={me.color} size={46} />
         )}
       </header>
+
+      {notice}
 
       {actionError && (
         <p

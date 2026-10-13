@@ -9,6 +9,7 @@ import { useRequireProfileId } from "@/hooks/useProfileId";
 import { useProgress } from "@/hooks/data/useProgress";
 import BottomNav from "@/components/BottomNav";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
+import OfflineBanner from "@/components/OfflineBanner";
 import ProgressView from "./ProgressView";
 import StatsSummary from "./StatsSummary";
 
@@ -31,7 +32,8 @@ function ProgressContent() {
   const auth = useRequireProfileId("/progress");
   const progress = useProgress(auth.profileId, requested);
 
-  if (auth.error || progress.error) {
+  // CM-90 (PR 3) : erreur seulement sans données (sinon bandeau « Hors ligne »).
+  if (auth.error || (progress.error && !progress.data)) {
     return (
       <Frame>
         <div className="mt-6">
@@ -43,9 +45,14 @@ function ProgressContent() {
     );
   }
 
-  if (auth.isPending || progress.isPending) return <ProgressLoading />;
+  if (auth.isPending || !progress.data) return <ProgressLoading />;
 
-  return <ProgressBody data={progress.data} />;
+  return (
+    <ProgressBody
+      data={progress.data}
+      notice={<OfflineBanner sources={[progress]} className="mt-3" />}
+    />
+  );
 }
 
 function ProgressLoading() {
@@ -73,11 +80,12 @@ function Frame({ color, children }: { color?: string; children: ReactNode }) {
   );
 }
 
-function ProgressBody({ data }: { data: ProgressData }) {
+function ProgressBody({ data, notice }: { data: ProgressData; notice: ReactNode }) {
   const { members, selectedProfileId, color } = data;
 
   return (
     <Frame color={color}>
+      {notice}
       {showsComparison(members) && (
         <div className="mt-3 flex gap-2">
           {members.map((m) => {
