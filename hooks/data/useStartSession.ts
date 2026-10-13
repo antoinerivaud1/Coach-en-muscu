@@ -33,7 +33,7 @@ function startOffline(profileId: string, dayId: string, sessionId: string): Star
   const performedAt = new Date().toISOString();
   saveActiveSession(store, profileId, offlineSessionFromPack(pack, sessionId, performedAt), Date.now());
   addPendingStart(store, { sessionId, profileId, programDayId: dayId, performedAt });
-  return { ok: true, sessionId };
+  return { ok: true, sessionId, offline: true };
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout: T): Promise<T> {
@@ -100,7 +100,11 @@ export function useStartSession(profileId: string | null) {
         // bandeau) est RETIRÉ avant de le quitter. Une invalidation le
         // relirait tout de suite, pour rien : on le quitte. La suite (fin,
         // abandon) invalide `[profileId, "sessions"]` (PR 6).
-        queryClient.removeQueries({ queryKey: queryKeys.dashboard.all(id) });
+        //
+        // CM-90 (PR 4) : sauf démarrage hors ligne. L'accueil ne pourrait pas
+        // être relu, sa copie est la seule ; son « Reprendre » vient alors de
+        // la séance gardée sur le téléphone (useLocalSession).
+        if (!result.offline) queryClient.removeQueries({ queryKey: queryKeys.dashboard.all(id) });
         router.push(sessionPath(result.sessionId));
         return;
       }

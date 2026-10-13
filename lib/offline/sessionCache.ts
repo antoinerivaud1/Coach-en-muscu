@@ -17,7 +17,13 @@ import type { InitialSet, LoggerData } from "@/lib/data/sessionDetail";
 import type { KeyValueStore } from "@/lib/offline/durableQueues";
 import { LAST_PROFILE_KEY, OFFLINE_PACK_PREFIX, OFFLINE_SESSION_PREFIX } from "@/lib/offline/keys";
 import { EXTRA_EXERCISE_DEFAULTS } from "@/lib/utils/sessionExercises";
-import type { PendingSet } from "@/lib/utils/setQueue";
+import {
+  parseQueueSnapshot,
+  queueStorageKey,
+  restoredDeletedIds,
+  restoredSets,
+  type PendingSet,
+} from "@/lib/utils/setQueue";
 import { formatWeight } from "@/lib/utils/training";
 
 /** Écriture de série confirmée par le serveur, dans l'ordre. */
@@ -285,6 +291,59 @@ export function applyJournal(data: LoggerData, journal: readonly JournalOp[]): L
     initialSets[set.exerciseId] = rows;
   }
   return { ...data, exercises, initialSets };
+}
+
+/** Séance en cours gardée sur le téléphone, pour le bandeau « Reprendre ». */
+export type LocalSession = {
+  sessionId: string;
+  dayName: string;
+  startedAt: string;
+  /** Séries faites : confirmées (lecture + journal) et encore en file. */
+  setCount: number;
+};
+
+/**
+ * CM-90 (PR 4) : séance en cours la plus récente de ce compte gardée sur le
+ * téléphone. L'accueil hors ligne (copie locale) ou une séance démarrée hors
+ * ligne (pas encore en base) ne la connaissent pas : sans ça, l'app relancée
+ * en pleine séance n'aurait aucun « Reprendre ». `exclude` : séances déjà
+ * closes côté téléphone (clôture en file).
+ */
+export function latestLocalSession(
+  store: KeyValueStore,
+  profileId: string,
+  exclude: (sessionId: string) => boolean = () => false,
+): LocalSession | null {
+  let keys: string[] = [];
+  try {
+    keys = store.keys().filter((k) => k.startsWith(OFFLINE_SESSION_PREFIX));
+  } catch {
+    return null;
+  }
+  let best: ActiveSessionSnapshot | null = null;
+  for (const key of keys) {
+    const snapshot = readSnapshot(store, key.slice(OFFLINE_SESSION_PREFIX.length));
+    if (!snapshot || snapshot.profileId !== profileId) continue;
+    if (snapshot.data.finishedDurationSeconds !== null || exclude(snapshot.data.sessionId)) continue;
+    if (!best || snapshot.savedAt > best.savedAt) best = snapshot;
+  }
+  if (!best) return null;
+
+  const { sessionId, dayName, startedAt } = best.data;
+  const applied = applyJournal(best.data, best.journal);
+  const done = new Set<string>();
+  for (const rows of Object.values(applied.initialSets)) {
+    for (const row of rows) if (row.id) done.add(row.id);
+  }
+  let queue: ReturnType<typeof parseQueueSnapshot> = [];
+  try {
+    queue = parseQueueSnapshot(store.getItem(queueStorageKey(sessionId)));
+  } catch {
+    // File illisible : on compte ce qui est confirmé.
+  }
+  for (const set of restoredSets(queue)) done.add(set.id);
+  for (const id of restoredDeletedIds(queue)) done.delete(id);
+  return { sessionId, dayName, startedAt, setCount: done.size };
 }
 
 // ---------------------------------------------------------------------------

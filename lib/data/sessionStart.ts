@@ -11,7 +11,8 @@ import { SEANCE_NOT_FOUND, checkSeanceAccess } from "@/lib/data/seances";
  */
 
 export type StartSessionResult =
-  | { ok: true; sessionId: string }
+  /** CM-90 (PR 4) : `offline` = démarrée sur le téléphone, création en file. */
+  | { ok: true; sessionId: string; offline?: true }
   /**
    * CM-90 (PR 2) : `offline` = la requête n'a pas abouti (pas de réseau,
    * coupure). L'appelant peut alors démarrer hors ligne avec le même id.
