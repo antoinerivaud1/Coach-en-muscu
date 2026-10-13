@@ -1,14 +1,14 @@
 PODS:
-  - Capacitor (6.2.1):
+  - Capacitor (8.5.3):
     - CapacitorCordova
-  - CapacitorCordova (6.2.1)
-  - CapacitorLocalNotifications (6.1.3):
+  - CapacitorCordova (8.5.3)
+  - CapacitorLocalNotifications (8.3.1):
     - Capacitor
-  - CapacitorPreferences (6.0.4):
+  - CapacitorPreferences (8.0.1):
     - Capacitor
-  - CapacitorSplashScreen (6.0.4):
+  - CapacitorSplashScreen (8.0.2):
     - Capacitor
-  - CapacitorStatusBar (6.0.3):
+  - CapacitorStatusBar (8.0.4):
     - Capacitor
 
 DEPENDENCIES:
@@ -34,12 +34,12 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/status-bar"
 
 SPEC CHECKSUMS:
-  Capacitor: c95400d761e376be9da6be5a05f226c0e865cebf
-  CapacitorCordova: 8d93e14982f440181be7304aa9559ca631d77fff
-  CapacitorLocalNotifications: 801867e687c42dd2b33c1e22e08f48e6738d2f72
-  CapacitorPreferences: 5848e0691b36b4bb4acc98e481ab56d451578d30
-  CapacitorSplashScreen: ef140a8b1ea7244e0c245ce2dd4ce5251e7ab86a
-  CapacitorStatusBar: 149cde8f1328ec3aa6cbdd872a55137ae3f98b16
+  Capacitor: 17e970df74ced80ad73f1bf99f2c53aa6fcabde0
+  CapacitorCordova: 0b7326439c7a09fc5d20eced5e0dab986327a493
+  CapacitorLocalNotifications: ab98bfae3fa8646b1fadd79485ce1be010dea21f
+  CapacitorPreferences: 0fa33b3affebf12d96358b491ed7c2b39bec3270
+  CapacitorSplashScreen: 120117d1b2264bba31a6e6f998f51e510144dd12
+  CapacitorStatusBar: 9b98299f3d119657ea338c047e0b876714c213ad
 
 PODFILE CHECKSUM: db4c49a11505b4c7b7b58580e44214f368b8182e
 

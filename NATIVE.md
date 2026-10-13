@@ -18,7 +18,14 @@ Côté natif (CM-89, PR 4) :
 ## Prérequis (sur le Mac d'Antoine)
 - Xcode (iOS) + un compte Apple Developer (99 $/an) : ticket P5-4 / CM-46
 - Android Studio (Android) + compte Google Play Developer (25 $ une fois) : P5-5 / CM-47
-- Node 18+ et le repo cloné
+- Node 22+ (Capacitor 8) et le repo cloné hors iCloud (`~/Developer/Coach-en-muscu`)
+- CM-112 : Capacitor 8 (core, ios, cli et plugins en 8.x) depuis octobre 2026.
+  Exige Xcode 26+ et iOS 15+ minimum (l'app vise iOS 17). Projet iOS toujours
+  en CocoaPods (Capacitor 8 ne bascule vers Swift Package Manager que les
+  projets créés neufs). Le routeur `StaticExportRouter` s'appuie sur
+  `CAPBridgeViewController.router()` et le protocole `Router`, inchangés en 8.
+- Icônes et splash : `npm run assets:gen` lance `@capacitor/assets` à la
+  demande (`npx`), il n'est plus une dépendance du projet (alertes de sécurité).
 
 ## Première initialisation (une seule fois)
 ```bash
