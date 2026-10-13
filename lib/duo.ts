@@ -47,6 +47,15 @@ export function inviteJoinPath(code: string): string {
   return `/duo/rejoindre?code=${encodeURIComponent(code)}`;
 }
 
+/**
+ * CM-107 : texte complet partagé par « Partager ». Le lien est DANS le texte :
+ * la feuille de partage iOS ne garde parfois qu'un seul élément (action
+ * « Copier », certaines apps), le lien ne doit donc jamais être un élément à part.
+ */
+export function inviteShareText(inviterName: string, code: string, url: string): string {
+  return `${inviterName} t'invite à s'entraîner en duo sur Coach en Muscu.\nCode : ${code}\n${url}`;
+}
+
 /** Date d'expiration lisible : « jusqu'au 14 octobre ». */
 export function formatInviteExpiry(expiresAt: string | Date): string {
   const d = typeof expiresAt === "string" ? new Date(expiresAt) : expiresAt;

@@ -141,7 +141,7 @@ export default function SessionRecap({
 
   return (
     <main
-      className="min-h-screen p-4 pb-24"
+      className="min-h-screen p-4 pb-24 pt-[max(1rem,env(safe-area-inset-top))]"
       style={memberStyle(memberAccent({ accent_color: data.ownerAccent }))}
     >
       {/* CM-78 : séance terminée alors que des séries attendaient encore leur

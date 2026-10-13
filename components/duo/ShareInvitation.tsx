@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { inviteJoinPath } from "@/lib/duo";
+import { inviteJoinPath, inviteShareText } from "@/lib/duo";
 import { publicSiteOrigin } from "@/lib/siteUrl";
 
 /**
@@ -30,10 +30,11 @@ export default function ShareInvitation({
     // CM-89 (PR 4) : origine publique du site, jamais `capacitor://localhost`
     // dans l'app native (lien inutilisable pour la personne invitée).
     const url = `${publicSiteOrigin()}${inviteJoinPath(code)}`;
-    const text = `${inviterName} t'invite à s'entraîner en duo sur Coach en Muscu. Code : ${code}`;
+    const text = inviteShareText(inviterName, code, url);
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: "Coach en Muscu", text, url });
+        // CM-107 : pas de champ `url` séparé, le lien est dans `text`.
+        await navigator.share({ title: "Coach en Muscu", text });
         return;
       } catch (e) {
         // Partage annulé par l'utilisateur : rien à faire.
