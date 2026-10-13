@@ -47,6 +47,10 @@ export default function QueryProvider({ children }: { children: ReactNode }) {
             retry: 1,
             refetchOnWindowFocus: true,
             networkMode: "always",
+            // Explicite : en mode "always", TanStack le coupe par défaut. Le
+            // retour du réseau doit relire les écrans affichés (et retirer le
+            // bandeau « Hors ligne »).
+            refetchOnReconnect: true,
           },
           mutations: { retry: 0, networkMode: "always" },
         },
