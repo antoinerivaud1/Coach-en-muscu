@@ -5,6 +5,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { deleteSessionSet, upsertSessionSet } from "@/lib/data/sessionWrites";
 import { markSessionListsStale } from "@/hooks/data/useSessionScreen";
+import { hasPendingStart } from "@/lib/offline/pendingStarts";
+import { claimSessionQueue } from "@/lib/offline/queueOwners";
+import { queueStore, whenQueuesReady } from "@/lib/offline/queueStore";
 import {
   backoffDelay,
   enqueueOp,
@@ -21,6 +24,13 @@ import {
 
 /** Nombre d'échecs consécutifs à partir duquel on prévient l'utilisateur. */
 const FAILURE_NOTICE_THRESHOLD = 3;
+
+/**
+ * CM-90 : séance démarrée hors ligne, pas encore créée en base. Ses séries
+ * attendent (PendingSync crée la séance d'abord) : nouvel essai à ce rythme,
+ * sans compter d'échec ni afficher « en difficulté ».
+ */
+const WAIT_FOR_START_MS = 2000;
 
 export interface SetPersistence {
   /**
@@ -70,6 +80,11 @@ export interface SetPersistence {
  * validée dans le métro puis l'app tuée par iOS est écrite à la réouverture de
  * la séance. C'est une donnée de secours, jamais une source de vérité — la clé
  * est supprimée dès que la file est vide.
+ *
+ * CM-90 (PR 1) : stockage via `queueStore()` (recopié dans Preferences sur
+ * iPhone, que iOS ne purge pas), lu après `whenQueuesReady()`. Tant que le
+ * hook est monté, il POSSÈDE la file de sa séance (`claimSessionQueue`) :
+ * `PendingSync` rejoue toutes les autres, jamais celle-ci.
  */
 export function useSetPersistence(sessionId: string): SetPersistence {
   const queryClient = useQueryClient();
@@ -85,6 +100,13 @@ export function useSetPersistence(sessionId: string): SetPersistence {
   const aliveRef = useRef(true);
   /** Réveils demandés pendant qu'une opération était en vol. */
   const wakeUpRef = useRef(false);
+  /**
+   * CM-90 : vrai une fois la file stockée relue (après `whenQueuesReady`).
+   * Avant, rien n'est écrit ni envoyé : une validation faite pendant ces
+   * quelques millisecondes ne doit ni écraser la file stockée, ni passer
+   * devant elle.
+   */
+  const loadedRef = useRef(false);
 
   const storageKey = queueStorageKey(sessionId);
   const refusedKey = refusedStorageKey(sessionId);
@@ -96,11 +118,12 @@ export function useSetPersistence(sessionId: string): SetPersistence {
    */
   const setAside = useCallback(
     (op: QueuedOp) => {
-      if (op.kind !== "upsert" || typeof window === "undefined") return;
+      if (op.kind !== "upsert") return;
       try {
-        const kept = parseQueueSnapshot(window.localStorage.getItem(refusedKey));
+        const store = queueStore();
+        const kept = parseQueueSnapshot(store.getItem(refusedKey));
         const next = [...kept, { ...op, attempts: 0 }];
-        window.localStorage.setItem(refusedKey, serializeQueue(next));
+        store.setItem(refusedKey, serializeQueue(next));
         setRefusedCount(next.length);
       } catch {
         // Stockage indisponible : on garde au moins le compteur à l'écran.
@@ -112,10 +135,11 @@ export function useSetPersistence(sessionId: string): SetPersistence {
 
   const persist = useCallback(
     (next: readonly QueuedOp[]) => {
-      if (typeof window === "undefined") return;
+      if (!loadedRef.current) return;
       try {
-        if (next.length === 0) window.localStorage.removeItem(storageKey);
-        else window.localStorage.setItem(storageKey, serializeQueue(next));
+        const store = queueStore();
+        if (next.length === 0) store.removeItem(storageKey);
+        else store.setItem(storageKey, serializeQueue(next));
       } catch {
         // Quota plein ou stockage refusé (navigation privée iOS) : la file
         // reste en mémoire, on ne casse pas la saisie pour autant.
@@ -145,6 +169,7 @@ export function useSetPersistence(sessionId: string): SetPersistence {
    * appel concurrent se contente de demander un réveil, traité à la sortie.
    */
   const pump = useCallback(async (): Promise<void> => {
+    if (!loadedRef.current) return;
     if (runningRef.current) {
       wakeUpRef.current = true;
       return;
@@ -155,6 +180,13 @@ export function useSetPersistence(sessionId: string): SetPersistence {
       do {
         wakeUpRef.current = false;
         while (aliveRef.current && queueRef.current.length > 0) {
+          if (hasPendingStart(queueStore(), sessionId)) {
+            timerRef.current = setTimeout(() => {
+              timerRef.current = null;
+              void pump();
+            }, WAIT_FOR_START_MS);
+            return;
+          }
           const op = queueRef.current[0]!;
           let ok = false;
           let refused = false;
@@ -208,31 +240,45 @@ export function useSetPersistence(sessionId: string): SetPersistence {
     } finally {
       runningRef.current = false;
     }
-  }, [clearTimer, commit, setAside, queryClient]);
+  }, [clearTimer, commit, setAside, queryClient, sessionId]);
 
   // Reprise de la file laissée par une session précédente de la page, puis
   // envoi immédiat. C'est ce qui rattrape une série validée hors réseau avant
   // la fermeture de l'app.
   useEffect(() => {
     aliveRef.current = true;
-    let snapshot: string | null = null;
-    try {
-      snapshot = window.localStorage.getItem(storageKey);
-    } catch {
-      snapshot = null;
-    }
-    const pending = parseQueueSnapshot(snapshot);
-    try {
-      setRefusedCount(parseQueueSnapshot(window.localStorage.getItem(refusedKey)).length);
-    } catch {
-      setRefusedCount(0);
-    }
-    if (pending.length > 0) {
-      queueRef.current = pending;
-      setQueue(pending);
-    }
-    setRestored(pending);
-    void pump();
+    loadedRef.current = false;
+    // Nouvelle séance (ou premier montage) : rien d'une autre file en mémoire.
+    queueRef.current = [];
+    // Propre à CE montage : un double montage (mode strict) ne relit pas deux fois.
+    let active = true;
+    const release = claimSessionQueue(sessionId);
+
+    // CM-90 : sur iPhone, la file a pu être restaurée depuis Preferences ; on
+    // attend la fin de cette restauration avant de la lire.
+    void whenQueuesReady().then(() => {
+      if (!active || !aliveRef.current) return;
+      const store = queueStore();
+      let snapshot: string | null = null;
+      try {
+        snapshot = store.getItem(storageKey);
+      } catch {
+        snapshot = null;
+      }
+      const pending = parseQueueSnapshot(snapshot);
+      try {
+        setRefusedCount(parseQueueSnapshot(store.getItem(refusedKey)).length);
+      } catch {
+        setRefusedCount(0);
+      }
+      // Une série validée avant la fin de la restauration reste après les
+      // séries restaurées : l'ordre de validation est conservé.
+      loadedRef.current = true;
+      const merged = [...pending, ...queueRef.current];
+      if (merged.length > 0) commit(merged);
+      setRestored(pending);
+      void pump();
+    });
 
     const wake = () => {
       clearTimer();
@@ -244,12 +290,14 @@ export function useSetPersistence(sessionId: string): SetPersistence {
     window.addEventListener("online", wake);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
+      active = false;
       aliveRef.current = false;
+      release();
       clearTimer();
       window.removeEventListener("online", wake);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [storageKey, refusedKey, pump, clearTimer]);
+  }, [sessionId, storageKey, refusedKey, pump, clearTimer, commit]);
 
   const push = useCallback(
     (op: QueuedOp) => {

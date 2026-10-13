@@ -6,6 +6,8 @@
 // Le hook `useSetPersistence` n'ajoute que le pilotage (effets, timers, appels
 // server actions).
 
+import { PENDING_SETS_PREFIX, REFUSED_SETS_PREFIX } from "@/lib/offline/keys";
+
 /** Série telle qu'envoyée au serveur. L'`id` est généré côté client. */
 export interface PendingSet {
   id: string;
@@ -22,20 +24,17 @@ export type QueuedOp =
   | { kind: "upsert"; set: PendingSet; attempts: number }
   | { kind: "delete"; id: string; sessionId: string; attempts: number };
 
-/** Préfixe commun des files d'écriture, une par séance. */
-export const PENDING_SETS_PREFIX = "cm:pendingSets:";
+/** Préfixe commun des files d'écriture, une par séance (lib/offline/keys.ts). */
+export { PENDING_SETS_PREFIX, REFUSED_SETS_PREFIX };
 
 /** Clé `localStorage` de la file d'une séance. */
 export function queueStorageKey(sessionId: string): string {
   return `${PENDING_SETS_PREFIX}${sessionId}`;
 }
 
-/**
- * CM-59 B : séries refusées définitivement par le serveur (séance introuvable
- * ou pas à toi). Mises de côté sous cette clé, une par séance, au lieu d'être
- * jetées : aucune saisie ne disparaît en silence.
- */
-export const REFUSED_SETS_PREFIX = "cm:refusedSets:";
+// CM-59 B : séries refusées définitivement par le serveur (séance introuvable
+// ou pas à toi), mises de côté sous `REFUSED_SETS_PREFIX`, une clé par séance,
+// au lieu d'être jetées : aucune saisie ne disparaît en silence.
 
 /** Clé `localStorage` des séries refusées d'une séance. */
 export function refusedStorageKey(sessionId: string): string {

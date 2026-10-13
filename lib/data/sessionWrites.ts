@@ -89,6 +89,55 @@ const EXPIRED: ActionResult = { ok: false, error: SESSION_EXPIRED_MESSAGE, expir
 const NOT_FOUND_REFUSED: ActionResult = { ok: false, error: "Séance introuvable", refused: true };
 
 // ---------------------------------------------------------------------------
+// Démarrage hors ligne (CM-90), rejoué par `PendingSync` avant les séries
+// ---------------------------------------------------------------------------
+
+export interface StartedSessionInput {
+  sessionId: string;
+  profileId: string;
+  programDayId: string;
+  /** ISO 8601 : heure réelle du démarrage sur le téléphone. */
+  performedAt: string;
+}
+
+/**
+ * Crée en base une séance démarrée hors ligne, avec l'id et l'heure choisis
+ * sur le téléphone. Idempotent : un rejeu après une réponse perdue ne crée
+ * rien de plus (`ignoreDuplicates`).
+ *
+ * Refus définitif : séance type supprimée entre-temps (23503) ou création
+ * interdite par la RLS avec un jeton toujours valable (séance type plus
+ * accessible). Tout le reste est rejoué. LÈVE `OfflineError` sans réseau.
+ */
+export async function insertStartedSession(
+  supabase: BrowserSupabase,
+  input: StartedSessionInput,
+): Promise<ActionResult> {
+  if (!input.sessionId || !input.programDayId) return NOT_FOUND_REFUSED;
+  const token = await currentToken(supabase);
+  if (!token) return EXPIRED;
+  const { error } = await supabase.from("sessions").upsert(
+    {
+      id: input.sessionId,
+      profile_id: input.profileId,
+      program_day_id: input.programDayId,
+      performed_at: input.performedAt,
+    },
+    { onConflict: "id", ignoreDuplicates: true },
+  );
+  if (!error) return { ok: true };
+  if (isTransportError(error)) throw new OfflineError();
+  if (isJwtRejected(error)) return EXPIRED;
+  if (error.code === "23503") return { ok: false, error: REFUSED_MESSAGE, refused: true };
+  if (isRlsDenied(error)) {
+    return (await sameSessionStill(supabase, token))
+      ? { ok: false, error: REFUSED_MESSAGE, refused: true }
+      : EXPIRED;
+  }
+  return { ok: false, error: writeErrorMessage(error) };
+}
+
+// ---------------------------------------------------------------------------
 // Séries, une par une (CM-78), rejouées par `useSetPersistence`
 // ---------------------------------------------------------------------------
 

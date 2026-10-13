@@ -1,39 +1,49 @@
 import type { FinishSessionInput } from "@/lib/data/sessionWrites";
-
-/** Clôtures de séance faites hors ligne, rejouées par `PendingSync`. */
-export const PENDING_SESSIONS_KEY = "cm_pending_sessions";
+import type { KeyValueStore } from "@/lib/offline/durableQueues";
+import { PENDING_SESSIONS_KEY, REFUSED_SESSIONS_KEY } from "@/lib/offline/keys";
+import { queueStore } from "@/lib/offline/queueStore";
 
 /**
- * CM-59 B : clôtures refusées définitivement par le serveur (séance
- * introuvable ou pas à toi). Mises de côté au lieu d'être jetées en silence.
+ * Clôtures de séance faites hors ligne, rejouées par `PendingSync`
+ * (lib/offline/outbox.ts depuis CM-90).
+ *
+ * CM-90 (PR 1) : stockage via `queueStore()` (localStorage recopié dans
+ * Preferences sur iPhone). Le `store` est injectable pour les tests.
  */
-export const REFUSED_SESSIONS_KEY = "cm_refused_sessions";
+export { PENDING_SESSIONS_KEY, REFUSED_SESSIONS_KEY };
 
-const KEY = PENDING_SESSIONS_KEY;
-
-function read(key: string): FinishSessionInput[] {
-  if (typeof window === "undefined") return [];
+function read(store: KeyValueStore, key: string): FinishSessionInput[] {
   try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as FinishSessionInput[]) : [];
+    const raw = store.getItem(key);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as FinishSessionInput[]) : [];
   } catch {
     return [];
   }
 }
 
-export function getPending(): FinishSessionInput[] {
-  return read(KEY);
+function write(store: KeyValueStore, key: string, items: FinishSessionInput[]): void {
+  try {
+    if (items.length === 0) store.removeItem(key);
+    else store.setItem(key, JSON.stringify(items));
+  } catch {
+    // Stockage indisponible (quota, navigation privée) : rien de mieux à faire.
+  }
 }
 
-export function setPending(items: FinishSessionInput[]): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(KEY, JSON.stringify(items));
+export function getPending(store: KeyValueStore = queueStore()): FinishSessionInput[] {
+  return read(store, PENDING_SESSIONS_KEY);
 }
 
-export function addPending(item: FinishSessionInput): void {
-  const items = getPending();
-  items.push(item);
-  setPending(items);
+export function setPending(
+  items: FinishSessionInput[],
+  store: KeyValueStore = queueStore(),
+): void {
+  write(store, PENDING_SESSIONS_KEY, items);
+}
+
+export function addPending(item: FinishSessionInput, store: KeyValueStore = queueStore()): void {
+  setPending([...getPending(store), item], store);
 }
 
 /**
@@ -41,22 +51,22 @@ export function addPending(item: FinishSessionInput): void {
  * rejouée. L'accueil ne propose alors pas de la « Reprendre » : elle est
  * terminée pour l'utilisateur, seule son écriture attend le réseau.
  */
-export function hasPendingClosure(sessionId: string): boolean {
-  return getPending().some((p) => p.sessionId === sessionId);
+export function hasPendingClosure(sessionId: string, store: KeyValueStore = queueStore()): boolean {
+  return getPending(store).some((p) => p.sessionId === sessionId);
 }
 
-export function getRefusedSessions(): FinishSessionInput[] {
-  return read(REFUSED_SESSIONS_KEY);
+/**
+ * CM-59 B : clôtures refusées définitivement par le serveur (séance
+ * introuvable ou pas à toi). Mises de côté au lieu d'être jetées en silence.
+ */
+export function getRefusedSessions(store: KeyValueStore = queueStore()): FinishSessionInput[] {
+  return read(store, REFUSED_SESSIONS_KEY);
 }
 
-export function addRefusedSessions(items: FinishSessionInput[]): void {
-  if (typeof window === "undefined" || items.length === 0) return;
-  try {
-    window.localStorage.setItem(
-      REFUSED_SESSIONS_KEY,
-      JSON.stringify([...getRefusedSessions(), ...items]),
-    );
-  } catch {
-    // Stockage indisponible : rien de plus à faire.
-  }
+export function addRefusedSessions(
+  items: FinishSessionInput[],
+  store: KeyValueStore = queueStore(),
+): void {
+  if (items.length === 0) return;
+  write(store, REFUSED_SESSIONS_KEY, [...getRefusedSessions(store), ...items]);
 }

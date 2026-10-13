@@ -1,26 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { finishSession, type FinishSessionInput } from "@/lib/data/sessionWrites";
+import {
+  deleteSessionSet,
+  finishSession,
+  insertStartedSession,
+  upsertSessionSet,
+} from "@/lib/data/sessionWrites";
 import { readBrowserProfileId } from "@/hooks/useProfileId";
 import { invalidateSessions } from "@/hooks/data/useSessionScreen";
-import {
-  addRefusedSessions,
-  getPending,
-  getRefusedSessions,
-  setPending,
-} from "@/lib/pendingSessions";
 import { isPublicPath } from "@/lib/auth/publicPaths";
+import { outboxCounts, replayOutbox, type OutboxCounts } from "@/lib/offline/outbox";
+import { isSessionQueueOwned } from "@/lib/offline/queueOwners";
+import { QUEUE_CHANGED_EVENT, queueStore, whenQueuesReady } from "@/lib/offline/queueStore";
 
 /**
  * CM-59 B : pas de rejeu sans session possible : `/login` et les pages
  * publiques (légal, support) ne rejouent jamais la file.
- *
- * CM-88 (PR 6) : la clôture s'écrit depuis le navigateur ; une séance
- * enfin enregistrée fait relire accueil, Carnet et Stats.
  */
 function isSyncablePath(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -28,76 +27,106 @@ function isSyncablePath(pathname: string | null): boolean {
   return !isPublicPath(pathname);
 }
 
+/** Nouvel essai tant qu'il reste quelque chose à envoyer. */
+const RETRY_INTERVAL_MS = 30_000;
+
+/**
+ * Rejeu de toutes les écritures hors ligne (CM-18, CM-78, CM-90).
+ *
+ * CM-90 (PR 1) : une seule file ordonnée (lib/offline/outbox.ts) : démarrages
+ * de séance, puis séries de chaque séance que l'écran de saisie ne possède
+ * pas, puis clôtures. Rejouée au lancement (après la restauration iPhone), au
+ * retour du réseau, au retour de l'app au premier plan, et toutes les 30 s
+ * tant qu'il reste quelque chose. Une écriture enfin passée fait relire
+ * accueil, Carnet et Stats.
+ *
+ * Indicateur discret sous la barre d'état : écritures en attente (hors séance
+ * en cours de saisie, qui a ses propres pastilles) et écritures refusées.
+ */
 export default function PendingSync() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const syncable = isSyncablePath(pathname);
-  const [count, setCount] = useState(0);
-  const [refused, setRefused] = useState(0);
+  const [counts, setCounts] = useState<OutboxCounts>({ pending: 0, refused: 0 });
+  const running = useRef(false);
 
   useEffect(() => {
     if (!syncable) return;
     let cancelled = false;
+    let ready = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const refreshCounts = () => {
+      if (cancelled || !ready) return;
+      setCounts(outboxCounts(queueStore(), isSessionQueueOwned));
+    };
 
     async function sync() {
-      setRefused(getRefusedSessions().length);
-      const items = getPending();
-      if (items.length === 0) {
-        setCount(0);
-        return;
+      if (cancelled || !ready || running.current) return;
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
       }
-      if (typeof navigator !== "undefined" && navigator.onLine === false) {
-        setCount(items.length);
-        return;
-      }
-      const remaining: FinishSessionInput[] = [];
-      const setAside: FinishSessionInput[] = [];
-      let written = 0;
-      const supabase = getSupabaseBrowserClient();
-      for (const it of items) {
-        try {
-          const r = await finishSession(supabase, it);
-          if (r.ok) written += 1;
-          // CM-59 B : refus définitif (séance introuvable ou pas à toi) : mis
-          // de côté (`cm_refused_sessions`), jamais jeté. Tout le reste
-          // (42501, session expirée, réseau) est rejoué plus tard.
-          if (!r.ok && r.refused) setAside.push(it);
-          else if (!r.ok) remaining.push(it);
-        } catch {
-          remaining.push(it);
+      running.current = true;
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { written } = await replayOutbox({
+          store: queueStore(),
+          isOwned: isSessionQueueOwned,
+          startSession: (start) => insertStartedSession(supabase, start),
+          upsertSet: (set) => upsertSessionSet(supabase, set),
+          deleteSet: (input) => deleteSessionSet(supabase, input),
+          finishSession: (input) => finishSession(supabase, input),
+        });
+        if (written > 0) {
+          const profileId = await readBrowserProfileId().catch(() => null);
+          if (profileId) void invalidateSessions(queryClient, profileId);
         }
+      } finally {
+        running.current = false;
       }
       if (cancelled) return;
-      addRefusedSessions(setAside);
-      setPending(remaining);
-      setCount(remaining.length);
-      setRefused(getRefusedSessions().length);
-      if (written > 0) {
-        const profileId = await readBrowserProfileId().catch(() => null);
-        if (profileId) void invalidateSessions(queryClient, profileId);
-      }
+      const next = outboxCounts(queueStore(), isSessionQueueOwned);
+      setCounts(next);
+      if (next.pending > 0) timer = setTimeout(() => void sync(), RETRY_INTERVAL_MS);
     }
 
-    sync();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void sync();
+    };
+
+    void whenQueuesReady().then(() => {
+      ready = true;
+      refreshCounts();
+      void sync();
+    });
     window.addEventListener("online", sync);
+    window.addEventListener(QUEUE_CHANGED_EVENT, refreshCounts);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
+      if (timer !== null) clearTimeout(timer);
       window.removeEventListener("online", sync);
+      window.removeEventListener(QUEUE_CHANGED_EVENT, refreshCounts);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [syncable, queryClient]);
 
-  if (!syncable || (count === 0 && refused === 0)) return null;
+  if (!syncable || (counts.pending === 0 && counts.refused === 0)) return null;
   return (
-    <div className="fixed left-1/2 top-2 z-50 flex -translate-x-1/2 flex-col items-center gap-1">
-      {count > 0 && (
-        <div className="rounded-full bg-amber-500/90 px-3 py-1 text-xs font-medium text-amber-950">
-          {count} séance{count > 1 ? "s" : ""} à synchroniser…
+    <div
+      className="pointer-events-none fixed left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-1"
+      style={{ top: "max(0.5rem, env(safe-area-inset-top))" }}
+    >
+      {counts.pending > 0 && (
+        <div role="status" className="rounded-full bg-amber-500/90 px-3 py-1 text-sm font-medium text-amber-950">
+          {counts.pending} en attente de synchro
         </div>
       )}
-      {refused > 0 && (
-        <div role="status" className="rounded-full bg-surface2/95 px-3 py-1 text-xs font-medium text-fg-muted">
-          {refused} séance{refused > 1 ? "s n'ont" : " n'a"} pas pu être enregistrée
-          {refused > 1 ? "s" : ""}
+      {counts.refused > 0 && (
+        <div role="status" className="rounded-full bg-surface2/95 px-3 py-1 text-sm font-medium text-fg-muted">
+          {counts.refused} enregistrement{counts.refused > 1 ? "s" : ""} refusé
+          {counts.refused > 1 ? "s" : ""} par le serveur
         </div>
       )}
     </div>
