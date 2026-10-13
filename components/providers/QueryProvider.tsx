@@ -33,7 +33,8 @@ import {
  *   données propose « Réessayer » au lieu d'un squelette sans fin.
  * - Cache recopié dans IndexedDB et restauré au lancement
  *   (lib/offline/readCache.ts). `gcTime` aligné sur sa durée de vie : une
- *   lecture quittée reste en cache, donc dans la copie.
+ *   lecture quittée reste en cache, donc dans la copie. CM-90 (PR 4) : la
+ *   copie restaurée est toujours relue en arrière-plan au lancement.
  */
 export default function QueryProvider({ children }: { children: ReactNode }) {
   const [persister] = useState(createReadCachePersister);
@@ -92,6 +93,12 @@ export default function QueryProvider({ children }: { children: ReactNode }) {
         buster: READ_CACHE_BUSTER,
         dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
       }}
+      // CM-90 (PR 4) : une copie restaurée est affichée tout de suite mais
+      // toujours relue en arrière-plan. Sans ça, une copie de moins de 30 s
+      // (`staleTime`) écrite juste AVANT une écriture (copie par lots d'~1 s,
+      // app relancée aussitôt) resterait affichée telle quelle. Hors ligne, la
+      // relecture échoue et la copie reste, avec son bandeau.
+      onSuccess={() => void client.invalidateQueries()}
     >
       {children}
     </PersistQueryClientProvider>

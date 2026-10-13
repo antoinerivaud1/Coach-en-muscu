@@ -38,6 +38,9 @@ async function cleanup(page: Page, prefix: string) {
   await page.goto("/seances");
   const mine = page.getByRole("region", { name: "Mes séances" });
   await expect(mine).toBeVisible();
+  // CM-90 : la copie locale s'affiche d'abord, relue en arrière-plan. On
+  // compte sur la relecture, pas sur une carte déjà supprimée.
+  await page.waitForLoadState("networkidle");
   const cards = mine.locator("section").filter({ hasText: prefix });
   for (let n = await cards.count(); n > 0; n--) {
     const card = cards.first();

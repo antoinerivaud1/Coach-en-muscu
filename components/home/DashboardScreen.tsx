@@ -7,6 +7,8 @@ import { useRequireProfileId } from "@/hooks/useProfileId";
 import { useDashboard, usePurgeAbandonedSessions } from "@/hooks/data/useDashboard";
 import { useStartSession } from "@/hooks/data/useStartSession";
 import { useRefreshSessionPacks } from "@/hooks/data/useSessionPacks";
+import { useLocalSession } from "@/hooks/data/useLocalSession";
+import { useOnline } from "@/hooks/useOnline";
 import {
   buildDashboardView,
   todayLabel,
@@ -23,11 +25,18 @@ import { hasPendingClosure } from "@/lib/pendingSessions";
 import ResumeSessionBanner from "@/components/ResumeSessionBanner";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
 import OfflineBanner from "@/components/OfflineBanner";
+import { isShowingOfflineData } from "@/lib/offline/readCache";
+import { hasPendingStart } from "@/lib/offline/pendingStarts";
+import { queueStore } from "@/lib/offline/queueStore";
+import { resumeBannerState } from "@/lib/utils/currentSession";
 import { memberStyle } from "@/lib/duo";
 import { deriveMuscleTags, splitVisibleTags } from "@/lib/utils/seances";
 import { formatLastDone } from "@/lib/utils/recommendation";
 
 const WEEK = ["L", "M", "M", "J", "V", "S", "D"];
+
+/** Ce qu'affiche le bandeau « Reprendre ». */
+type Resume = { sessionId: string; dayName: string; setCount: number; stale: boolean };
 
 /** Nombre de tags musculaires affichés sur une carte de la grille (2 colonnes). */
 const CARD_VISIBLE_TAGS = 2;
@@ -68,6 +77,10 @@ export default function DashboardScreen() {
     [programs],
   );
   useRefreshSessionPacks(profileId, dashboard.isFetchedAfterMount ? dayIds : null);
+  // CM-90 (PR 4) : séance en cours gardée sur le téléphone.
+  const online = useOnline();
+  const local = useLocalSession(profileId);
+  const offlineShown = isShowingOfflineData([dashboard], online);
 
   // Recalculé à chaque nouvelle donnée, avec l'heure courante (« Hier »,
   // semaine en cours, bandeau périmé…).
@@ -92,6 +105,25 @@ export default function DashboardScreen() {
     );
   }
   if (!view || !profileId) return <DashboardShell />;
+
+  // CM-90 (PR 4) : « Reprendre » pour une séance que l'accueil ne peut pas
+  // connaître : démarrée hors ligne (pas encore en base), ou accueil affiché
+  // depuis sa copie locale. En ligne avec un accueil à jour, le serveur fait
+  // foi (séance close ou supprimée ailleurs : pas de bandeau).
+  let localResume: Resume | null = null;
+  if (local && (offlineShown || hasPendingStart(queueStore(), local.sessionId))) {
+    const state = resumeBannerState(
+      {
+        id: local.sessionId,
+        performedAt: local.startedAt,
+        setCreatedAt: Array.from({ length: local.setCount }, () => local.startedAt),
+      },
+      view.now,
+    );
+    if (state.kind === "banner") {
+      localResume = { sessionId: local.sessionId, dayName: local.dayName, setCount: state.setCount, stale: state.stale };
+    }
+  }
 
   // CM-90 (PR 3) : accueil affiché depuis la copie locale.
   const notice = <OfflineBanner sources={[dashboard]} className="mt-4" />;
@@ -123,6 +155,7 @@ export default function DashboardScreen() {
       profileId={profileId}
       actionError={actionError}
       notice={notice}
+      localResume={localResume}
       onStart={start}
     />
   );
@@ -134,6 +167,7 @@ function Home({
   profileId,
   actionError,
   notice,
+  localResume,
   onStart,
 }: {
   view: HomeView;
@@ -141,6 +175,7 @@ function Home({
   profileId: string;
   actionError?: string;
   notice: React.ReactNode;
+  localResume: Resume | null;
   onStart: (dayId: string) => void;
 }) {
   const {
@@ -155,6 +190,15 @@ function Home({
     recommended,
   } = view;
   const doneThisWeek = new Set(view.doneThisWeek);
+  const resume: Resume | null =
+    banner.kind === "banner" && !hasPendingClosure(banner.sessionId)
+      ? {
+          sessionId: banner.sessionId,
+          dayName: view.currentDayName,
+          setCount: banner.setCount,
+          stale: banner.stale,
+        }
+      : localResume;
   const startOnSubmit = (dayId: string) => (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     onStart(dayId);
@@ -258,13 +302,13 @@ function Home({
 
       {/* Séance en cours : toujours visible, même si la bibliothèque est vide.
           Ne bloque rien, la grille en dessous reste tapable (CM-83). */}
-      {banner.kind === "banner" && !hasPendingClosure(banner.sessionId) && (
+      {resume && (
         <ResumeSessionBanner
           profileId={profileId}
-          sessionId={banner.sessionId}
-          dayName={view.currentDayName}
-          setCount={banner.setCount}
-          stale={banner.stale}
+          sessionId={resume.sessionId}
+          dayName={resume.dayName}
+          setCount={resume.setCount}
+          stale={resume.stale}
         />
       )}
 
@@ -291,7 +335,7 @@ function Home({
               n'est verrouillé, taper une autre carte reste immédiat. Masqué
               quand une séance est en cours : le bandeau de reprise occupe déjà
               cette place (CM-83). */}
-          {banner.kind !== "banner" && recommended && (
+          {!resume && recommended && (
             <form onSubmit={startOnSubmit(recommended.id)} className="mb-2.5">
               <button
                 type="submit"

@@ -67,6 +67,17 @@ sur `main`, sans aucun secret :
    puis `npm run test:native` (`tests/native/` : `/login`, connexion jusqu'au
    tableau de bord, rechargement du Carnet et d'une séance, aucune requête
    `vercel.app`). Détails dans NATIVE.md.
+8. CM-90 (PR 4) : dans la même suite native, `tests/native/hors-ligne.spec.ts`
+   joue la salle sans réseau. Comme sur l'iPhone en mode avion, le bundle
+   reste local et seul Supabase est coupé (`tests/native/offline.ts` : requêtes
+   Supabase en échec + `navigator.onLine` à faux ; jamais `setOffline`, qui
+   couperait aussi le bundle). Parcours : séance démarrée, saisie et terminée
+   hors ligne puis retrouvée en base au retour du réseau (vérifiée depuis un
+   navigateur neuf) ; app fermée en pleine séance, relancée sur l'accueil sans
+   réseau, « Reprendre » puis rien de perdu ; réseau « présent mais
+   inutilisable » ; séance pas prête hors ligne (message) ; Carnet, séances
+   types et Profil lus hors ligne avec le bandeau, actions en ligne
+   désactivées ; écran jamais ouvert (message explicite).
 
 En cas d'échec, l'artefact `playwright-report` contient le rapport HTML, les
 traces (`test-results/`), `next.log` et les logs PostgREST. Le job e2e tourne

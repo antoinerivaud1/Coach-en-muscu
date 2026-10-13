@@ -756,7 +756,11 @@ export default function SessionLogger({
       setConfirmIncomplete(exercisesSkipped);
       return;
     }
-    if (!persistence.hasPending) {
+    // CM-90 (PR 4) : mode avion, ou séance démarrée hors ligne pas encore
+    // créée en base : attendre le réseau ne sert à rien et la confirmation
+    // inquiète pour rien. La clôture part dans la file, derrière les séries.
+    const knownOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+    if (!persistence.hasPending || knownOffline || hasPendingStart(queueStore(), sessionId)) {
       finish();
       return;
     }

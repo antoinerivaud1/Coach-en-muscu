@@ -38,7 +38,8 @@ const RETRY_INTERVAL_MS = 30_000;
  * de séance, puis séries de chaque séance que l'écran de saisie ne possède
  * pas, puis clôtures. Rejouée au lancement (après la restauration iPhone), au
  * retour du réseau, au retour de l'app au premier plan, et toutes les 30 s
- * tant qu'il reste quelque chose. Une écriture enfin passée fait relire
+ * tant qu'il reste quelque chose (et à chaque changement d'écran, CM-90
+ * PR 4). Une écriture enfin passée fait relire
  * accueil, Carnet et Stats.
  *
  * Indicateur discret sous la barre d'état : écritures en attente (hors séance
@@ -117,7 +118,10 @@ export default function PendingSync() {
       window.removeEventListener(QUEUE_CHANGED_EVENT, refreshCounts);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [syncable, queryClient]);
+    // CM-90 (PR 4) : relancé à chaque changement d'écran. En quittant la
+    // séance, sa file est libérée par l'écran de saisie : si le réseau est
+    // revenu entre-temps, elle part tout de suite, pas au prochain essai (30 s).
+  }, [pathname, syncable, queryClient]);
 
   if (!syncable || (counts.pending === 0 && counts.refused === 0)) return null;
   return (

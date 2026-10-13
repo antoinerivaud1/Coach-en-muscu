@@ -9,6 +9,7 @@ import {
   dropActiveSession,
   isLoggerData,
   lastKnownProfileId,
+  latestLocalSession,
   offlineSessionFromPack,
   packKey,
   packSavedAt,
@@ -20,7 +21,7 @@ import {
   saveActiveSession,
   savePack,
 } from "@/lib/offline/sessionCache";
-import type { PendingSet } from "@/lib/utils/setQueue";
+import { queueStorageKey, serializeQueue, type PendingSet } from "@/lib/utils/setQueue";
 
 // CM-90 (PR 2) : cache local des séances (packs, séance en cours).
 // Lancer : npm run test:unit
@@ -202,5 +203,46 @@ test.describe("dernier compte connu", () => {
     expect(isOfflineCacheKey(LAST_PROFILE_KEY)).toBe(true);
     expect(isQueueKey(LAST_PROFILE_KEY)).toBe(false);
     expect(isOfflineCacheKey(packKey(P, "d1"))).toBe(true);
+  });
+});
+
+test.describe("séance en cours pour « Reprendre » (CM-90 PR 4)", () => {
+  test("la plus récente du compte, avec séries confirmées et en file", () => {
+    const store = memoryStore();
+    saveActiveSession(store, P, logger("s1"), 1);
+    saveActiveSession(store, P, logger("s2"), 2);
+    saveActiveSession(store, "autre", logger("s3"), 3);
+    recordConfirmed(store, "s2", { kind: "upsert", set: aSet("a", { sessionId: "s2" }) });
+    store.setItem(
+      queueStorageKey("s2"),
+      serializeQueue([
+        { kind: "upsert", set: aSet("b", { sessionId: "s2", setIndex: 2 }), attempts: 0 },
+        // Re-écriture d'une série confirmée : comptée une fois.
+        { kind: "upsert", set: aSet("a", { sessionId: "s2", weightKg: 65 }), attempts: 0 },
+      ]),
+    );
+    expect(latestLocalSession(store, P)).toEqual({
+      sessionId: "s2",
+      dayName: "Pec",
+      startedAt: "2026-10-13T18:00:00.000Z",
+      setCount: 2,
+    });
+  });
+
+  test("une série supprimée en file n'est plus comptée", () => {
+    const store = memoryStore();
+    saveActiveSession(store, P, logger("s1"), 1);
+    recordConfirmed(store, "s1", { kind: "upsert", set: aSet("a") });
+    store.setItem(queueStorageKey("s1"), serializeQueue([{ kind: "delete", id: "a", sessionId: "s1", attempts: 0 }]));
+    expect(latestLocalSession(store, P)?.setCount).toBe(0);
+  });
+
+  test("séance close (clôture en file) ou terminée : ignorée", () => {
+    const store = memoryStore();
+    saveActiveSession(store, P, logger("s1"), 1);
+    saveActiveSession(store, P, { ...logger("s2"), finishedDurationSeconds: 600 }, 2);
+    expect(latestLocalSession(store, P)?.sessionId).toBe("s1");
+    expect(latestLocalSession(store, P, (id) => id === "s1")).toBeNull();
+    expect(latestLocalSession(store, "autre")).toBeNull();
   });
 });
