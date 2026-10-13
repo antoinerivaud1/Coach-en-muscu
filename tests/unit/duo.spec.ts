@@ -7,6 +7,7 @@ import {
   formatRecord,
   hexToRgbChannels,
   inviteJoinPath,
+  inviteShareText,
   isValidInviteCode,
   latestRecord,
   normalizeInviteCode,
@@ -196,4 +197,12 @@ test.describe("dernier record du partenaire (CM-87)", () => {
   test("format « 82,5 kg × 5 »", () => {
     expect(formatRecord(82.5, 5)).toBe("82,5 kg × 5");
   });
+});
+
+test("CM-107 : le texte partagé contient le code et le lien complet", () => {
+  const url = "https://example.app/duo/rejoindre?code=AZRU95";
+  const text = inviteShareText("Léa", "AZRU95", url);
+  expect(text).toContain("Léa t'invite");
+  expect(text).toContain("Code : AZRU95");
+  expect(text.endsWith(url)).toBe(true);
 });
