@@ -123,7 +123,11 @@ export default function PendingSync() {
     // revenu entre-temps, elle part tout de suite, pas au prochain essai (30 s).
   }, [pathname, syncable, queryClient]);
 
-  if (!syncable || (counts.pending === 0 && counts.refused === 0)) return null;
+  // CM-90 : pas de pastille sur l'écran de séance. Elle recouvrait la frise
+  // (chrono, séries) ; le logger affiche lui-même ses séries en attente ou
+  // refusées. Le rejeu, lui, continue.
+  const onSessionScreen = pathname?.startsWith("/sessions/") ?? false;
+  if (!syncable || onSessionScreen || (counts.pending === 0 && counts.refused === 0)) return null;
   return (
     <div
       className="pointer-events-none fixed left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-1"
