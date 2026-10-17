@@ -40,18 +40,18 @@ export default function OnboardingSeancesScreen() {
       <h1 className="mt-7 text-balance text-[30px] font-black leading-[1.1] tracking-tight text-fg">
         Par quoi tu commences, {identity.display_name}&nbsp;?
       </h1>
-      <p className="mt-2 text-base leading-snug text-[#A4A4AE]">
+      <p className="mt-2 text-base leading-snug text-fg-muted">
         Un modèle prêt à l&apos;emploi, modifiable ensuite.
       </p>
       {invited && (
         <div
           role="note"
           aria-label="Invitation en attente"
-          className="mt-5 flex items-start gap-3 rounded-[18px] border-[1.5px] border-energy/35 bg-energy/[0.06] px-4 py-3.5"
+          className="mt-5 flex items-start gap-3 rounded-[18px] border-[1.5px] border-accent/35 bg-energy/[0.06] px-4 py-3.5"
         >
           <span
             aria-hidden
-            className="mt-0.5 flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg bg-energy/[0.14] text-energy"
+            className="mt-0.5 flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg bg-energy/[0.14] text-accent"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -60,7 +60,7 @@ export default function OnboardingSeancesScreen() {
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
           </span>
-          <span className="text-balance text-base leading-snug text-[#E4E4EA]">
+          <span className="text-balance text-base leading-snug text-fg-soft">
             <span className="font-bold text-fg">Ton invitation t&apos;attend.</span>{" "}
             Ajoute un modèle ou passe cette étape&nbsp;: tu confirmes ensuite ton duo.
           </span>

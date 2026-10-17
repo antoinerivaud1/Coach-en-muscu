@@ -29,7 +29,7 @@ export default function LoginScreen() {
     <main className="flex min-h-[100dvh] flex-col px-6 pb-7 pt-[max(1rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col">
         <div className="mt-2 flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-energy font-oswald text-lg font-bold text-ink">
+          <span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-energy font-oswald text-lg font-bold text-energy-fg">
             C
           </span>
           <span className="font-oswald text-sm font-bold uppercase tracking-[0.22em] text-fg">
@@ -44,7 +44,7 @@ export default function LoginScreen() {
         ) : (
           <>
             <h1 className="mt-6 text-[40px] font-black leading-[0.95] tracking-tight text-fg">
-              Connexion<span className="text-energy">.</span>
+              Connexion<span className="text-accent">.</span>
             </h1>
             <p className="mt-3 text-sm leading-snug text-fg-muted">
               Entre ton email et ton mot de passe pour retrouver tes séances.
@@ -56,7 +56,7 @@ export default function LoginScreen() {
 
             <p className="mt-5 text-center text-base text-fg-muted">
               Pas encore de compte&nbsp;?{" "}
-              <Link href={withNext("/welcome", requested)} className="inline-flex min-h-11 items-center font-bold text-energy">
+              <Link href={withNext("/welcome", requested)} className="inline-flex min-h-11 items-center font-bold text-accent">
                 Créer un compte
               </Link>
             </p>

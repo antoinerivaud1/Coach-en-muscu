@@ -1,14 +1,22 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Design system : Refonte UI « Direction Sport » (CM-31).
- * Thème encre + vert acide, un accent par personne.
- * CM-87 : l'accent de membre n'est plus « toi » / « elle » mais la couleur
- * choisie par chacun (`profiles.accent_color`, lib/members.ts). La classe
- * `member` (`bg-member`, `text-member/80`…) lit la variable CSS
- * `--member-rgb`, posée par l'écran sur le conteneur du membre concerné
- * (`memberStyle`, lib/duo.ts) ; cyan par défaut (app/globals.css).
+ * Design system « A2 » (CM-116, canevas Tour 2 validé le 17/10/2026), clair et
+ * sombre. Les couleurs lisent les variables CSS de app/globals.css, en canaux
+ * RGB : mêmes classes dans les deux thèmes, opacités comprises (`bg-fg/10`).
+ *
+ * - `energy` : l'orange PLEIN des boutons d'action (texte dessus : `energy-fg`).
+ * - `accent` : l'orange en TEXTE, icône ou bordure, assez foncé pour être
+ *   lisible sur le fond du thème (plus foncé en clair).
+ * - `member` : la couleur du membre affiché (CM-87), posée par `memberStyle`
+ *   (lib/duo.ts) sur le conteneur, variante claire comprise.
+ * - `danger`, `success`, `warning` : états, lisibles dans les deux thèmes.
+ *
+ * `font-oswald` garde son nom (des dizaines d'usages) mais désigne désormais
+ * SF Pro Rounded, la police des chiffres.
  */
+const rgb = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
@@ -19,23 +27,28 @@ const config: Config = {
     extend: {
       colors: {
         // Surfaces
-        ink: "#0B0B0F",
-        surface: "#16161C",
-        surface2: "#1F1F27",
-        line: "rgba(255,255,255,0.07)",
-        // Accent d'énergie (vert acide)
-        // `dim` : muscles secondaires sur la carte musculaire (CM-30).
-        energy: { DEFAULT: "#CCFF02", fg: "#0B0B0F", dim: "#6F8A0B" },
-        // Carte musculaire (CM-30) : muscle non sollicité / zone hors muscle.
-        body: { idle: "#3A3A44", base: "#26262E" },
-        flame: "#FF8A3D",
+        ink: rgb("ink"),
+        surface: rgb("surface"),
+        surface2: rgb("surface-2"),
+        line: "var(--line)",
+        edge: rgb("edge"),
+        // Action
+        energy: { DEFAULT: rgb("energy"), fg: rgb("energy-fg"), dim: rgb("energy-dim") },
+        accent: rgb("accent"),
+        flame: rgb("flame"),
+        // Carte musculaire (CM-30)
+        body: { idle: rgb("body-idle"), base: rgb("body-base") },
         // Texte
-        fg: { DEFAULT: "#F2F2F5", muted: "#8C8C97", faint: "#56565E" },
-        // Accent du membre affiché (CM-87), opacités comprises.
-        member: "rgb(var(--member-rgb) / <alpha-value>)"
+        fg: { DEFAULT: rgb("fg"), soft: rgb("fg-soft"), muted: rgb("fg-muted"), faint: rgb("fg-faint") },
+        // États
+        danger: { DEFAULT: rgb("danger"), soft: rgb("danger-soft"), ground: rgb("danger-ground") },
+        success: rgb("success"),
+        warning: rgb("warning"),
+        // Accent du membre affiché (CM-87)
+        member: rgb("member-rgb")
       },
       // CM-101 : échelle de texte agrandie pour la lecture à bout de bras, à la
-      // salle (design system « Coach en Muscu », 08/10/2026). Rien sous 12px.
+      // salle. Rien sous 12px.
       fontSize: {
         xs: ["14px", { lineHeight: "20px" }],
         sm: ["16px", { lineHeight: "22px" }],
@@ -43,8 +56,11 @@ const config: Config = {
         lg: ["19px", { lineHeight: "26px" }]
       },
       fontFamily: {
-        sans: ["var(--font-archivo)", "system-ui", "sans-serif"],
-        oswald: ["var(--font-oswald)", "system-ui", "sans-serif"]
+        sans: ["-apple-system", "BlinkMacSystemFont", '"SF Pro Text"', "system-ui", '"Segoe UI"', "Roboto", "sans-serif"],
+        oswald: ["ui-rounded", '"SF Pro Rounded"', "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"]
+      },
+      borderRadius: {
+        card: "28px"
       }
     }
   },

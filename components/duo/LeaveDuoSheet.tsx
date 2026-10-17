@@ -39,7 +39,7 @@ export default function LeaveDuoSheet({ partnerName }: { partnerName: string }) 
         type="button"
         onClick={() => setOpen(true)}
         disabled={!online}
-        className="min-h-11 self-center px-3 text-base font-bold text-[#FF6B6B] disabled:opacity-50"
+        className="min-h-11 self-center px-3 text-base font-bold text-danger disabled:opacity-50"
       >
         Quitter le duo
       </button>
@@ -54,9 +54,9 @@ export default function LeaveDuoSheet({ partnerName }: { partnerName: string }) 
             aria-modal="true"
             aria-labelledby={titleId}
             onClick={(e) => e.stopPropagation()}
-            className="flex w-full max-w-lg flex-col rounded-t-[28px] border-t border-white/[0.08] bg-surface px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-3"
+            className="flex w-full max-w-lg flex-col rounded-t-[28px] border-t border-fg/[0.08] bg-surface px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-3"
           >
-            <span className="h-[5px] w-10 self-center rounded-full bg-[#3A3A44]" aria-hidden />
+            <span className="h-[5px] w-10 self-center rounded-full bg-edge" aria-hidden />
             <h2
               id={titleId}
               className="mt-5 text-balance text-2xl font-black leading-tight tracking-tight text-fg"
@@ -69,7 +69,7 @@ export default function LeaveDuoSheet({ partnerName }: { partnerName: string }) 
                   <span
                     aria-hidden
                     className={`flex h-6 w-6 flex-none items-center justify-center rounded-lg ${
-                      it.keep ? "bg-energy/[0.12] text-energy" : "bg-[#FF5A5A]/[0.14] text-[#FF7A7A]"
+                      it.keep ? "bg-energy/[0.12] text-accent" : "bg-danger/[0.14] text-danger"
                     }`}
                   >
                     {it.keep ? (
@@ -83,12 +83,12 @@ export default function LeaveDuoSheet({ partnerName }: { partnerName: string }) 
                       </svg>
                     )}
                   </span>
-                  <span className="text-balance text-base leading-snug text-[#E4E4EA]">{it.text}</span>
+                  <span className="text-balance text-base leading-snug text-fg-soft">{it.text}</span>
                 </li>
               ))}
             </ul>
             {error && (
-              <p role="alert" className="mt-4 text-sm text-red-400">
+              <p role="alert" className="mt-4 text-sm text-danger">
                 {error}
               </p>
             )}
@@ -102,7 +102,7 @@ export default function LeaveDuoSheet({ partnerName }: { partnerName: string }) 
               <button
                 type="submit"
                 disabled={pending}
-                className="h-[54px] w-full rounded-2xl bg-[#FF5A5A] text-[17px] font-extrabold text-ink disabled:opacity-60"
+                className="h-[54px] w-full rounded-2xl bg-danger text-[17px] font-extrabold text-ink disabled:opacity-60"
               >
                 {pending ? "Départ…" : "Quitter le duo"}
               </button>

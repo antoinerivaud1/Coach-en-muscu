@@ -22,13 +22,13 @@ export function InviteButton() {
       <button
         type="submit"
         disabled={pending || !online}
-        className="flex h-[52px] items-center justify-center rounded-2xl bg-energy text-[17px] font-extrabold text-ink disabled:opacity-60"
+        className="flex h-[52px] items-center justify-center rounded-2xl bg-energy text-[17px] font-extrabold text-energy-fg disabled:opacity-60"
       >
         {pending ? "Création…" : "Inviter mon partenaire"}
       </button>
       <OnlineOnlyHint />
       {error && (
-        <p role="alert" className="text-sm text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}
@@ -55,13 +55,13 @@ export function RevokeInvitationButton({ then }: { then?: string }) {
       <button
         type="submit"
         disabled={pending || !online}
-        className="min-h-11 px-3 text-base font-bold text-[#FF6B6B] disabled:opacity-60"
+        className="min-h-11 px-3 text-base font-bold text-danger disabled:opacity-60"
       >
         {pending ? "Annulation…" : "Annuler l'invitation"}
       </button>
       <OnlineOnlyHint />
       {error && (
-        <p role="alert" className="text-sm text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}

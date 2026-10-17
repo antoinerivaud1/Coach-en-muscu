@@ -98,7 +98,7 @@ export default function AddExerciseSheet({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher un exercice"
-            className="w-full rounded-xl bg-surface2 px-4 py-2.5 text-sm text-fg placeholder-fg-faint focus:outline-none focus:ring-1 focus:ring-energy"
+            className="w-full rounded-xl bg-surface2 px-4 py-2.5 text-sm text-fg placeholder-fg-faint focus:outline-none focus:ring-1 focus:ring-accent"
             aria-label="Rechercher un exercice"
           />
         </div>
@@ -115,7 +115,7 @@ export default function AddExerciseSheet({
                 onClick={() => setGroup(active ? null : g)}
                 className={`flex-none rounded-full px-3 py-1.5 text-xs font-bold ${
                   active
-                    ? "bg-energy text-ink"
+                    ? "bg-energy text-energy-fg"
                     : "border border-line bg-surface2 text-fg-muted"
                 }`}
               >
@@ -147,7 +147,7 @@ export default function AddExerciseSheet({
                       className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left ${
                         alreadyIn
                           ? "text-fg-faint"
-                          : "text-fg active:bg-white/5"
+                          : "text-fg active:bg-fg/5"
                       }`}
                     >
                       <span className="min-w-0">
@@ -188,7 +188,7 @@ export default function AddExerciseSheet({
               <button
                 type="button"
                 onClick={() => setShowCreate(true)}
-                className="w-full rounded-xl border border-dashed border-line py-2.5 text-sm font-semibold text-fg-muted active:bg-white/5"
+                className="w-full rounded-xl border border-dashed border-line py-2.5 text-sm font-semibold text-fg-muted active:bg-fg/5"
               >
                 + Créer un exercice
               </button>

@@ -1,26 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, Oswald } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import OrientationLock from "@/components/OrientationLock";
 import PendingSync from "@/components/PendingSync";
 import QueryProvider from "@/components/providers/QueryProvider";
 import OnboardingGate from "@/components/providers/OnboardingGate";
-
-// Direction Sport — Archivo (titres / interface) + Oswald (chiffres / scores)
-const archivo = Archivo({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-  variable: "--font-archivo",
-  display: "swap",
-});
-
-const oswald = Oswald({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-oswald",
-  display: "swap",
-});
+import ThemeController from "@/components/ThemeController";
+import { THEME_BACKGROUND, THEME_BOOT_SCRIPT } from "@/lib/appearance";
 
 export const metadata: Metadata = {
   title: "Coach en Muscu",
@@ -28,7 +14,10 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    // CM-116 : « default » (et non « black-translucent ») : en PWA, la barre
+    // d'état prend la couleur du thème et un texte lisible, en clair comme en
+    // sombre.
+    statusBarStyle: "default",
     title: "Muscu",
   },
   icons: {
@@ -38,7 +27,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0B0B0F",
+  // CM-116 : couleur de la barre du navigateur selon le thème du système ;
+  // le script de thème la remplace par celle du thème choisi.
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: THEME_BACKGROUND.dark },
+    { media: "(prefers-color-scheme: light)", color: THEME_BACKGROUND.light },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -50,13 +44,19 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="fr" className={`${archivo.variable} ${oswald.variable}`}>
-      <body className="min-h-screen bg-ink font-sans text-fg antialiased">
+    // CM-116 : police système (SF Pro, chiffres en SF Pro Rounded) ; le thème
+    // (clair / sombre) est posé avant le premier rendu par THEME_BOOT_SCRIPT.
+    <html lang="fr" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
+      <body className="min-h-screen font-sans text-fg antialiased">
         <QueryProvider>
           {/* CM-89 (PR 1) : redirection vers l'onboarding, côté navigateur. */}
           <OnboardingGate>{children}</OnboardingGate>
           <PendingSync />
         </QueryProvider>
+        <ThemeController />
         <ServiceWorkerRegister />
         <OrientationLock />
       </body>

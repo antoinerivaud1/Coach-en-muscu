@@ -30,7 +30,7 @@ export default function StepHeader({
         {[1, 2, 3].map((i) => (
           <span
             key={i}
-            className={`h-1.5 w-7 rounded-full ${i <= step ? "bg-energy" : "bg-[#2A2A33]"}`}
+            className={`h-1.5 w-7 rounded-full ${i <= step ? "bg-energy" : "bg-surface2"}`}
           />
         ))}
       </div>

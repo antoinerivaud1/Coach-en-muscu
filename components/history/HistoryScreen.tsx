@@ -10,6 +10,7 @@ import { useRequireProfileId } from "@/hooks/useProfileId";
 import { useHistory } from "@/hooks/data/useHistory";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
 import OfflineBanner from "@/components/OfflineBanner";
+import { memberCss } from "@/lib/members";
 
 const FEEDBACK_LABELS: Record<string, string> = {
   easy: "Facile",
@@ -94,7 +95,7 @@ function HistoryList({
           </p>
           <Link
             href="/dashboard"
-            className="mt-4 inline-block rounded-xl bg-energy px-5 py-2.5 font-extrabold text-ink"
+            className="mt-4 inline-block rounded-xl bg-energy px-5 py-2.5 font-extrabold text-energy-fg"
           >
             Voir mes séances
           </Link>
@@ -116,7 +117,7 @@ function HistoryList({
                     {member && (
                       <span
                         className="rounded-full px-2.5 py-0.5 text-xs font-bold"
-                        style={{ color: member.color, background: `${member.color}33` }}
+                        style={{ color: memberCss(member.color), background: memberCss(member.color, 0.2) }}
                       >
                         {member.name}
                       </span>

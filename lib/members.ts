@@ -22,6 +22,45 @@ export const MEMBER_COLORS = [
 
 export type MemberColor = (typeof MEMBER_COLORS)[number]["value"];
 
+/**
+ * CM-116 : variante de chaque couleur pour le thème clair, plus foncée pour
+ * rester lisible sur fond blanc (texte, pastilles, courbes). Le thème sombre
+ * garde la couleur choisie telle quelle.
+ */
+export const MEMBER_COLORS_LIGHT: Record<string, string> = {
+  "#2FE6FF": "#0A84B8",
+  "#FF4F7E": "#D6336C",
+  "#FF8A3D": "#C2410C",
+  "#A78BFA": "#7C3AED",
+  "#5B8CFF": "#2563EB",
+  "#FFD23F": "#A16207",
+};
+
+/** Couleur d'un membre pour le thème clair (la couleur telle quelle si inconnue). */
+export function memberColorLight(value: string): string {
+  return MEMBER_COLORS_LIGHT[value] ?? value;
+}
+
+/**
+ * CM-116 : valeur CSS d'une couleur de membre qui suit le thème, pour un style
+ * en ligne (`style={{ color: memberCss(c) }}`) ou un attribut SVG. Les 6
+ * couleurs de la palette lisent `--mc-<HEX>` (app/globals.css), qui vaut la
+ * couleur choisie en sombre et sa variante foncée en clair. `alpha` (0 à 1)
+ * remplace les suffixes hexadécimaux (`${c}1A`). Hors palette : la couleur
+ * telle quelle.
+ */
+export function memberCss(value: string, alpha?: number): string {
+  if (isMemberColor(value)) {
+    const v = `--mc-${value.slice(1).toUpperCase()}`;
+    return alpha === undefined ? `rgb(var(${v}))` : `rgb(var(${v}) / ${alpha})`;
+  }
+  if (alpha === undefined || !/^#[0-9a-f]{6}$/i.test(value)) return value;
+  const a = Math.round(Math.min(1, Math.max(0, alpha)) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  return `${value}${a}`;
+}
+
 /** Couleur par défaut (défaut de la colonne en base). */
 export const DEFAULT_MEMBER_COLOR: MemberColor = "#2FE6FF";
 

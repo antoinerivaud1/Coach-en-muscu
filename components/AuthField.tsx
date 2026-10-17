@@ -38,12 +38,12 @@ export default function AuthField({
         spellCheck={false}
         aria-invalid={error ? true : undefined}
         aria-describedby={errorId}
-        className={`mt-1.5 w-full rounded-xl border bg-surface2 px-4 py-3 text-base text-fg placeholder-fg-faint focus:outline-none focus:ring-2 focus:ring-energy/70 ${
-          error ? "border-red-400/60" : "border-line"
+        className={`mt-1.5 w-full rounded-xl border bg-surface2 px-4 py-3 text-base text-fg placeholder-fg-faint focus:outline-none focus:ring-2 focus:ring-accent/70 ${
+          error ? "border-danger/60" : "border-line"
         }`}
       />
       {error && (
-        <span id={errorId} className="mt-1 block text-xs font-semibold text-red-400">
+        <span id={errorId} className="mt-1 block text-xs font-semibold text-danger">
           {error}
         </span>
       )}

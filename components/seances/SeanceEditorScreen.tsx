@@ -58,14 +58,14 @@ export default function SeanceEditorScreen({ dayId }: { dayId: string | null }) 
         <div className="mx-auto flex max-w-lg flex-col items-center gap-4 pt-16 text-center">
           <p
             role="alert"
-            className="rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+            className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
           >
             {DUO_READ_ERROR_MESSAGE}
           </p>
           <button
             type="button"
             onClick={() => void editor.refetch()}
-            className="rounded-xl bg-energy px-4 py-2.5 text-sm font-extrabold text-ink"
+            className="rounded-xl bg-energy px-4 py-2.5 text-sm font-extrabold text-energy-fg"
           >
             Réessayer
           </button>

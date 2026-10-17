@@ -95,7 +95,7 @@ export default function InviterScreen() {
             <span
               key={i}
               aria-hidden
-              className="flex h-[52px] items-center justify-center rounded-[14px] bg-surface2 font-oswald text-[32px] font-bold text-energy"
+              className="flex h-[52px] items-center justify-center rounded-[14px] bg-surface2 font-oswald text-[32px] font-bold text-accent"
             >
               {c}
             </span>
@@ -108,12 +108,12 @@ export default function InviterScreen() {
 
       <ShareInvitation code={code} inviterName={inviterName} />
 
-      <div className="mt-1.5 flex items-center gap-3 rounded-[18px] border border-energy/20 bg-energy/[0.06] px-4 py-3.5">
+      <div className="mt-1.5 flex items-center gap-3 rounded-[18px] border border-accent/20 bg-energy/[0.06] px-4 py-3.5">
         <span
-          className="h-2.5 w-2.5 flex-none rounded-full bg-energy shadow-[0_0_0_5px_rgba(204,255,2,0.18)]"
+          className="h-2.5 w-2.5 flex-none rounded-full bg-energy shadow-[0_0_0_5px_rgba(255,122,69,0.18)]"
           aria-hidden
         />
-        <span className="text-balance text-base leading-snug text-[#E4E4EA]">
+        <span className="text-balance text-base leading-snug text-fg-soft">
           En attente. Tu verras ton duo ici dès qu&apos;il aura accepté.
         </span>
       </div>
@@ -123,10 +123,10 @@ export default function InviterScreen() {
         <ul className="flex flex-col gap-3">
           {PERKS.map((p) => (
             <li key={p} className="flex items-start gap-2.5">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#CCFF02" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-[18px] w-[18px] flex-none" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-[18px] w-[18px] flex-none" aria-hidden>
                 <path d="M20 6 9 17l-5-5" />
               </svg>
-              <span className="text-base leading-snug text-[#C9C9D1]">{p}</span>
+              <span className="text-base leading-snug text-fg-soft">{p}</span>
             </li>
           ))}
         </ul>

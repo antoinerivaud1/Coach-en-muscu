@@ -37,13 +37,13 @@ export default function SignupScreen() {
           <h1 className="mt-8 text-balance text-[30px] font-black leading-[1.1] tracking-tight text-fg">
             Crée ton compte
           </h1>
-          <p className="mt-2 text-base leading-snug text-[#A4A4AE]">
+          <p className="mt-2 text-base leading-snug text-fg-muted">
             Tes séances sont sauvegardées et te suivent sur tous tes appareils.
           </p>
           <SignupForm next={next} onStart={() => setSubmitting(true)} />
-          <p className="mt-4 text-center text-base text-[#A4A4AE]">
+          <p className="mt-4 text-center text-base text-fg-muted">
             Déjà un compte&nbsp;?{" "}
-            <Link href={withNext("/login", next)} className="inline-flex min-h-11 items-center font-bold text-energy">
+            <Link href={withNext("/login", next)} className="inline-flex min-h-11 items-center font-bold text-accent">
               Se connecter
             </Link>
           </p>
@@ -53,14 +53,14 @@ export default function SignupScreen() {
           <h1 className="mt-8 text-balance text-[30px] font-black leading-[1.1] tracking-tight text-fg">
             Les inscriptions ouvriront bientôt
           </h1>
-          <p className="mt-2 text-base leading-snug text-[#A4A4AE]">
+          <p className="mt-2 text-base leading-snug text-fg-muted">
             Coach en Muscu est encore en phase de test. Tu as déjà un compte&nbsp;?
             Connecte-toi pour retrouver tes séances.
           </p>
           <div className="flex-1" />
           <Link
             href={withNext("/login", next)}
-            className="mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-energy text-base font-extrabold text-ink"
+            className="mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-energy text-base font-extrabold text-energy-fg"
           >
             J&apos;ai déjà un compte
           </Link>

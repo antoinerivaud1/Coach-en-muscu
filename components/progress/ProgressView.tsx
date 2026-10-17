@@ -100,9 +100,9 @@ export default function ProgressView({ series, color }: Props) {
             <span
               className={`ml-2 text-sm font-medium ${
                 delta > 0
-                  ? "text-emerald-400"
+                  ? "text-success"
                   : delta < 0
-                    ? "text-red-400"
+                    ? "text-danger"
                     : "text-fg-muted"
               }`}
             >
@@ -122,7 +122,7 @@ export default function ProgressView({ series, color }: Props) {
         <h3 className="text-sm font-semibold text-fg">
           Dernières séances
         </h3>
-        <ul className="mt-2 divide-y divide-white/10">
+        <ul className="mt-2 divide-y divide-fg/10">
           {[...current.points]
             .slice(-8)
             .reverse()

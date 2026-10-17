@@ -13,16 +13,16 @@ const config: CapacitorConfig = {
   appId: "com.antoinerivaud.coachenmuscu",
   appName: "Coach en Muscu",
   webDir: "capacitor/www",
-  backgroundColor: "#0B0B0F",
+  backgroundColor: "#111114",
   plugins: {
     SplashScreen: {
-      backgroundColor: "#0B0B0F",
+      backgroundColor: "#111114",
       showSpinner: false,
       launchAutoHide: true,
     },
     StatusBar: {
       style: "DARK",
-      backgroundColor: "#0B0B0F",
+      backgroundColor: "#111114",
     },
   },
 };

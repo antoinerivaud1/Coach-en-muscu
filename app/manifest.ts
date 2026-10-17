@@ -12,8 +12,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Suivi de séances de musculation, seul ou à deux",
     start_url: "/dashboard",
     display: "standalone",
-    background_color: "#09090b",
-    theme_color: "#F97316",
+    background_color: "#111114",
+    theme_color: "#111114",
     lang: "fr",
     orientation: "portrait",
     icons: [

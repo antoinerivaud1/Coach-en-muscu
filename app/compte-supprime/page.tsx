@@ -17,7 +17,7 @@ export default function AccountDeletedPage() {
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         <div className="mt-6 flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-energy" aria-hidden>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B0B0F" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--energy-fg))" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <path d="m6.5 6.5 11 11" /><path d="m21 21-1-1" /><path d="m3 3 1 1" /><path d="m18 22 4-4" /><path d="m2 6 4-4" /><path d="m3 10 7-7" /><path d="m14 21 7-7" />
             </svg>
           </span>
@@ -37,11 +37,11 @@ export default function AccountDeletedPage() {
         <h1 className="mt-5 text-balance font-oswald text-[46px] font-bold uppercase leading-[1.08] tracking-[-0.01em] text-fg">
           Ton compte est supprimé.
         </h1>
-        <p className="mt-4 text-balance text-base leading-relaxed text-[#A4A4AE]">
+        <p className="mt-4 text-balance text-base leading-relaxed text-fg-muted">
           Ton profil, tes séances, tes séries, tes séances types et tes exercices perso ont
           été effacés, et la session est fermée sur ce téléphone.
         </p>
-        <ul className="mt-5 flex flex-col gap-3 text-balance text-base leading-snug text-[#C9C9D1]">
+        <ul className="mt-5 flex flex-col gap-3 text-balance text-base leading-snug text-fg-soft">
           <li className="flex gap-3">
             <span aria-hidden className="mt-[9px] h-1.5 w-1.5 flex-none rounded-full bg-energy" />
             Si tu étais en duo, ton partenaire garde ses séances et la bibliothèque du duo.
@@ -56,7 +56,7 @@ export default function AccountDeletedPage() {
         <div className="mt-9 flex flex-col gap-2.5">
           <Link
             href="/welcome"
-            className="flex h-14 w-full items-center justify-center rounded-2xl bg-energy text-base font-extrabold text-ink"
+            className="flex h-14 w-full items-center justify-center rounded-2xl bg-energy text-base font-extrabold text-energy-fg"
           >
             Revenir à l&apos;accueil
           </Link>

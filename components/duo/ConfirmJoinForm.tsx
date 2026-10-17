@@ -80,14 +80,14 @@ export default function ConfirmJoinForm({
         {facts.map((f, i) => (
           <li
             key={f}
-            className={`flex items-start gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-white/[0.06]" : ""}`}
+            className={`flex items-start gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-fg/[0.06]" : ""}`}
           >
-            <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg bg-energy/[0.12] text-energy" aria-hidden>
+            <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg bg-energy/[0.12] text-accent" aria-hidden>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                 <path d="M20 6 9 17l-5-5" />
               </svg>
             </span>
-            <span className="text-base leading-snug text-[#E4E4EA]">{f}</span>
+            <span className="text-base leading-snug text-fg-soft">{f}</span>
           </li>
         ))}
       </ul>
@@ -115,7 +115,7 @@ export default function ConfirmJoinForm({
       )}
 
       {error && (
-        <p role="alert" className="mt-3 rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2.5 text-base text-red-300">
+        <p role="alert" className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2.5 text-base text-danger-soft">
           {error}
         </p>
       )}
@@ -127,7 +127,7 @@ export default function ConfirmJoinForm({
       <button
         type="submit"
         disabled={pending || sameAsInviter || !online}
-        className="mt-6 h-14 rounded-2xl bg-energy text-[17px] font-extrabold text-ink disabled:opacity-40"
+        className="mt-6 h-14 rounded-2xl bg-energy text-[17px] font-extrabold text-energy-fg disabled:opacity-40"
       >
         {pending ? "Un instant…" : "Rejoindre le duo"}
       </button>

@@ -63,14 +63,14 @@ export default function CreateExerciseForm({
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Nom de l'exercice"
-        className="w-full rounded bg-surface2 px-3 py-2 text-sm text-white placeholder-fg-faint focus:outline-none focus:ring-1 focus:ring-member"
+        className="w-full rounded bg-surface2 px-3 py-2 text-sm text-fg placeholder-fg-faint focus:outline-none focus:ring-1 focus:ring-member"
       />
       <select
         value={group}
         onChange={(e) =>
           setGroup(e.target.value as SystemExercise["muscle_group"])
         }
-        className="w-full rounded bg-surface2 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-member"
+        className="w-full rounded bg-surface2 px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-member"
       >
         {Object.entries(MUSCLE_GROUP_LABELS).map(([value, label]) => (
           <option key={value} value={value}>
@@ -78,7 +78,7 @@ export default function CreateExerciseForm({
           </option>
         ))}
       </select>
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
       <OnlineOnlyHint className="text-xs" />
       <div className="flex gap-2">
         <button
@@ -96,7 +96,7 @@ export default function CreateExerciseForm({
           type="button"
           onClick={handleSubmit}
           disabled={isCreating || !online}
-          className="flex-1 rounded bg-member py-2 text-xs font-semibold text-white disabled:opacity-50"
+          className="flex-1 rounded bg-member py-2 text-xs font-semibold text-fg disabled:opacity-50"
         >
           {isCreating ? "Création…" : submitLabel}
         </button>

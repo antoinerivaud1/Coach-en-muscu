@@ -1,5 +1,7 @@
 "use client";
 
+import { memberCss } from "@/lib/members";
+
 export type ChartPoint = { label: string; value: number };
 
 type Props = {
@@ -66,8 +68,8 @@ export default function LineChart({
     >
       <defs>
         <linearGradient id="lc-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
+          <stop offset="0%" stopColor={memberCss(color)} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={memberCss(color)} stopOpacity="0" />
         </linearGradient>
       </defs>
 
@@ -75,7 +77,7 @@ export default function LineChart({
       <path
         d={linePath}
         fill="none"
-        stroke={color}
+        stroke={memberCss(color)}
         strokeWidth="2"
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -87,18 +89,18 @@ export default function LineChart({
           cx={x(i)}
           cy={y(p.value)}
           r="2.5"
-          fill={color}
+          fill={memberCss(color)}
         />
       ))}
 
       {/* max / min labels */}
-      <text x={padX} y={11} fill="#8C8C97" fontSize="10">
+      <text x={padX} y={11} fill="rgb(var(--fg-muted))" fontSize="10">
         {Math.round(max)} {unit}
       </text>
-      <text x={padX} y={H - 8} fill="#56565E" fontSize="10">
+      <text x={padX} y={H - 8} fill="rgb(var(--fg-faint))" fontSize="10">
         {firstLabel}
       </text>
-      <text x={W - padX} y={H - 8} fill="#56565E" fontSize="10" textAnchor="end">
+      <text x={W - padX} y={H - 8} fill="rgb(var(--fg-faint))" fontSize="10" textAnchor="end">
         {lastLabel}
       </text>
     </svg>

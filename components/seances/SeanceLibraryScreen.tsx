@@ -11,6 +11,7 @@ import OfflineBanner, { OnlineOnlyHint } from "@/components/OfflineBanner";
 import { useOnline } from "@/hooks/useOnline";
 import type { Member } from "@/lib/duo";
 import SeanceLibrary from "./SeanceLibrary";
+import { memberCss } from "@/lib/members";
 
 /**
  * Bibliothèque « Mes séances » (CM-81).
@@ -56,7 +57,7 @@ function Message({
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-xl bg-energy px-4 py-2.5 text-sm font-extrabold text-ink"
+            className="rounded-xl bg-energy px-4 py-2.5 text-sm font-extrabold text-energy-fg"
           >
             Réessayer
           </button>
@@ -81,14 +82,14 @@ function NewSeanceCta() {
       {online ? (
         <Link
           href="/seances/new"
-          className="block rounded-2xl bg-energy py-4 text-center text-[18px] font-extrabold text-ink"
+          className="block rounded-2xl bg-energy py-4 text-center text-[18px] font-extrabold text-energy-fg"
         >
           + Nouvelle séance
         </Link>
       ) : (
         <span
           aria-disabled="true"
-          className="block rounded-2xl bg-energy py-4 text-center text-[18px] font-extrabold text-ink opacity-40"
+          className="block rounded-2xl bg-energy py-4 text-center text-[18px] font-extrabold text-energy-fg opacity-40"
         >
           + Nouvelle séance
         </span>
@@ -103,7 +104,7 @@ function Dot({ member, className = "" }: { member: Member; className?: string })
     <span
       aria-hidden
       className={`h-[18px] w-[18px] rounded-full border-2 border-ink ${className}`}
-      style={{ background: member.color }}
+      style={{ background: memberCss(member.color) }}
     />
   );
 }
@@ -191,7 +192,7 @@ export default function SeanceLibraryScreen() {
       <Message onRetry={() => void auth.refetch()}>
         <p
           role="alert"
-          className="rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+          className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
         >
           Impossible de charger tes séances. Réessaie dans un instant.
         </p>
@@ -203,7 +204,7 @@ export default function SeanceLibraryScreen() {
       <Message onRetry={() => void library.refetch()}>
         <p
           role="alert"
-          className="rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+          className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
         >
           {library.error.message}
         </p>
@@ -249,7 +250,7 @@ export default function SeanceLibraryScreen() {
         {actionError && (
           <p
             role="alert"
-            className="mt-4 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+            className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
           >
             {actionError}
           </p>
@@ -258,7 +259,7 @@ export default function SeanceLibraryScreen() {
         {info && (
           <p
             role="status"
-            className="mt-4 text-balance rounded-lg border border-energy/30 bg-energy/10 px-3 py-2.5 text-sm text-fg"
+            className="mt-4 text-balance rounded-lg border border-accent/30 bg-energy/10 px-3 py-2.5 text-sm text-fg"
           >
             {info}
           </p>
@@ -267,7 +268,7 @@ export default function SeanceLibraryScreen() {
         {sharedNotice && (
           <p
             role="status"
-            className="mt-4 text-balance rounded-lg border border-energy/30 bg-energy/10 px-3 py-2.5 text-sm text-fg"
+            className="mt-4 text-balance rounded-lg border border-accent/30 bg-energy/10 px-3 py-2.5 text-sm text-fg"
           >
             {sharedNotice}
           </p>

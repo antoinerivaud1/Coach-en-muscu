@@ -13,7 +13,7 @@ export default function SentryTestButtons() {
 
   return (
     <div className="flex flex-col gap-3">
-      <button type="button" className="w-full rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-ink disabled:opacity-50" onClick={() => setCrash(true)}>
+      <button type="button" className="w-full rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-energy-fg disabled:opacity-50" onClick={() => setCrash(true)}>
         Planter côté client
       </button>
     </div>

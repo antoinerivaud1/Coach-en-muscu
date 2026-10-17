@@ -67,11 +67,4 @@ test.describe("Licences (CM-93)", () => {
     const shown = LICENSES.find((l) => l.id === "react-body-highlighter");
     expect(shown?.text).toBe(installed);
   });
-
-  test("polices sous SIL OFL 1.1", () => {
-    for (const id of ["archivo", "oswald"]) {
-      const l = LICENSES.find((x) => x.id === id);
-      expect(l?.text).toContain("SIL OPEN FONT LICENSE Version 1.1");
-    }
-  });
 });

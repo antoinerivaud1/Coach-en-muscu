@@ -77,7 +77,7 @@ export default function RestTimerBar({
               <span
                 role="timer"
                 aria-label="Temps de repos restant"
-                className="mt-1 font-oswald text-3xl font-bold leading-none tabular-nums text-energy"
+                className="mt-1 font-oswald text-3xl font-bold leading-none tabular-nums text-accent"
               >
                 {formatClock(remainingSeconds)}
               </span>
@@ -87,7 +87,7 @@ export default function RestTimerBar({
               <button
                 type="button"
                 onClick={() => onAddSeconds(-15)}
-                className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+                className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-fg/10"
                 aria-label="Retirer 15 secondes de repos"
               >
                 −15
@@ -95,14 +95,14 @@ export default function RestTimerBar({
               <button
                 type="button"
                 onClick={onSkip}
-                className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+                className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-fg/10"
               >
                 Passer
               </button>
               <button
                 type="button"
                 onClick={() => onAddSeconds(15)}
-                className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+                className="flex h-10 items-center rounded-xl border border-line bg-surface2 px-2.5 font-oswald text-sm font-semibold text-fg active:bg-fg/10"
                 aria-label="Ajouter 15 secondes de repos"
               >
                 +15

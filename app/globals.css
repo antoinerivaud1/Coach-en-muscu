@@ -2,29 +2,163 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * CM-116 : design system « A2 » (canevas Tour 2, validé le 17/10/2026).
+ * Deux thèmes, mêmes noms de couleurs : chaque classe Tailwind (`bg-surface`,
+ * `text-fg-muted`…) lit une variable CSS en canaux RGB (« 17 17 20 »), donc
+ * les opacités (`bg-fg/10`) marchent dans les deux thèmes.
+ *
+ * Le thème est posé sur <html data-theme="dark|light"> AVANT le premier rendu
+ * par le script de app/layout.tsx (lib/appearance.ts), puis tenu à jour par
+ * components/ThemeController.tsx. Sombre par défaut ; sans script, on suit le
+ * réglage du système.
+ */
 @layer base {
-  :root {
-    --ink: #0b0b0f;
-    --surface: #16161c;
-    --surface-2: #1f1f27;
-    --energy: #ccff02;
-    --flame: #ff8a3d;
-    /* CM-87 : accent du membre affiché (canaux RGB, voir tailwind.config.ts).
-       Cyan par défaut ; chaque écran pose la couleur du membre concerné. */
+  :root,
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    /* Fonds, du plus profond au plus haut */
+    --ink: 17 17 20; /* #111114 page */
+    --surface: 27 27 31; /* #1B1B1F carte */
+    --surface-2: 38 38 43; /* #26262B élément posé sur une carte */
+    --line: rgba(255, 255, 255, 0.08);
+    --edge: 58 58 68; /* bordures d'état vide, poignées de feuille */
+    /* Action : l'orange plein ne sert qu'aux boutons d'action */
+    --energy: 255 122 69; /* #FF7A45 */
+    --energy-fg: 28 13 5; /* texte sur l'orange */
+    --energy-dim: 138 66 38; /* muscles secondaires (carte musculaire) */
+    /* Orange en texte, icône, bordure (lisible sur le fond du thème) */
+    --accent: 255 148 102; /* #FF9466 */
+    --flame: 255 148 102;
+    /* Texte */
+    --fg: 245 245 247;
+    --fg-soft: 214 214 220;
+    --fg-muted: 169 169 175;
+    --fg-faint: 94 94 102;
+    /* États */
+    --danger: 248 113 113;
+    --danger-soft: 252 165 165;
+    --danger-ground: 69 10 10;
+    --success: 110 231 168;
+    --warning: 245 158 11;
+    /* Carte musculaire */
+    --body-idle: 58 58 68;
+    --body-base: 38 38 46;
+    /* Verre (Liquid Glass) des commandes : barre d'onglets, boutons du haut,
+       minuteur, sélecteurs */
+    --glass-bg: linear-gradient(155deg, rgba(255, 255, 255, 0.17) 0%, rgba(255, 255, 255, 0.05) 55%, rgba(255, 255, 255, 0.1) 100%);
+    --glass-solid: rgb(38 38 42);
+    --glass-border: rgba(255, 255, 255, 0.22);
+    --glass-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.45), inset 0 -1px 0 rgba(255, 255, 255, 0.1), 0 12px 32px rgba(0, 0, 0, 0.55);
+    --glass-active: rgba(255, 255, 255, 0.12);
+    --halo: rgba(255, 122, 69, 0.2);
+    /* CM-87 : accent du membre affiché, cyan par défaut */
     --member-rgb: 47 230 255;
-    --fg: #f2f2f5;
-    --fg-muted: #8c8c97;
-    --fg-faint: #56565e;
-    --line: rgba(255, 255, 255, 0.07);
+    /* CM-116 : les 6 couleurs de membre (lib/members.ts, memberCss) */
+    --mc-2FE6FF: 47 230 255;
+    --mc-FF4F7E: 255 79 126;
+    --mc-FF8A3D: 255 138 61;
+    --mc-A78BFA: 167 139 250;
+    --mc-5B8CFF: 91 140 255;
+    --mc-FFD23F: 255 210 63;
+  }
+
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --ink: 242 242 245; /* #F2F2F5 */
+    --surface: 255 255 255;
+    --surface-2: 236 236 240;
+    --line: rgba(17, 17, 20, 0.08);
+    --edge: 199 199 204;
+    --energy: 255 122 69;
+    --energy-fg: 28 13 5;
+    --energy-dim: 255 196 170;
+    --accent: 217 72 15; /* #D9480F, lisible sur blanc */
+    --flame: 217 72 15;
+    --fg: 17 17 20;
+    --fg-soft: 58 58 64;
+    --fg-muted: 95 95 102;
+    --fg-faint: 160 160 168;
+    --danger: 220 38 38;
+    --danger-soft: 153 27 27;
+    --danger-ground: 254 226 226;
+    --success: 21 128 61;
+    --warning: 245 158 11;
+    --body-idle: 201 201 209;
+    --body-base: 228 228 234;
+    --glass-bg: linear-gradient(155deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.4) 55%, rgba(255, 255, 255, 0.6) 100%);
+    --glass-solid: rgb(255 255 255);
+    --glass-border: rgba(255, 255, 255, 0.95);
+    --glass-shadow: inset 0 1.5px 0 #fff, 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 10px 30px rgba(0, 0, 0, 0.14);
+    --glass-active: rgba(0, 0, 0, 0.06);
+    --halo: rgba(255, 122, 69, 0.16);
+    --member-rgb: 10 132 184;
+    /* Variantes foncées, lisibles sur blanc (MEMBER_COLORS_LIGHT) */
+    --mc-2FE6FF: 10 132 184;
+    --mc-FF4F7E: 214 51 108;
+    --mc-FF8A3D: 194 65 12;
+    --mc-A78BFA: 124 58 237;
+    --mc-5B8CFF: 37 99 235;
+    --mc-FFD23F: 161 98 7;
+  }
+
+  /* Sans script (rare) : on suit le système. */
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) {
+      color-scheme: light;
+      --ink: 242 242 245;
+      --surface: 255 255 255;
+      --surface-2: 236 236 240;
+      --line: rgba(17, 17, 20, 0.08);
+      --accent: 217 72 15;
+      --flame: 217 72 15;
+      --fg: 17 17 20;
+      --fg-soft: 58 58 64;
+      --fg-muted: 95 95 102;
+      --fg-faint: 160 160 168;
+    }
+  }
+
+  /*
+   * CM-116 : couleur de membre selon le thème. `memberStyle` (lib/duo.ts) pose
+   * `--member-d` (sombre) et `--member-l` (clair, plus foncée pour rester
+   * lisible sur blanc) ; ces règles choisissent la bonne.
+   */
+  [style*="--member-d"] {
+    --member-rgb: var(--member-d);
+  }
+  :root[data-theme="light"] [style*="--member-d"] {
+    --member-rgb: var(--member-l);
   }
 
   html {
-    background-color: var(--ink);
+    background-color: rgb(var(--ink));
   }
 
   body {
-    background-color: var(--ink);
-    color: var(--fg);
-    font-family: var(--font-archivo), system-ui, sans-serif;
+    /* Halo orange très léger en haut d'écran : juste assez de couleur pour que
+       le verre se voie. Il défile avec la page. */
+    background: radial-gradient(ellipse 75% 320px at 50% -40px, var(--halo), transparent 75%) no-repeat, rgb(var(--ink));
+    color: rgb(var(--fg));
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+}
+
+@layer components {
+  /* Verre des commandes (iOS 26/27). Jamais sur le contenu (cartes). */
+  .glass {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .glass {
+      background: var(--glass-solid);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
   }
 }

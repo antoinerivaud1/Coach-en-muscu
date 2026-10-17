@@ -12,6 +12,7 @@ import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
 import OfflineBanner from "@/components/OfflineBanner";
 import ProgressView from "./ProgressView";
 import StatsSummary from "./StatsSummary";
+import { memberCss } from "@/lib/members";
 
 /**
  * Stats (progression). CM-88 : lu dans le navigateur, sous RLS. Le
@@ -98,7 +99,7 @@ function ProgressBody({ data, notice }: { data: ProgressData; notice: ReactNode 
                 className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-bold ${
                   active ? "text-ink" : "bg-surface2 text-fg-muted"
                 }`}
-                style={active ? { background: m.color } : undefined}
+                style={active ? { background: memberCss(m.color) } : undefined}
               >
                 {m.name}
               </Link>
