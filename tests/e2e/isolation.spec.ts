@@ -80,7 +80,7 @@ test.describe("Isolation des données (RLS, CM-59)", () => {
   test("Solo ne lit pas les Stats de Théo en passant son id dans l'URL", async ({ page }) => {
     await login(page, SEED_ACCOUNTS.solo.email, SEED_ACCOUNTS.solo.password);
     await page.goto(`/progress?profile=${TOI_PROFILE}`);
-    await expect(page.getByRole("heading", { name: "Progression", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Progrès", level: 1 })).toBeVisible();
     // Ses propres stats (séance du seed), sans onglet ni comparaison.
     await expect(page.getByText("Meilleur 1RM estimé")).toBeVisible();
     await expect(page.getByRole("link", { name: SEED_NAMES.toi, exact: true })).toHaveCount(0);

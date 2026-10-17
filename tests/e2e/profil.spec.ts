@@ -9,7 +9,7 @@ test.describe("Connexion et profil (CM-59 B)", () => {
   test("se connecter ouvre son tableau de bord", async ({ page }) => {
     await login(page, E2E_ACCOUNT.email, E2E_ACCOUNT.password);
     await expect(page.getByRole("link", { name: "Gérer mes séances" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Stats" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Progrès", exact: true })).toBeVisible();
   });
 
   test("« Se déconnecter » ramène à la connexion", async ({ page }) => {

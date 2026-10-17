@@ -41,9 +41,10 @@ test.describe("Progression", () => {
 
     // Accès par la barre de navigation, comme un utilisateur.
     await page.goto("/dashboard");
-    await page.getByRole("link", { name: "Stats" }).click();
+    await page.getByRole("link", { name: "Progrès", exact: true }).click();
     await expect(page).toHaveURL(/\/progress/);
-    await expect(page.getByRole("heading", { name: "Progression", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Progrès", level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Courbes", exact: true })).toHaveAttribute("aria-current", "page");
 
     await page.getByRole("button", { name: exercise, exact: true }).click();
     await expect(page.getByRole("heading", { name: exercise, level: 2 })).toBeVisible();
@@ -57,12 +58,14 @@ test.describe("Progression", () => {
   // le Carnet, il doit montrer l'état à jour. Tout par navigation client
   // (aucun `goto`), sinon le cache repartirait de zéro.
   test("Carnet déjà ouvert : une séance terminée puis supprimée y est à jour", async ({ page }) => {
-    await page.getByRole("link", { name: "Carnet" }).click();
+    // CM-117 : le Carnet est la vue Historique de l'onglet Progrès.
+    await page.getByRole("link", { name: "Progrès", exact: true }).click();
+    await page.getByRole("link", { name: "Historique", exact: true }).click();
     await expect(page).toHaveURL(/\/history$/);
-    await expect(page.getByRole("heading", { name: "Historique", level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Historique", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByText(/séances? enregistrées?/)).toBeVisible();
 
-    await page.getByRole("link", { name: "Séances" }).click();
+    await page.getByRole("link", { name: "Aujourd'hui" }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
     const id = await startSession(page);
     created.push(id);
@@ -81,7 +84,7 @@ test.describe("Progression", () => {
     await page.getByRole("button", { name: "Supprimer", exact: true }).click();
     await page.getByRole("button", { name: "Oui, supprimer" }).click();
     await expect(page).toHaveURL(/\/history$/);
-    await expect(page.getByRole("heading", { name: "Historique", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Progrès", level: 1 })).toBeVisible();
     await expect(row).toHaveCount(0);
   });
 });

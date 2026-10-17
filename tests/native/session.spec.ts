@@ -30,9 +30,11 @@ test("navigation dans l'app vers le Carnet : sans rechargement, charge RSC en 20
   await login(page, SEED_ACCOUNTS.toi.email, SEED_ACCOUNTS.toi.password);
 
   const documents = trackDocuments(page);
-  await page.getByRole("link", { name: "Carnet" }).click();
+  // CM-117 : Carnet = onglet Progrès, vue Historique.
+  await page.getByRole("link", { name: "Progrès", exact: true }).click();
+  await page.getByRole("link", { name: "Historique", exact: true }).click();
   await expect(page).toHaveURL(/\/history$/);
-  await expect(page.getByRole("heading", { name: "Historique", level: 1 })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Historique", exact: true })).toHaveAttribute("aria-current", "page");
 
   // Aucun nouveau document : navigation client, toujours le document du
   // tableau de bord.
@@ -50,13 +52,13 @@ test("rechargement complet du Carnet : l'écran du Carnet, pas la racine", async
 
   const response = await page.goto("/history");
   expect(servedFile(response)).toBe("history.html");
-  await expect(page.getByRole("heading", { name: "Historique", level: 1 })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Historique", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.locator(`a[href="${sessionPath(TOI_SESSION)}"]`)).toBeVisible();
 
   const reloaded = await page.reload();
   expect(servedFile(reloaded)).toBe("history.html");
   await expect(page).toHaveURL(/\/history$/);
-  await expect(page.getByRole("heading", { name: "Historique", level: 1 })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Historique", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
 test("rechargement complet d'une séance : le récap de cette séance", async ({ page }) => {
