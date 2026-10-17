@@ -42,8 +42,8 @@ export default function JoinCodeForm({
               key={i}
               className={`flex h-[62px] items-center justify-center rounded-[14px] bg-surface font-oswald text-[30px] font-bold text-fg ${
                 focused && i === activeIndex
-                  ? "border-[1.5px] border-energy"
-                  : "border border-white/10"
+                  ? "border-[1.5px] border-accent"
+                  : "border border-fg/10"
               }`}
             >
               {c}
@@ -73,17 +73,17 @@ export default function JoinCodeForm({
         Lettres et chiffres, sans 0, O, 1 ni I pour éviter les confusions.
       </p>
       {error && (
-        <p role="alert" className="mt-3 rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2.5 text-base text-red-300">
+        <p role="alert" className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2.5 text-base text-danger-soft">
           {error}
         </p>
       )}
 
       <div className="mt-6 flex items-start gap-3 rounded-[18px] border border-line bg-surface px-4 py-3.5">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#8C8C97" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-5 w-5 flex-none" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="rgb(var(--fg-muted))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-5 w-5 flex-none" aria-hidden>
           <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
           <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
         </svg>
-        <span className="text-balance text-[15px] leading-snug text-[#C9C9D1]">
+        <span className="text-balance text-[15px] leading-snug text-fg-soft">
           Tu as reçu un lien&nbsp;? Ouvre-le sur ce téléphone&nbsp;: le code est rempli tout seul.
         </span>
       </div>
@@ -93,7 +93,7 @@ export default function JoinCodeForm({
       <button
         type="submit"
         disabled={!complete}
-        className="mt-6 h-14 rounded-2xl bg-energy text-[17px] font-extrabold text-ink disabled:opacity-40"
+        className="mt-6 h-14 rounded-2xl bg-energy text-[17px] font-extrabold text-energy-fg disabled:opacity-40"
       >
         Valider le code
       </button>

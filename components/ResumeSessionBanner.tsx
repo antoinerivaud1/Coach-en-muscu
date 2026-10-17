@@ -74,12 +74,12 @@ export default function ResumeSessionBanner({
     setCount === 0 ? "Aucune série" : `${setCount} série${setCount > 1 ? "s" : ""}`;
 
   return (
-    <section className="mt-5 rounded-[18px] border border-energy/30 bg-energy/10 px-3.5 py-2.5">
+    <section className="mt-5 rounded-[18px] border border-accent/30 bg-energy/10 px-3.5 py-2.5">
       <div className="flex items-center gap-3">
         {/* CM-101 : libellé au-dessus du nom, sinon le nom de séance est tronqué
             avec la nouvelle taille de texte. */}
         <div className="min-w-0 flex-1">
-          <span className="block text-[12px] font-extrabold uppercase tracking-[0.12em] text-energy">
+          <span className="block text-[12px] font-extrabold uppercase tracking-[0.12em] text-accent">
             Séance en cours
           </span>
           <span className="block truncate text-sm font-extrabold text-fg">
@@ -89,14 +89,14 @@ export default function ResumeSessionBanner({
         </div>
         <Link
           href={sessionPath(sessionId)}
-          className="shrink-0 rounded-xl bg-energy px-3 py-1.5 text-[15px] font-extrabold text-ink"
+          className="shrink-0 rounded-xl bg-energy px-3 py-1.5 text-[15px] font-extrabold text-energy-fg"
         >
           Reprendre
         </Link>
       </div>
 
       {stale && (
-        <div className="mt-2.5 border-t border-energy/20 pt-2.5">
+        <div className="mt-2.5 border-t border-accent/20 pt-2.5">
           <p className="text-[13px] font-semibold text-fg-muted">
             Séance ouverte depuis plus de 12 h. Tu peux la reprendre, l&apos;enregistrer
             telle quelle ou la supprimer.

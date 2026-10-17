@@ -26,7 +26,7 @@ function Mark({ keep }: { keep: boolean }) {
     <span
       aria-hidden
       className={`mt-px flex h-6 w-6 flex-none items-center justify-center rounded-lg ${
-        keep ? "bg-energy/[0.12] text-energy" : "bg-[#FF5A5A]/[0.14] text-[#FF7A7A]"
+        keep ? "bg-energy/[0.12] text-accent" : "bg-danger/[0.14] text-danger"
       }`}
     >
       {keep ? (
@@ -50,7 +50,7 @@ function ItemList({ items, label }: { items: Item[]; label: string }) {
         <li key={i} className="flex items-start gap-3">
           <Mark keep={it.keep} />
           <span className="sr-only">{it.keep ? "Conservé\u00a0: " : "Supprimé\u00a0: "}</span>
-          <span className="text-balance text-base leading-snug text-[#E4E4EA]">{it.text}</span>
+          <span className="text-balance text-base leading-snug text-fg-soft">{it.text}</span>
         </li>
       ))}
     </ul>
@@ -192,10 +192,10 @@ export default function DeleteAccountSheet({
         type="button"
         onClick={openSheet}
         disabled={!online}
-        className="flex min-h-[64px] w-full items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition-colors hover:border-white/20 disabled:opacity-50"
+        className="flex min-h-[64px] w-full items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition-colors hover:border-fg/20 disabled:opacity-50"
       >
         <span className="flex-1">
-          <span className="block font-extrabold text-[#FF6B6B]">Supprimer mon compte</span>
+          <span className="block font-extrabold text-danger">Supprimer mon compte</span>
           <span className="mt-0.5 block text-xs font-semibold text-fg-muted">
             Compte et données effacés, définitivement
           </span>
@@ -213,9 +213,9 @@ export default function DeleteAccountSheet({
             aria-labelledby={titleId}
             aria-describedby={descId}
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-y-auto overscroll-contain rounded-t-[28px] border-t border-white/[0.08] bg-surface px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-3"
+            className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-y-auto overscroll-contain rounded-t-[28px] border-t border-fg/[0.08] bg-surface px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-3"
           >
-            <span className="h-[5px] w-10 flex-none self-center rounded-full bg-[#3A3A44]" aria-hidden />
+            <span className="h-[5px] w-10 flex-none self-center rounded-full bg-edge" aria-hidden />
             <p className="mt-4 text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
               Étape {step} sur 2
             </p>
@@ -252,7 +252,7 @@ export default function DeleteAccountSheet({
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="mt-6 h-[54px] w-full flex-none rounded-2xl bg-[#FF5A5A] text-[17px] font-extrabold text-ink"
+                  className="mt-6 h-[54px] w-full flex-none rounded-2xl bg-danger text-[17px] font-extrabold text-ink"
                 >
                   Continuer
                 </button>
@@ -290,13 +290,13 @@ export default function DeleteAccountSheet({
                   enterKeyHint="done"
                   aria-invalid={Boolean(state.error)}
                   className={`mt-2 h-14 rounded-2xl bg-ink px-4 font-oswald text-[26px] font-bold uppercase tracking-[0.08em] text-fg outline-none disabled:opacity-60 ${
-                    confirmed ? "border-[1.5px] border-[#FF5A5A]" : "border border-white/15 focus:border-white/40"
+                    confirmed ? "border-[1.5px] border-danger" : "border border-fg/15 focus:border-fg/40"
                   }`}
                 />
                 {state.error && (
                   <p
                     role="alert"
-                    className="mt-3 rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2.5 text-base text-red-300"
+                    className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2.5 text-base text-danger-soft"
                   >
                     {state.error}
                   </p>
@@ -304,7 +304,7 @@ export default function DeleteAccountSheet({
                 <button
                   type="submit"
                   disabled={!confirmed || pending}
-                  className="mt-6 h-[54px] w-full rounded-2xl bg-[#FF5A5A] text-[17px] font-extrabold text-ink disabled:bg-surface2 disabled:text-fg-muted"
+                  className="mt-6 h-[54px] w-full rounded-2xl bg-danger text-[17px] font-extrabold text-ink disabled:bg-surface2 disabled:text-fg-muted"
                 >
                   {pending ? "Suppression…" : "Supprimer définitivement"}
                 </button>

@@ -22,14 +22,14 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
           justifyContent: "center",
           gap: 16,
           padding: 24,
-          background: "#0B0B0F",
-          color: "#F2F2F5",
+          background: "#111114",
+          color: "#F5F5F7",
           fontFamily: "system-ui, -apple-system, sans-serif",
           textAlign: "center",
         }}
       >
         <h1 style={{ fontSize: 24, margin: 0 }}>Oups, l&apos;app a planté</h1>
-        <p style={{ fontSize: 17, margin: 0, color: "#9A9AA8", maxWidth: 360 }}>
+        <p style={{ fontSize: 17, margin: 0, color: "#A9A9AF", maxWidth: 360 }}>
           L&apos;erreur nous a été signalée. Tes séries déjà validées sont enregistrées.
         </p>
         <button
@@ -41,8 +41,8 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
             padding: "14px 24px",
             borderRadius: 999,
             border: "none",
-            background: "#CCFF02",
-            color: "#0B0B0F",
+            background: "#FF7A45",
+            color: "#1C0D05",
           }}
         >
           Recharger

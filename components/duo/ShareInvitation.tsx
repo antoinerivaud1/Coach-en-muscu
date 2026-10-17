@@ -50,7 +50,7 @@ export default function ShareInvitation({
         <button
           type="button"
           onClick={share}
-          className="flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-energy text-[17px] font-extrabold text-ink"
+          className="flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-energy text-[17px] font-extrabold text-energy-fg"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]" aria-hidden>
             <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
@@ -62,7 +62,7 @@ export default function ShareInvitation({
         <button
           type="button"
           onClick={() => copy(code, "Code copié.")}
-          className="flex h-[52px] items-center justify-center gap-2 rounded-2xl border border-white/[0.12] text-[17px] font-bold text-fg"
+          className="flex h-[52px] items-center justify-center gap-2 rounded-2xl border border-fg/[0.12] text-[17px] font-bold text-fg"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]" aria-hidden>
             <rect x="9" y="9" width="13" height="13" rx="2" />

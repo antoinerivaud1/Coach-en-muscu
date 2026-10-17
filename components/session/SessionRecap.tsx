@@ -156,7 +156,7 @@ export default function SessionRecap({
           {isMine && (
             <Link
               href={sessionPath(sessionId, { editSets: !editSets })}
-              className="text-sm font-semibold text-energy"
+              className="text-sm font-semibold text-accent"
             >
               {editSets ? "Terminer" : "Corriger les séries"}
             </Link>
@@ -173,7 +173,7 @@ export default function SessionRecap({
         {error && (
           <p
             role="alert"
-            className="mt-4 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+            className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
           >
             {error}
           </p>
@@ -268,7 +268,7 @@ export default function SessionRecap({
                         <button
                           type="submit"
                           disabled={busy}
-                          className="rounded bg-energy px-2 py-1 font-bold text-ink disabled:opacity-60"
+                          className="rounded bg-energy px-2 py-1 font-bold text-energy-fg disabled:opacity-60"
                           aria-label="Enregistrer"
                         >
                           ✓
@@ -279,7 +279,7 @@ export default function SessionRecap({
                         type="button"
                         disabled={busy}
                         onClick={() => setConfirmSetId(r.id)}
-                        className="px-1 text-fg-faint hover:text-red-400 disabled:opacity-60"
+                        className="px-1 text-fg-faint hover:text-danger disabled:opacity-60"
                         aria-label={`Supprimer la série ${label(ex.name)} ${formatWeight(r.weight_kg)} kg × ${r.reps}`}
                       >
                         ✕
@@ -318,7 +318,7 @@ export default function SessionRecap({
             <form onSubmit={onDeleteSession} className="flex-1">
               <ConfirmSubmit
                 message="Supprimer cette séance et ses séries ? C'est définitif."
-                className="w-full rounded-lg bg-surface2 py-3 text-sm font-semibold text-red-400"
+                className="w-full rounded-lg bg-surface2 py-3 text-sm font-semibold text-danger"
               >
                 Supprimer
               </ConfirmSubmit>

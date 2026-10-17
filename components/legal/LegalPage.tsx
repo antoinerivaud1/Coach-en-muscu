@@ -32,7 +32,7 @@ export const LEGAL_PAGES: readonly { key: LegalPageKey; href: string; label: str
     key: "credits",
     href: "/credits",
     label: "Crédits et licences",
-    sub: "Bibliothèques et polices utilisées",
+    sub: "Bibliothèques utilisées",
   },
 ];
 
@@ -64,7 +64,7 @@ export default function LegalPage({
           <BackButton fallback="/" />
           <span className="flex items-center gap-2">
             <span
-              className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-energy font-oswald text-sm font-bold text-ink"
+              className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-energy font-oswald text-sm font-bold text-energy-fg"
               aria-hidden
             >
               C
@@ -77,7 +77,7 @@ export default function LegalPage({
 
         <h1 className="mt-7 text-balance text-[34px] font-black leading-[1.05] tracking-tight text-fg">
           {fr(title)}
-          <span className="text-energy">.</span>
+          <span className="text-accent">.</span>
         </h1>
         <p className="mt-3 text-sm text-fg-muted">
           {frenchTypo("Dernière mise à jour :")}{" "}
@@ -95,9 +95,9 @@ export default function LegalPage({
                 <li key={item.id}>
                   <a
                     href={`#${item.id}`}
-                    className="flex gap-3 rounded-lg py-1.5 text-base text-fg hover:text-energy"
+                    className="flex gap-3 rounded-lg py-1.5 text-base text-fg hover:text-accent"
                   >
-                    <span className="w-6 flex-none text-right font-oswald font-semibold text-energy">
+                    <span className="w-6 flex-none text-right font-oswald font-semibold text-accent">
                       {i + 1}
                     </span>
                     <span>{frenchTypo(item.title)}</span>
@@ -119,7 +119,7 @@ export default function LegalPage({
               <li key={p.key}>
                 <Link
                   href={p.href}
-                  className="flex items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 transition-colors hover:border-white/20"
+                  className="flex items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 transition-colors hover:border-fg/20"
                 >
                   <span className="flex-1">
                     <span className="block font-extrabold text-fg">{p.label}</span>
@@ -174,7 +174,7 @@ export function Section({
         className="flex gap-3 text-balance text-[22px] font-extrabold leading-tight tracking-tight text-fg"
       >
         {n !== undefined && (
-          <span className="flex-none font-oswald font-semibold text-energy">{n}</span>
+          <span className="flex-none font-oswald font-semibold text-accent">{n}</span>
         )}
         <span>{frenchTypo(title)}</span>
       </h2>
@@ -213,7 +213,7 @@ export function B({ children }: { children: ReactNode }) {
 }
 
 const LINK_CLASS =
-  "font-semibold text-energy underline decoration-energy/40 underline-offset-4 hover:decoration-energy";
+  "font-semibold text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent";
 
 /** Lien interne (Link) ou externe (nouvel onglet). */
 export function A({ href, children }: { href: string; children: ReactNode }) {

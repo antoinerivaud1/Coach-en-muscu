@@ -7,6 +7,7 @@ import { seanceEditPath } from "@/lib/routes";
 import type { SeanceView, SeanceWriteResult } from "@/lib/data/seances";
 import { useSeanceLibraryAction, type SeanceLibraryAction } from "@/hooks/data/useSeances";
 import { useOnline } from "@/hooks/useOnline";
+import { memberCss } from "@/lib/members";
 
 export type { SeanceExerciseView, SeanceView } from "@/lib/data/seances";
 
@@ -162,7 +163,7 @@ export default function SeanceLibrary({
                   title={
                     isEmpty ? "Ajoute au moins un exercice pour démarrer" : undefined
                   }
-                  className="rounded-xl bg-energy px-4 py-2 text-sm font-extrabold text-ink disabled:opacity-40"
+                  className="rounded-xl bg-energy px-4 py-2 text-sm font-extrabold text-energy-fg disabled:opacity-40"
                 >
                   Démarrer
                 </button>
@@ -266,7 +267,7 @@ export default function SeanceLibrary({
                 disabled={locked}
                 aria-expanded={confirming?.id === seance.id && confirming.kind === "delete"}
                 aria-controls={`confirm-delete-${seance.id}`}
-                className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-red-400 disabled:opacity-50"
+                className="rounded-lg bg-surface2 px-3 py-2 text-sm font-semibold text-danger disabled:opacity-50"
               >
                 Supprimer
               </button>
@@ -284,7 +285,7 @@ export default function SeanceLibrary({
                 <span
                   aria-hidden
                   className="h-3.5 w-3.5 flex-none rounded-full"
-                  style={{ background: shareWith.color }}
+                  style={{ background: memberCss(shareWith.color) }}
                 />
                 Partager avec {shareWith.name}
               </button>
@@ -293,7 +294,7 @@ export default function SeanceLibrary({
             {shareWith && confirming?.id === seance.id && confirming.kind === "share" && (
               <div
                 id={`confirm-share-${seance.id}`}
-                className="mt-3 rounded-xl border border-energy/40 bg-energy/10 p-3"
+                className="mt-3 rounded-xl border border-accent/40 bg-energy/10 p-3"
               >
                 <p className="text-balance text-sm font-semibold text-fg">
                   Partager « {seance.name} » avec {shareWith.name}&nbsp;?{" "}
@@ -314,7 +315,7 @@ export default function SeanceLibrary({
                       void run(seance.id, { kind: "share", dayId: seance.id, name: seance.name })
                     }
                     disabled={locked}
-                    className="min-h-11 flex-1 rounded-lg bg-energy text-sm font-extrabold text-ink disabled:opacity-50"
+                    className="min-h-11 flex-1 rounded-lg bg-energy text-sm font-extrabold text-energy-fg disabled:opacity-50"
                   >
                     {busy ? "Partage…" : "Oui, partager"}
                   </button>
@@ -355,7 +356,7 @@ export default function SeanceLibrary({
             {errorKey === seance.id && errorMessage && (
               <p
                 role="alert"
-                className="mt-2 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-400"
+                className="mt-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"
               >
                 {errorMessage}
               </p>

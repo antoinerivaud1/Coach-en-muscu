@@ -66,7 +66,7 @@ export default function BottomNav() {
         key={item.href}
         href={item.href}
         className={`flex flex-1 flex-col items-center gap-1 ${
-          active ? "text-energy" : "text-[#6b6b73]"
+          active ? "text-accent" : "text-fg-faint"
         }`}
       >
         {item.icon}
@@ -77,7 +77,7 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 flex items-start justify-between border-t border-white/[0.07] bg-ink/[0.88] px-8 pt-3.5 backdrop-blur-xl"
+      className="fixed inset-x-0 bottom-0 z-30 flex items-start justify-between border-t border-line bg-ink/[0.88] px-8 pt-3.5 backdrop-blur-xl"
       style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
     >
       <div className="mx-auto flex w-full max-w-lg items-start justify-between">
@@ -86,9 +86,9 @@ export default function BottomNav() {
           <Link
             href="/seances/new"
             aria-label="Nouvelle séance"
-            className="-mt-7 flex h-14 w-14 items-center justify-center rounded-full border-4 border-ink bg-energy shadow-[0_8px_24px_rgba(204,255,2,0.4)]"
+            className="-mt-7 flex h-14 w-14 items-center justify-center rounded-full border-4 border-ink bg-energy shadow-[0_8px_24px_rgba(255,122,69,0.35)]"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="#0B0B0F" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgb(var(--energy-fg))" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
               <path d="M5 12h14" />
               <path d="M12 5v14" />
             </svg>

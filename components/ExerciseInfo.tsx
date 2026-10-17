@@ -78,7 +78,7 @@ export default function ExerciseInfo({
           aria-label={`Fiche exercice\u00a0: ${name}`}
           className={
             className ??
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-surface2 text-fg active:bg-white/10"
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-surface2 text-fg active:bg-fg/10"
           }
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -128,7 +128,7 @@ export default function ExerciseInfo({
                 {tags.map((t) => (
                   <span
                     key={t}
-                    className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-fg"
+                    className="rounded-full border border-fg/15 px-3 py-1 text-xs font-semibold text-fg"
                   >
                     {t}
                   </span>
@@ -152,7 +152,7 @@ export default function ExerciseInfo({
                       className={`h-11 min-w-[88px] rounded-full px-4 text-sm font-semibold ${
                         active
                           ? "bg-fg text-ink"
-                          : "border border-white/15 text-fg-muted active:bg-surface2"
+                          : "border border-fg/15 text-fg-muted active:bg-surface2"
                       }`}
                     >
                       {SILHOUETTE_LABELS[s]}
@@ -173,7 +173,7 @@ export default function ExerciseInfo({
                   <ol className="flex flex-col gap-3">
                     {guide.steps.map((step, i) => (
                       <li key={i} className="flex items-start gap-3">
-                        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-surface2 font-oswald text-base font-bold text-energy">
+                        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-surface2 font-oswald text-base font-bold text-accent">
                           {i + 1}
                         </span>
                         <span className="text-pretty text-base text-fg">{step}</span>

@@ -1,5 +1,6 @@
 import { MUSCLE_GROUP_LABELS } from "@/lib/utils/training";
 import type { StatsData } from "@/lib/data/progress";
+import { memberCss } from "@/lib/members";
 
 function volumeParts(kg: number): { value: string; unit: string } {
   if (kg >= 1000) {
@@ -53,15 +54,15 @@ export default function StatsSummary({
               <span className="font-oswald text-[46px] font-bold leading-none text-fg">
                 {vol.value}
               </span>
-              <span className="text-lg font-extrabold text-energy">{vol.unit}</span>
+              <span className="text-lg font-extrabold text-accent">{vol.unit}</span>
             </div>
           </div>
           {variation !== 0 && (
             <span
               className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-extrabold ${
                 variation > 0
-                  ? "border-energy/30 bg-energy/15 text-energy"
-                  : "border-white/10 bg-surface2 text-fg-muted"
+                  ? "border-accent/30 bg-energy/15 text-accent"
+                  : "border-fg/10 bg-surface2 text-fg-muted"
               }`}
             >
               {variation > 0 ? "▲" : "▼"} {Math.abs(variation)} %
@@ -77,11 +78,11 @@ export default function StatsSummary({
                   className="w-full rounded-md"
                   style={{
                     height: `${Math.max(6, (wk.volume / maxWeek) * 80)}px`,
-                    backgroundColor: wk.volume === 0 ? "#2a2a33" : isLast ? "var(--energy)" : color,
+                    backgroundColor: wk.volume === 0 ? "rgb(var(--surface-2))" : isLast ? "rgb(var(--energy))" : memberCss(color),
                     opacity: wk.volume === 0 ? 1 : isLast ? 1 : 0.55,
                   }}
                 />
-                <span className={`text-[12px] font-bold ${isLast ? "text-energy" : "text-fg-muted"}`}>
+                <span className={`text-[12px] font-bold ${isLast ? "text-accent" : "text-fg-muted"}`}>
                   {wk.label}
                 </span>
               </div>
@@ -95,13 +96,13 @@ export default function StatsSummary({
         <div className="flex w-[130px] flex-none flex-col items-center justify-center rounded-[20px] border border-line bg-surface p-4">
           <div className="relative h-24 w-24">
             <svg viewBox="0 0 96 96" className="h-full w-full -rotate-90">
-              <circle cx="48" cy="48" r="44" fill="none" stroke="#1c1c24" strokeWidth="9" />
+              <circle cx="48" cy="48" r="44" fill="none" stroke="rgb(var(--surface-2))" strokeWidth="9" />
               <circle
                 cx="48"
                 cy="48"
                 r="44"
                 fill="none"
-                stroke="var(--energy)"
+                stroke="rgb(var(--energy))"
                 strokeWidth="9"
                 strokeLinecap="round"
                 strokeDasharray={RC}
@@ -138,7 +139,7 @@ export default function StatsSummary({
                       className="block h-full rounded-full"
                       style={{
                         width: `${Math.max(4, (c.sets / maxCouple) * 100)}%`,
-                        backgroundColor: c.color,
+                        backgroundColor: memberCss(c.color),
                       }}
                     />
                   </div>
@@ -184,7 +185,7 @@ export default function StatsSummary({
               <div className="font-extrabold text-fg">{stats.recordExercise || "Record"}</div>
               <div className="mt-0.5 text-xs font-semibold text-fg-muted">Meilleur 1RM estimé</div>
             </div>
-            <span className="font-oswald text-lg font-bold text-energy">
+            <span className="font-oswald text-lg font-bold text-accent">
               {Math.round(stats.recordE1rm)} kg
             </span>
           </div>
@@ -203,7 +204,7 @@ export default function StatsSummary({
                   <span>{g.pct}%</span>
                 </div>
                 <div className="h-1.5 rounded bg-ink">
-                  <div className="h-full rounded" style={{ width: `${g.pct}%`, backgroundColor: color }} />
+                  <div className="h-full rounded" style={{ width: `${g.pct}%`, backgroundColor: memberCss(color) }} />
                 </div>
               </div>
             ))}

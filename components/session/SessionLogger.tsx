@@ -1003,7 +1003,7 @@ export default function SessionLogger({
         <button
           type="button"
           onClick={() => router.push("/dashboard")}
-          className="mt-4 w-full rounded-xl bg-energy py-3 font-extrabold text-ink"
+          className="mt-4 w-full rounded-xl bg-energy py-3 font-extrabold text-energy-fg"
         >
           Retour à l&apos;accueil
         </button>
@@ -1054,7 +1054,7 @@ export default function SessionLogger({
           >
             ‹
           </button>
-          <span className="font-oswald text-[15px] font-bold text-energy">
+          <span className="font-oswald text-[15px] font-bold text-accent">
             {currentIdx + 1}/{allExercises.length}
           </span>
           <button
@@ -1090,13 +1090,13 @@ export default function SessionLogger({
         <div ref={restCardRef} className="mt-2 flex flex-col items-center gap-3">
           <div className="relative h-[150px] w-[150px]">
             <svg viewBox="0 0 160 160" className="h-full w-full -rotate-90">
-              <circle cx="80" cy="80" r="70" fill="none" stroke="#1c1c24" strokeWidth="11" />
+              <circle cx="80" cy="80" r="70" fill="none" stroke="rgb(var(--surface-2))" strokeWidth="11" />
               <circle
                 cx="80"
                 cy="80"
                 r="70"
                 fill="none"
-                stroke="var(--energy)"
+                stroke="rgb(var(--energy))"
                 strokeWidth="11"
                 strokeLinecap="round"
                 strokeDasharray={C}
@@ -1117,21 +1117,21 @@ export default function SessionLogger({
             <button
               type="button"
               onClick={() => rest.addSeconds(-15)}
-              className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+              className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-fg/10"
             >
               − 15 s
             </button>
             <button
               type="button"
               onClick={skipRest}
-              className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+              className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-fg/10"
             >
               Passer
             </button>
             <button
               type="button"
               onClick={() => rest.addSeconds(15)}
-              className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-white/10"
+              className="rounded-xl border border-line bg-surface2 px-4 py-2 font-oswald text-sm font-semibold text-fg active:bg-fg/10"
             >
               + 15 s
             </button>
@@ -1178,7 +1178,7 @@ export default function SessionLogger({
               {exProgress && (
                 <span
                   className={`flex-none font-oswald text-xs font-bold ${
-                    exProgress.isComplete ? "text-energy" : "text-fg-muted"
+                    exProgress.isComplete ? "text-accent" : "text-fg-muted"
                   }`}
                 >
                   {exProgress.isComplete
@@ -1272,13 +1272,13 @@ export default function SessionLogger({
               return (
                 <div
                   key={row.id}
-                  className="rounded-xl border-[1.5px] border-energy bg-surface px-3.5 py-2.5"
+                  className="rounded-xl border-[1.5px] border-accent bg-surface px-3.5 py-2.5"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-energy font-oswald text-xs font-bold text-ink">
+                    <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-energy font-oswald text-xs font-bold text-energy-fg">
                       ✓
                     </span>
-                    <span className="flex flex-1 items-center gap-1.5 text-[15px] font-bold text-energy">
+                    <span className="flex flex-1 items-center gap-1.5 text-[15px] font-bold text-accent">
                       Corriger la série {i + 1}
                       {waitingDot}
                     </span>
@@ -1309,14 +1309,14 @@ export default function SessionLogger({
                     <button
                       type="button"
                       onClick={cancelCorrection}
-                      className="min-h-11 flex-1 rounded-xl bg-surface2 text-sm font-semibold text-fg active:bg-white/10"
+                      className="min-h-11 flex-1 rounded-xl bg-surface2 text-sm font-semibold text-fg active:bg-fg/10"
                     >
                       Annuler
                     </button>
                     <button
                       type="button"
                       onClick={() => saveCorrection(ex.exerciseId)}
-                      className="min-h-11 flex-1 rounded-xl bg-energy text-sm font-extrabold text-ink"
+                      className="min-h-11 flex-1 rounded-xl bg-energy text-sm font-extrabold text-energy-fg"
                     >
                       Enregistrer
                     </button>
@@ -1346,7 +1346,7 @@ export default function SessionLogger({
                 key={row.id ?? `row-${i}`}
                 className={`flex items-center gap-3 rounded-xl px-3.5 ${
                   active
-                    ? "border-[1.5px] border-energy bg-energy/[0.08] py-2.5"
+                    ? "border-[1.5px] border-accent bg-energy/[0.08] py-2.5"
                     : done
                       ? // CM-72 : la zone tactile de correction fait 44 px.
                         "bg-surface py-0.5"
@@ -1356,9 +1356,9 @@ export default function SessionLogger({
                 <span
                   className={`flex h-6 w-6 flex-none items-center justify-center rounded-full font-oswald text-xs font-bold ${
                     done
-                      ? "bg-energy text-ink"
+                      ? "bg-energy text-energy-fg"
                       : active
-                        ? "border-2 border-energy text-energy"
+                        ? "border-2 border-accent text-accent"
                         : "border border-fg-faint text-fg-muted"
                   }`}
                 >
@@ -1435,7 +1435,7 @@ export default function SessionLogger({
                   <>
                     <span
                       className={`flex flex-1 items-center gap-1.5 text-[15px] font-bold ${
-                        active ? "text-energy" : "text-fg-muted"
+                        active ? "text-accent" : "text-fg-muted"
                       }`}
                     >
                       {label}
@@ -1474,7 +1474,7 @@ export default function SessionLogger({
           <button
             type="button"
             onClick={() => addRow(ex.exerciseId)}
-            className="mt-3 w-full rounded-xl border border-dashed border-line py-2.5 text-xs font-semibold text-fg-muted active:bg-white/5"
+            className="mt-3 w-full rounded-xl border border-dashed border-line py-2.5 text-xs font-semibold text-fg-muted active:bg-fg/5"
           >
             + Ajouter une série
           </button>
@@ -1493,7 +1493,7 @@ export default function SessionLogger({
                   type="button"
                   onClick={() => setFeedback((p) => (p === opt.value ? null : opt.value))}
                   className={`rounded-xl py-2 text-xs font-bold ${
-                    feedback === opt.value ? "bg-energy text-ink" : "bg-surface2 text-fg-muted"
+                    feedback === opt.value ? "bg-energy text-energy-fg" : "bg-surface2 text-fg-muted"
                   }`}
                 >
                   {opt.label}
@@ -1504,7 +1504,7 @@ export default function SessionLogger({
         )}
 
         {error && (
-          <p className="mt-4 rounded-xl border border-red-500/30 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+          <p className="mt-4 rounded-xl border border-danger/30 bg-danger-ground/40 px-3 py-2 text-sm text-danger-soft">
             {error}
           </p>
         )}
@@ -1517,7 +1517,7 @@ export default function SessionLogger({
       <button
         type="button"
         onClick={() => setSheetOpen(true)}
-        className="mt-5 w-full rounded-xl border border-dashed border-line py-3 text-sm font-semibold text-fg-muted active:bg-white/5"
+        className="mt-5 w-full rounded-xl border border-dashed border-line py-3 text-sm font-semibold text-fg-muted active:bg-fg/5"
       >
         + Ajouter un exercice
       </button>
@@ -1532,7 +1532,7 @@ export default function SessionLogger({
                 ? validateSet(ex.exerciseId, activeIndex, ex.restSeconds)
                 : addRow(ex.exerciseId)
             }
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-ink"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-energy-fg"
           >
             {activeRow ? "Valider la série" : "Ajouter une série"}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -1544,7 +1544,7 @@ export default function SessionLogger({
             type="button"
             onClick={() => handleFinish()}
             disabled={isPending || isFlushing}
-            className="w-full rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-ink disabled:opacity-50"
+            className="w-full rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-energy-fg disabled:opacity-50"
           >
             {isPending || isFlushing ? "Enregistrement…" : "Terminer la séance"}
           </button>
@@ -1552,7 +1552,7 @@ export default function SessionLogger({
           <button
             type="button"
             onClick={() => setCurrentIdx((i) => Math.min(allExercises.length - 1, i + 1))}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-ink"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-energy-fg"
           >
             Exercice suivant
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -1720,7 +1720,7 @@ function SetInputs({
           {deltaKg !== null && (
             <span
               className={`font-oswald text-xs font-bold ${
-                deltaKg >= 0 ? "text-energy" : "text-flame"
+                deltaKg >= 0 ? "text-accent" : "text-flame"
               }`}
             >
               {deltaKg > 0 ? "+" : "−"}
@@ -1755,7 +1755,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("weight", -2.5)}
-            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 font-oswald text-base font-semibold text-fg active:bg-white/10"
+            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 font-oswald text-base font-semibold text-fg active:bg-fg/10"
             aria-label="Moins 2,5 kg"
           >
             −2.5
@@ -1763,7 +1763,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("weight", -1)}
-            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
+            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-fg/10"
             aria-label="Moins 1 kg"
           >
             −
@@ -1771,7 +1771,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("weight", 1)}
-            className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
+            className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-energy-fg"
             aria-label="Plus 1 kg"
           >
             +
@@ -1779,7 +1779,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("weight", 2.5)}
-            className="flex h-11 items-center justify-center rounded-2xl bg-energy font-oswald text-base font-bold text-ink"
+            className="flex h-11 items-center justify-center rounded-2xl bg-energy font-oswald text-base font-bold text-energy-fg"
             aria-label="Plus 2,5 kg"
           >
             +2.5
@@ -1816,7 +1816,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("reps", -1)}
-            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-white/10"
+            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-fg/10"
             aria-label="Moins 1 répétition"
           >
             −
@@ -1824,7 +1824,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("reps", 1)}
-            className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-ink"
+            className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-energy-fg"
             aria-label="Plus 1 répétition"
           >
             +
@@ -1885,7 +1885,7 @@ function DirectInput({
         }
       }}
       inputMode={field === "weight" ? "decimal" : "numeric"}
-      className="h-11 w-28 rounded-xl border border-energy bg-ink px-2 font-oswald text-[34px] font-bold leading-none text-fg outline-none"
+      className="h-11 w-28 rounded-xl border border-accent bg-ink px-2 font-oswald text-[34px] font-bold leading-none text-fg outline-none"
       aria-label={field === "weight" ? "Saisir le poids" : "Saisir les répétitions"}
     />
   );

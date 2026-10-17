@@ -52,7 +52,7 @@ export default function ColorPicker({
             }`}
             style={{
               background: isTaken ? "transparent" : c.value,
-              boxShadow: selected ? `0 0 0 3px #0B0B0F, 0 0 0 5px ${c.value}` : "none",
+              boxShadow: selected ? `0 0 0 3px rgb(var(--ink)), 0 0 0 5px ${c.value}` : "none",
             }}
           >
             {isTaken && (

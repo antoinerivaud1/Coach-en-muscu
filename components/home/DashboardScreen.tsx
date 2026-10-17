@@ -32,6 +32,7 @@ import { resumeBannerState } from "@/lib/utils/currentSession";
 import { memberStyle } from "@/lib/duo";
 import { deriveMuscleTags, splitVisibleTags } from "@/lib/utils/seances";
 import { formatLastDone } from "@/lib/utils/recommendation";
+import { memberCss } from "@/lib/members";
 
 const WEEK = ["L", "M", "M", "J", "V", "S", "D"];
 
@@ -212,7 +213,7 @@ function Home({
             {todayLabel(now)}
           </div>
           <h1 className="mt-1 text-[30px] font-black tracking-tight text-fg">
-            Salut, <span style={{ color: me.color }}>{me.name}</span>
+            Salut, <span style={{ color: memberCss(me.color) }}>{me.name}</span>
           </h1>
         </div>
         {partnerMember ? (
@@ -227,7 +228,7 @@ function Home({
       {actionError && (
         <p
           role="alert"
-          className="mt-5 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-sm text-red-400"
+          className="mt-5 rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger"
         >
           {actionError}
         </p>
@@ -237,13 +238,13 @@ function Home({
         <div
           className="mt-5 flex items-center gap-3 rounded-2xl border px-4 py-3"
           style={{
-            borderColor: `${partnerMember.color}4D`,
-            background: `${partnerMember.color}1A`,
+            borderColor: memberCss(partnerMember.color, 0.3),
+            background: memberCss(partnerMember.color, 0.1),
           }}
         >
           <span
             className="h-2.5 w-2.5 flex-none animate-pulse rounded-full"
-            style={{ background: partnerMember.color }}
+            style={{ background: memberCss(partnerMember.color) }}
           />
           <div className="text-sm">
             <span className="font-bold" style={{ color: partnerMember.color }}>
@@ -281,7 +282,7 @@ function Home({
             return (
               <div key={i} className="flex flex-col items-center gap-1.5">
                 <span
-                  className={`text-[12px] font-bold ${isToday ? "text-energy" : "text-fg-muted"}`}
+                  className={`text-[12px] font-bold ${isToday ? "text-accent" : "text-fg-muted"}`}
                 >
                   {d}
                 </span>
@@ -290,7 +291,7 @@ function Home({
                     done
                       ? "bg-energy"
                       : isToday
-                        ? "border-2 border-energy bg-transparent"
+                        ? "border-2 border-accent bg-transparent"
                         : "bg-surface2"
                   }`}
                 />
@@ -320,7 +321,7 @@ function Home({
           </p>
           <Link
             href="/seances/new"
-            className="mt-4 inline-block rounded-xl bg-energy px-5 py-2.5 font-extrabold text-ink"
+            className="mt-4 inline-block rounded-xl bg-energy px-5 py-2.5 font-extrabold text-energy-fg"
           >
             Créer ma première séance
           </Link>
@@ -339,9 +340,9 @@ function Home({
             <form onSubmit={startOnSubmit(recommended.id)} className="mb-2.5">
               <button
                 type="submit"
-                className="flex w-full items-center gap-2 rounded-[14px] border border-energy/30 bg-energy/10 px-3.5 py-2.5 text-left"
+                className="flex w-full items-center gap-2 rounded-[14px] border border-accent/30 bg-energy/10 px-3.5 py-2.5 text-left"
               >
-                <span className="shrink-0 text-[12px] font-extrabold uppercase tracking-[0.12em] text-energy">
+                <span className="shrink-0 text-[12px] font-extrabold uppercase tracking-[0.12em] text-accent">
                   Suggestion
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-extrabold text-fg">
@@ -418,7 +419,7 @@ function Home({
 
       {/* Bibliothèque de séances types (accès complet) */}
       <div className="mt-7 flex items-center justify-between">
-        <Link href="/seances" className="text-sm font-semibold text-energy">
+        <Link href="/seances" className="text-sm font-semibold text-accent">
           Gérer mes séances
         </Link>
       </div>

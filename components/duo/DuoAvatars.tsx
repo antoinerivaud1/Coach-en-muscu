@@ -1,4 +1,5 @@
 import { initialOf } from "@/lib/onboarding";
+import { memberCss } from "@/lib/members";
 
 /**
  * CM-87 : pastilles rondes des membres du duo, l'une sur l'autre (accueil en
@@ -20,7 +21,7 @@ export default function DuoAvatars({
           style={{
             width: size,
             height: size,
-            background: m.color,
+            background: memberCss(m.color),
             borderWidth: Math.max(3, Math.round(size / 22)),
             marginLeft: i > 0 ? -Math.round(size / 4) : 0,
             fontSize: Math.round(size * 0.44),

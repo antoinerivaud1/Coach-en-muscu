@@ -8,7 +8,7 @@ import { LICENSES } from "@/lib/licenses";
 
 export const metadata: Metadata = {
   title: "Crédits et licences · Coach en Muscu",
-  description: "Bibliothèques et polices utilisées par Coach en Muscu, et leurs licences.",
+  description: "Bibliothèques utilisées par Coach en Muscu, et leurs licences.",
 };
 
 /**

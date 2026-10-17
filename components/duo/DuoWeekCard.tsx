@@ -1,4 +1,5 @@
 import type { Member } from "@/lib/duo";
+import { memberCss } from "@/lib/members";
 
 export type MemberWeek = Member & {
   /** Jours (0 = lundi) avec au moins une séance terminée. */
@@ -45,7 +46,7 @@ export default function DuoWeekCard({
             <span
               key={i}
               className={`text-center text-[12px] font-bold ${
-                i === todayIdx ? "text-energy" : "text-fg-muted"
+                i === todayIdx ? "text-accent" : "text-fg-muted"
               }`}
             >
               {d}
@@ -58,7 +59,7 @@ export default function DuoWeekCard({
         <div key={m.id} className="flex items-center gap-2.5" data-member={m.name}>
           <span
             className="w-[72px] flex-none truncate text-[15px] font-bold"
-            style={{ color: m.color }}
+            style={{ color: memberCss(m.color) }}
           >
             {m.name}
           </span>
@@ -69,9 +70,9 @@ export default function DuoWeekCard({
                 <span
                   key={i}
                   className={`h-[22px] rounded-[7px] ${
-                    done ? "" : i === todayIdx ? "border-2 border-[#3A3A44]" : "bg-surface2"
+                    done ? "" : i === todayIdx ? "border-2 border-edge" : "bg-surface2"
                   }`}
-                  style={done ? { background: m.color } : undefined}
+                  style={done ? { background: memberCss(m.color) } : undefined}
                 />
               );
             })}

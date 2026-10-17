@@ -83,7 +83,7 @@ export default function TemplatePicker({
               aria-checked={selected}
               onClick={() => setPicked(t.id)}
               className={`flex flex-col items-stretch rounded-[20px] px-4 py-3.5 text-left ${
-                selected ? "border-[1.5px] border-energy bg-energy/[0.06]" : "border border-line bg-surface"
+                selected ? "border-[1.5px] border-accent bg-energy/[0.06]" : "border border-line bg-surface"
               }`}
             >
               <span className="flex w-full items-center justify-between gap-3">
@@ -94,11 +94,11 @@ export default function TemplatePicker({
                 <span
                   aria-hidden
                   className={`flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full ${
-                    selected ? "bg-energy" : "border-2 border-[#3A3A44]"
+                    selected ? "bg-energy" : "border-2 border-edge"
                   }`}
                 >
                   {selected && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0B0B0F" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--energy-fg))" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20 6 9 17l-5-5" />
                     </svg>
                   )}
@@ -106,7 +106,7 @@ export default function TemplatePicker({
               </span>
               <span className="mt-3 flex flex-wrap gap-1.5">
                 {t.seances.map((s) => (
-                  <span key={s} className="rounded-full bg-surface2 px-2.5 py-1.5 text-sm font-semibold text-[#C9C9D1]">
+                  <span key={s} className="rounded-full bg-surface2 px-2.5 py-1.5 text-sm font-semibold text-fg-soft">
                     {s}
                   </span>
                 ))}
@@ -121,7 +121,7 @@ export default function TemplatePicker({
           <button
             type="submit"
             disabled={busy !== null}
-            className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-[18px] border-[1.5px] border-dashed border-white/15 text-base font-bold text-fg"
+            className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-[18px] border-[1.5px] border-dashed border-fg/15 text-base font-bold text-fg"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
               <path d="M5 12h14" /><path d="M12 5v14" />
@@ -132,7 +132,7 @@ export default function TemplatePicker({
       )}
 
       {error && (
-        <p role="alert" className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">
+        <p role="alert" className="mt-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger-soft">
           {error}
         </p>
       )}
@@ -150,7 +150,7 @@ export default function TemplatePicker({
         <button
           type="submit"
           disabled={busy !== null || !picked}
-          className="h-14 w-full rounded-2xl bg-energy text-base font-extrabold text-ink disabled:opacity-60"
+          className="h-14 w-full rounded-2xl bg-energy text-base font-extrabold text-energy-fg disabled:opacity-60"
         >
           {pending ? "Ajout en cours…" : "Ajouter et c'est parti"}
         </button>

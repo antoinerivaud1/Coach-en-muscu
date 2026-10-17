@@ -43,13 +43,13 @@ export default function SignupForm({ next = "", onStart }: { next?: string; onSt
   const emailError = state.fieldErrors?.email;
   const passwordError = state.fieldErrors?.password;
   const field =
-    "h-[54px] w-full rounded-[14px] border bg-surface px-4 text-base text-fg placeholder-fg-muted focus:border-energy focus:outline-none";
+    "h-[54px] w-full rounded-[14px] border bg-surface px-4 text-base text-fg placeholder-fg-muted focus:border-accent focus:outline-none";
 
   return (
     <form onSubmit={submit} className="flex flex-1 flex-col" noValidate>
       <div className="mt-8 flex flex-col gap-[18px]">
         <label className="flex flex-col gap-2">
-          <span className="text-[15px] font-semibold text-[#A4A4AE]">Email</span>
+          <span className="text-[15px] font-semibold text-fg-muted">Email</span>
           <input
             name="email"
             type="email"
@@ -62,17 +62,17 @@ export default function SignupForm({ next = "", onStart }: { next?: string; onSt
             required
             aria-invalid={emailError ? true : undefined}
             aria-describedby={emailError ? "email-error" : undefined}
-            className={`${field} ${emailError ? "border-red-400/60" : "border-white/10"}`}
+            className={`${field} ${emailError ? "border-danger/60" : "border-fg/10"}`}
           />
           {emailError && (
-            <span id="email-error" className="text-sm font-semibold text-red-400">
+            <span id="email-error" className="text-sm font-semibold text-danger">
               {emailError}
             </span>
           )}
         </label>
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="password" className="text-[15px] font-semibold text-[#A4A4AE]">
+          <label htmlFor="password" className="text-[15px] font-semibold text-fg-muted">
             Mot de passe
           </label>
           <div className="relative">
@@ -90,7 +90,7 @@ export default function SignupForm({ next = "", onStart }: { next?: string; onSt
               minLength={PASSWORD_MIN_LENGTH}
               aria-invalid={passwordError ? true : undefined}
               aria-describedby="password-hint"
-              className={`${field} pr-[52px] ${passwordError ? "border-red-400/60" : "border-white/10"}`}
+              className={`${field} pr-[52px] ${passwordError ? "border-danger/60" : "border-fg/10"}`}
             />
             <button
               type="button"
@@ -108,13 +108,13 @@ export default function SignupForm({ next = "", onStart }: { next?: string; onSt
           </div>
           <span
             id="password-hint"
-            className={`flex items-center gap-2 text-[15px] ${passwordError ? "font-semibold text-red-400" : "text-[#A4A4AE]"}`}
+            className={`flex items-center gap-2 text-[15px] ${passwordError ? "font-semibold text-danger" : "text-fg-muted"}`}
           >
             {passwordError ? (
               passwordError
             ) : (
               <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={longEnough ? "#CCFF02" : "#8C8C97"} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={longEnough ? "rgb(var(--accent))" : "rgb(var(--fg-muted))"} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M20 6 9 17l-5-5" />
                 </svg>
                 {PASSWORD_MIN_LENGTH}&nbsp;caractères minimum
@@ -125,7 +125,7 @@ export default function SignupForm({ next = "", onStart }: { next?: string; onSt
       </div>
 
       {state.error && (
-        <p role="alert" className="mt-5 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">
+        <p role="alert" className="mt-5 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger-soft">
           {state.error}
         </p>
       )}
@@ -135,7 +135,7 @@ export default function SignupForm({ next = "", onStart }: { next?: string; onSt
       <button
         type="submit"
         disabled={pending}
-        className="mt-8 h-14 w-full rounded-2xl bg-energy text-base font-extrabold text-ink disabled:opacity-60"
+        className="mt-8 h-14 w-full rounded-2xl bg-energy text-base font-extrabold text-energy-fg disabled:opacity-60"
       >
         {pending ? "Création du compte…" : "Continuer"}
       </button>

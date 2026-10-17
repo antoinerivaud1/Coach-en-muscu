@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { FormEvent } from "react";
 import BottomNav from "@/components/BottomNav";
 import MemberAvatar from "@/components/onboarding/MemberAvatar";
+import { memberCss } from "@/lib/members";
 
 const WEEK = ["L", "M", "M", "J", "V", "S", "D"];
 
@@ -57,7 +58,7 @@ export default function FirstDayHome({
     <main className="min-h-[100dvh] px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
       <header className="flex items-center justify-between gap-3">
         <h1 className="min-w-0 truncate text-[28px] font-black tracking-tight text-fg">
-          Salut, <span style={{ color: accent }}>{name}</span>
+          Salut, <span style={{ color: memberCss(accent) }}>{name}</span>
         </h1>
         <MemberAvatar name={name} color={accent} size={44} />
       </header>
@@ -65,14 +66,14 @@ export default function FirstDayHome({
       {notice}
 
       {error && (
-        <p role="alert" className="mt-5 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-sm text-red-400">
+        <p role="alert" className="mt-5 rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
         </p>
       )}
 
       <section aria-label="Cette semaine" className="mt-[18px] rounded-[20px] border border-line bg-surface px-4 py-3.5">
         <div className="flex items-baseline justify-between">
-          <span className="text-[15px] font-bold uppercase tracking-[0.06em] text-[#A4A4AE]">
+          <span className="text-[15px] font-bold uppercase tracking-[0.06em] text-fg-muted">
             Cette semaine
           </span>
           <span className="font-oswald text-[19px] font-semibold text-fg">
@@ -85,14 +86,14 @@ export default function FirstDayHome({
               <span className="text-[13px] font-semibold text-fg-muted">{d}</span>
               <span
                 className={`h-[30px] w-[30px] rounded-[10px] ${i === todayIdx ? "border-2" : "bg-surface2"}`}
-                style={i === todayIdx ? { borderColor: accent } : undefined}
+                style={i === todayIdx ? { borderColor: memberCss(accent) } : undefined}
               />
             </div>
           ))}
         </div>
       </section>
 
-      <section aria-label="Aujourd'hui" className="mt-3.5 flex flex-col gap-3.5 rounded-3xl bg-energy p-5 text-ink">
+      <section aria-label="Aujourd'hui" className="mt-3.5 flex flex-col gap-3.5 rounded-3xl bg-energy p-5 text-energy-fg">
         <div className="flex flex-col gap-1">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-1">
@@ -113,9 +114,9 @@ export default function FirstDayHome({
         <form onSubmit={startOnSubmit(today.id)}>
           <button
             type="submit"
-            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-base font-extrabold text-energy"
+            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-base font-extrabold text-accent"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#CCFF02" aria-hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="rgb(var(--accent))" aria-hidden>
               <path d="M7 4.5v15l12-7.5-12-7.5Z" />
             </svg>
             Démarrer la séance
@@ -125,7 +126,7 @@ export default function FirstDayHome({
 
       <div className="mt-[22px] flex items-baseline justify-between">
         <h2 className="text-lg font-extrabold text-fg">Tes séances</h2>
-        <Link href="/seances" className="inline-flex min-h-11 items-center text-base font-bold text-energy">
+        <Link href="/seances" className="inline-flex min-h-11 items-center text-base font-bold text-accent">
           Tout voir
         </Link>
       </div>
@@ -145,10 +146,10 @@ export default function FirstDayHome({
       </div>
 
       <div className="mt-3.5 flex items-start gap-3 rounded-[18px] border border-line bg-surface px-4 py-3.5">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#CCFF02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-px flex-none" aria-hidden>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-px flex-none" aria-hidden>
           <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
         </svg>
-        <p className="text-[15px] leading-relaxed text-[#C9C9D1]">
+        <p className="text-[15px] leading-relaxed text-fg-soft">
           Pour ta première séance, note simplement tes charges. Dès la deuxième, on
           te rappelle ce que tu as fait la dernière fois.
         </p>

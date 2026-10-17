@@ -75,13 +75,13 @@ export default function ProfileStepForm({
 
       <div className="mt-6 flex items-center gap-4">
         <MemberAvatar name={name} color={color} size={76} />
-        <p className="text-sm leading-snug text-[#A4A4AE]">
+        <p className="text-sm leading-snug text-fg-muted">
           Ton initiale, dans ta couleur.
         </p>
       </div>
 
       <label className="mt-6 flex flex-col gap-2">
-        <span className="text-[15px] font-semibold text-[#A4A4AE]">Prénom</span>
+        <span className="text-[15px] font-semibold text-fg-muted">Prénom</span>
         <input
           name="display_name"
           type="text"
@@ -93,19 +93,19 @@ export default function ProfileStepForm({
           required
           aria-invalid={nameError ? true : undefined}
           aria-describedby={nameError ? "prenom-error" : undefined}
-          className={`h-[54px] rounded-[14px] border bg-surface px-4 text-base text-fg placeholder-fg-muted focus:border-energy focus:outline-none ${
-            nameError ? "border-red-400/60" : "border-white/10"
+          className={`h-[54px] rounded-[14px] border bg-surface px-4 text-base text-fg placeholder-fg-muted focus:border-accent focus:outline-none ${
+            nameError ? "border-danger/60" : "border-fg/10"
           }`}
         />
         {nameError && (
-          <span id="prenom-error" className="text-sm font-semibold text-red-400">
+          <span id="prenom-error" className="text-sm font-semibold text-danger">
             {nameError}
           </span>
         )}
       </label>
 
       <div className="mt-6 flex flex-col gap-2.5">
-        <span id="couleur-label" className="text-[15px] font-semibold text-[#A4A4AE]">
+        <span id="couleur-label" className="text-[15px] font-semibold text-fg-muted">
           Ta couleur
         </span>
         <ColorPicker value={color} onChange={setColor} labelId="couleur-label" />
@@ -123,7 +123,7 @@ export default function ProfileStepForm({
       </div>
 
       {state.error && (
-        <p role="alert" className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">
+        <p role="alert" className="mt-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger-soft">
           {state.error}
         </p>
       )}
@@ -133,7 +133,7 @@ export default function ProfileStepForm({
       <button
         type="submit"
         disabled={pending}
-        className="mt-8 h-14 w-full rounded-2xl bg-energy text-base font-extrabold text-ink disabled:opacity-60"
+        className="mt-8 h-14 w-full rounded-2xl bg-energy text-base font-extrabold text-energy-fg disabled:opacity-60"
       >
         {pending ? "Enregistrement…" : "Continuer"}
       </button>

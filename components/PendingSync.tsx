@@ -134,7 +134,7 @@ export default function PendingSync() {
       style={{ top: "max(0.5rem, env(safe-area-inset-top))" }}
     >
       {counts.pending > 0 && (
-        <div role="status" className="rounded-full bg-amber-500/90 px-3 py-1 text-sm font-medium text-amber-950">
+        <div role="status" className="rounded-full bg-warning/90 px-3 py-1 text-sm font-medium text-amber-950">
           {counts.pending} en attente de synchro
         </div>
       )}

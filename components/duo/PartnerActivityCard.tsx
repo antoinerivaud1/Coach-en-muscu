@@ -1,3 +1,4 @@
+import { memberCss } from "@/lib/members";
 /**
  * CM-87 : activité du partenaire sur l'accueil en duo (maquette 10) : son
  * dernier record battu. Purement informatif, aucune notification.
@@ -18,7 +19,7 @@ export default function PartnerActivityCard({
     <div className="mt-3.5 flex items-center gap-3 rounded-[20px] border border-line bg-surface px-4 py-3.5">
       <span
         className="flex h-10 w-10 flex-none items-center justify-center rounded-xl"
-        style={{ color, background: `${color}1F` }}
+        style={{ color: memberCss(color), background: memberCss(color, 0.12) }}
         aria-hidden
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">

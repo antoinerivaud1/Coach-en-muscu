@@ -68,7 +68,7 @@ export default function SignOutButton() {
       <form ref={formRef} action={signOutAndReload} onSubmit={onSubmit} className="mt-6">
         <button
           type="submit"
-          className="w-full rounded-2xl border border-line bg-surface2 py-3.5 text-sm font-bold text-fg active:bg-white/10"
+          className="w-full rounded-2xl border border-line bg-surface2 py-3.5 text-sm font-bold text-fg active:bg-fg/10"
         >
           Se déconnecter
         </button>
@@ -98,14 +98,14 @@ export default function SignOutButton() {
               <button
                 type="button"
                 onClick={() => setUnsynced(null)}
-                className="w-full rounded-xl bg-energy py-3 text-sm font-extrabold text-ink"
+                className="w-full rounded-xl bg-energy py-3 text-sm font-extrabold text-energy-fg"
               >
                 Rester connecté
               </button>
               <button
                 type="button"
                 onClick={confirmSignOut}
-                className="w-full rounded-xl bg-surface2 py-3 text-sm font-semibold text-red-400"
+                className="w-full rounded-xl bg-surface2 py-3 text-sm font-semibold text-danger"
               >
                 Me déconnecter quand même
               </button>

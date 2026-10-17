@@ -12,7 +12,7 @@
  */
 
 import type { CSSProperties } from "react";
-import { memberAccent, type MemberColor } from "@/lib/members";
+import { memberAccent, memberColorLight, type MemberColor } from "@/lib/members";
 
 // ---- Code d'invitation ---------------------------------------------------------
 
@@ -192,9 +192,16 @@ export function hexToRgbChannels(hex: string): string {
   return [m[1], m[2], m[3]].map((h) => parseInt(h!, 16)).join(" ");
 }
 
-/** Style à poser sur un conteneur pour que `*-member` prenne cette couleur. */
+/**
+ * Style à poser sur un conteneur pour que `*-member` prenne cette couleur.
+ * CM-116 : deux variantes, sombre (`--member-d`, la couleur choisie) et claire
+ * (`--member-l`, plus foncée) ; app/globals.css choisit selon le thème.
+ */
 export function memberStyle(color: string): CSSProperties {
-  return { "--member-rgb": hexToRgbChannels(color) } as CSSProperties;
+  return {
+    "--member-d": hexToRgbChannels(color),
+    "--member-l": hexToRgbChannels(memberColorLight(color)),
+  } as CSSProperties;
 }
 
 // ---- Bibliothèque ---------------------------------------------------------------

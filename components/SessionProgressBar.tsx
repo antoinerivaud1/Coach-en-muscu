@@ -54,7 +54,7 @@ export default function SessionProgressBar({
         aria-valuenow={done}
         aria-valuetext={label}
         aria-label="Progression de la séance"
-        className="w-full overflow-hidden rounded-full bg-white/10"
+        className="w-full overflow-hidden rounded-full bg-fg/10"
         style={{ height: LINE_HEIGHT }}
       >
         <div
@@ -64,7 +64,7 @@ export default function SessionProgressBar({
       </div>
       <p
         className={`mt-[3px] truncate text-xs leading-4 ${
-          isComplete ? "text-energy" : "text-fg-muted"
+          isComplete ? "text-accent" : "text-fg-muted"
         }`}
       >
         {label}

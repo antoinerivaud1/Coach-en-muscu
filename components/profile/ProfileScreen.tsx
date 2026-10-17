@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
 import { useRequireProfileId } from "@/hooks/useProfileId";
 import { useIdentity } from "@/hooks/data/useIdentity";
 import { useBadges } from "@/hooks/data/useBadges";
 import { useDuoState } from "@/hooks/data/useDuoState";
-import { memberAccent } from "@/lib/members";
+import { memberAccent, memberCss } from "@/lib/members";
+import { APPEARANCE_KEY, appearanceLabel, parseAppearance } from "@/lib/appearance";
 import type { Badge } from "@/lib/badges";
 import type { DuoState } from "@/lib/queries/duoState";
 import type { Identity } from "@/lib/queries/identity";
@@ -24,7 +25,7 @@ function Row({ href, title, sub }: { href: string; title: string; sub: string })
   return (
     <Link
       href={href}
-      className="flex items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 transition-colors hover:border-white/20"
+      className="flex items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 transition-colors hover:border-fg/20"
     >
       <div className="flex-1">
         <div className="font-extrabold text-fg">{title}</div>
@@ -35,6 +36,19 @@ function Row({ href, title, sub }: { href: string; title: string; sub: string })
       </svg>
     </Link>
   );
+}
+
+/** CM-116 : ligne « Apparence », avec le réglage en cours. */
+function AppearanceRow() {
+  const [sub, setSub] = useState("Automatique");
+  useEffect(() => {
+    try {
+      setSub(appearanceLabel(parseAppearance(window.localStorage.getItem(APPEARANCE_KEY))));
+    } catch {
+      // Stockage bloqué : libellé par défaut.
+    }
+  }, []);
+  return <Row href="/profile/apparence" title="Apparence" sub={sub} />;
 }
 
 /**
@@ -171,7 +185,7 @@ function ProfileView({
             {duo.kind === "duo" ? (
               <>
                 En duo avec{" "}
-                <span className="font-bold" style={{ color: memberAccent(duo.partner) }}>
+                <span className="font-bold" style={{ color: memberCss(memberAccent(duo.partner)) }}>
                   {duo.partner.display_name}
                 </span>{" "}
                 depuis le {since}
@@ -217,7 +231,7 @@ function ProfileView({
             <div
               key={b.id}
               className={`flex flex-col items-center gap-1 rounded-2xl border p-3 text-center ${
-                b.earned ? "border-energy/40 bg-energy/10" : "border-line bg-surface opacity-60"
+                b.earned ? "border-accent/40 bg-energy/10" : "border-line bg-surface opacity-60"
               }`}
             >
               <span className="text-2xl">{b.icon}</span>
@@ -231,6 +245,7 @@ function ProfileView({
       </div>
 
       <div className="mt-6 flex flex-col gap-2.5">
+        <AppearanceRow />
         <Row href="/guide" title="Guide des exercices" sub="Mouvements, erreurs à éviter, étirements" />
         <Row
           href="/seances"
@@ -255,7 +270,7 @@ function ProfileView({
           <Row href="/legal/confidentialite" title="Confidentialité" sub="Tes données et tes droits" />
           <Row href="/legal/cgu" title="CGU et abonnement" sub="Conditions d’utilisation, Premium" />
           <Row href="/legal/mentions" title="Mentions légales" sub="Éditeur et hébergeurs" />
-          <Row href="/credits" title="Crédits et licences" sub="Bibliothèques et polices" />
+          <Row href="/credits" title="Crédits et licences" sub="Bibliothèques utilisées" />
         </div>
       </section>
 

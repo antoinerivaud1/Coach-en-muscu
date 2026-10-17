@@ -6,6 +6,7 @@ import { DUO_READ_ERROR_MESSAGE } from "@/lib/duoMembership";
 import DuoAvatars from "@/components/duo/DuoAvatars";
 import { InviteButton, RevokeInvitationButton } from "@/components/duo/InvitationForms";
 import LeaveDuoSheet from "@/components/duo/LeaveDuoSheet";
+import { memberCss } from "@/lib/members";
 
 /**
  * CM-87 : carte « S'entraîner à deux » du Profil (maquette 6), selon l'état :
@@ -35,7 +36,7 @@ export default function DuoSection({
         <p role="alert" className="text-balance text-base leading-snug text-fg-muted">
           {DUO_READ_ERROR_MESSAGE}
         </p>
-        <a href="/profile" className="flex min-h-11 items-center font-bold text-energy">
+        <a href="/profile" className="flex min-h-11 items-center font-bold text-accent">
           Réessayer
         </a>
       </section>
@@ -75,11 +76,11 @@ export default function DuoSection({
     return (
       <section
         aria-labelledby="duo-titre"
-        className="mt-3 flex flex-col gap-3.5 rounded-3xl border-[1.5px] border-energy/35 bg-surface p-5"
+        className="mt-3 flex flex-col gap-3.5 rounded-3xl border-[1.5px] border-accent/35 bg-surface p-5"
       >
         <div className="flex items-center gap-3">
           <span
-            className="h-2.5 w-2.5 flex-none rounded-full bg-energy shadow-[0_0_0_5px_rgba(204,255,2,0.18)]"
+            className="h-2.5 w-2.5 flex-none rounded-full bg-energy shadow-[0_0_0_5px_rgba(255,122,69,0.18)]"
             aria-hidden
           />
           <h2 id="duo-titre" className="text-[21px] font-black text-fg">
@@ -98,7 +99,7 @@ export default function DuoSection({
             <span
               key={i}
               aria-hidden
-              className="flex h-12 items-center justify-center rounded-[14px] bg-surface2 font-oswald text-[28px] font-bold text-energy"
+              className="flex h-12 items-center justify-center rounded-[14px] bg-surface2 font-oswald text-[28px] font-bold text-accent"
             >
               {c}
             </span>
@@ -109,7 +110,7 @@ export default function DuoSection({
         </p>
         <Link
           href="/duo/inviter"
-          className="flex h-[52px] items-center justify-center rounded-2xl bg-energy text-[17px] font-extrabold text-ink"
+          className="flex h-[52px] items-center justify-center rounded-2xl bg-energy text-[17px] font-extrabold text-energy-fg"
         >
           Partager l&apos;invitation
         </Link>
@@ -121,14 +122,14 @@ export default function DuoSection({
   return (
     <section
       aria-labelledby="duo-titre"
-      className="mt-3 flex flex-col gap-3.5 overflow-hidden rounded-3xl border-[1.5px] border-energy/35 bg-surface p-5"
+      className="mt-3 flex flex-col gap-3.5 overflow-hidden rounded-3xl border-[1.5px] border-accent/35 bg-surface p-5"
     >
       <div className="flex items-center" aria-hidden>
         <span
           className="relative z-[1] h-11 w-11 rounded-full border-[3px] border-surface"
-          style={{ background: me.color }}
+          style={{ background: memberCss(me.color) }}
         />
-        <span className="-ml-3 flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed border-[#6E6E78] text-fg-muted">
+        <span className="-ml-3 flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed border-fg-faint text-fg-muted">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="h-[18px] w-[18px]">
             <path d="M5 12h14" />
             <path d="M12 5v14" />
@@ -146,7 +147,7 @@ export default function DuoSection({
       <InviteButton />
       <Link
         href="/duo/rejoindre"
-        className="-mt-1.5 flex min-h-11 items-center justify-center text-base font-bold text-energy"
+        className="-mt-1.5 flex min-h-11 items-center justify-center text-base font-bold text-accent"
       >
         J&apos;ai reçu un code
       </Link>

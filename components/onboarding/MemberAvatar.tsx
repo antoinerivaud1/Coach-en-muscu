@@ -1,4 +1,5 @@
 import { initialOf } from "@/lib/onboarding";
+import { memberCss } from "@/lib/members";
 
 /**
  * CM-86 : avatar d'un membre, son initiale sur un fond teinté de sa couleur
@@ -23,9 +24,9 @@ export default function MemberAvatar({
         width: size,
         height: size,
         borderRadius: Math.round(size * 0.32),
-        border: `2px solid ${color}`,
-        background: `${color}1A`,
-        color,
+        border: `2px solid ${memberCss(color)}`,
+        background: memberCss(color, 0.1),
+        color: memberCss(color),
         fontSize: Math.round(size * 0.45),
       }}
     >

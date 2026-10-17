@@ -20,6 +20,7 @@ import {
 import { DEFAULT_WEEKLY_GOAL, FIRST_NAME_MAX_LENGTH, parseWeeklyGoal } from "@/lib/onboarding";
 import ColorPicker from "@/components/onboarding/ColorPicker";
 import GoalStepper from "@/components/onboarding/GoalStepper";
+import { memberCss } from "@/lib/members";
 
 type FormState = {
   error?: string;
@@ -120,7 +121,7 @@ export default function IdentitySection({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="inline-flex min-h-11 items-center px-1 text-base font-bold text-energy"
+            className="inline-flex min-h-11 items-center px-1 text-base font-bold text-accent"
           >
             Modifier
           </button>
@@ -147,14 +148,14 @@ export default function IdentitySection({
           ].map((row, i) => (
             <div
               key={row.label}
-              className={`flex min-h-14 items-center justify-between gap-3 px-4 ${i > 0 ? "border-t border-white/[0.06]" : ""}`}
+              className={`flex min-h-14 items-center justify-between gap-3 px-4 ${i > 0 ? "border-t border-fg/[0.06]" : ""}`}
             >
               <span className="text-base font-semibold text-fg">{row.label}</span>
               <span className="min-w-0 truncate text-base text-fg-muted">{row.value}</span>
             </div>
           ))}
           {state.saved && (
-            <p role="status" className="border-t border-white/[0.06] px-4 py-3 text-sm font-semibold text-energy">
+            <p role="status" className="border-t border-fg/[0.06] px-4 py-3 text-sm font-semibold text-accent">
               Profil enregistré.
             </p>
           )}
@@ -165,7 +166,7 @@ export default function IdentitySection({
           <input type="hidden" name="weekly_goal" value={goal} />
 
           <label className="flex flex-col gap-2">
-            <span className="text-[15px] font-semibold text-[#A4A4AE]">Prénom</span>
+            <span className="text-[15px] font-semibold text-fg-muted">Prénom</span>
             <input
               name="display_name"
               type="text"
@@ -175,15 +176,15 @@ export default function IdentitySection({
               maxLength={FIRST_NAME_MAX_LENGTH}
               required
               aria-invalid={nameError ? true : undefined}
-              className={`h-[54px] rounded-[14px] border bg-surface2 px-4 text-base text-fg focus:border-energy focus:outline-none ${
-                nameError ? "border-red-400/60" : "border-white/10"
+              className={`h-[54px] rounded-[14px] border bg-surface2 px-4 text-base text-fg focus:border-accent focus:outline-none ${
+                nameError ? "border-danger/60" : "border-fg/10"
               }`}
             />
-            {nameError && <span className="text-sm font-semibold text-red-400">{nameError}</span>}
+            {nameError && <span className="text-sm font-semibold text-danger">{nameError}</span>}
           </label>
 
           <div className="flex flex-col gap-2.5">
-            <span id="profil-couleur" className="text-[15px] font-semibold text-[#A4A4AE]">
+            <span id="profil-couleur" className="text-[15px] font-semibold text-fg-muted">
               Ma couleur
             </span>
             <ColorPicker
@@ -198,7 +199,7 @@ export default function IdentitySection({
                 <span
                   aria-hidden
                   className="h-3.5 w-3.5 flex-none rounded-full"
-                  style={{ background: taken.color, filter: "grayscale(1) brightness(0.5)" }}
+                  style={{ background: memberCss(taken.color), filter: "grayscale(1) brightness(0.5)" }}
                 />
                 <span>
                   <span className="font-semibold text-fg">Couleur {deName(partner.name)}</span>
@@ -207,7 +208,7 @@ export default function IdentitySection({
               </p>
             )}
             {colorError && (
-              <span role="alert" className="text-sm font-semibold text-red-400">
+              <span role="alert" className="text-sm font-semibold text-danger">
                 {colorError}
               </span>
             )}
@@ -219,7 +220,7 @@ export default function IdentitySection({
           </div>
 
           {state.error && (
-            <p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">
+            <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger-soft">
               {state.error}
             </p>
           )}
@@ -236,7 +237,7 @@ export default function IdentitySection({
             <button
               type="submit"
               disabled={pending || !online}
-              className="h-12 flex-1 rounded-2xl bg-energy text-base font-extrabold text-ink disabled:opacity-60"
+              className="h-12 flex-1 rounded-2xl bg-energy text-base font-extrabold text-energy-fg disabled:opacity-60"
             >
               {pending ? "Enregistrement…" : "Enregistrer"}
             </button>

@@ -67,7 +67,7 @@ export default function ExportButton({
   const alert = error && (
     <p
       role="alert"
-      className="rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2.5 text-base text-red-300"
+      className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2.5 text-base text-danger-soft"
     >
       {error}
     </p>
@@ -81,7 +81,7 @@ export default function ExportButton({
           onClick={onClick}
           disabled={pending || !online}
           aria-busy={pending}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-energy/40 text-[17px] font-bold text-energy disabled:opacity-60"
+          className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-accent/40 text-[17px] font-bold text-accent disabled:opacity-60"
         >
           {icon}
           {pending ? "Préparation…" : "Exporter mes données"}
@@ -98,7 +98,7 @@ export default function ExportButton({
         onClick={onClick}
         disabled={pending || !online}
         aria-busy={pending}
-        className="flex min-h-[64px] w-full items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition-colors hover:border-white/20 disabled:opacity-60"
+        className="flex min-h-[64px] w-full items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition-colors hover:border-fg/20 disabled:opacity-60"
       >
         <span className="flex-1">
           <span className="block font-extrabold text-fg">

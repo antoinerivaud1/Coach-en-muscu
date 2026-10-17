@@ -28,7 +28,7 @@ export default function OfflineBanner({
       role="status"
       className={`flex items-center gap-2 rounded-full bg-surface2 px-3 py-1.5 text-sm text-fg-muted ${className}`}
     >
-      <span aria-hidden className="h-2 w-2 flex-none rounded-full bg-amber-500" />
+      <span aria-hidden className="h-2 w-2 flex-none rounded-full bg-warning" />
       <span>
         Hors ligne{stamp !== null ? ` · données du ${formatDataStamp(stamp)}` : ""}
       </span>
