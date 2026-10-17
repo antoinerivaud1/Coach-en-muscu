@@ -11,6 +11,7 @@ import {
 } from "@/lib/accountDeletion";
 import { unsyncedLocalCount } from "@/lib/localQueues";
 import ExportButton from "@/components/profile/ExportButton";
+import { memberCss } from "@/lib/members";
 
 export type DeleteAccountDuo =
   | { kind: "solo" }
@@ -137,7 +138,7 @@ export default function DeleteAccountSheet({
 
   const partner = duo.kind === "duo" ? duo : null;
   const partnerName = partner ? (
-    <span className="font-bold" style={{ color: partner.partnerColor || undefined }}>
+    <span className="font-bold" style={{ color: partner.partnerColor ? memberCss(partner.partnerColor) : undefined }}>
       {partner.partnerName}
     </span>
   ) : null;
@@ -216,7 +217,7 @@ export default function DeleteAccountSheet({
             className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-y-auto overscroll-contain rounded-t-[28px] border-t border-fg/[0.08] bg-surface px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-3"
           >
             <span className="h-[5px] w-10 flex-none self-center rounded-full bg-edge" aria-hidden />
-            <p className="mt-4 text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
+            <p className="mt-4 text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
               Étape {step} sur 2
             </p>
 

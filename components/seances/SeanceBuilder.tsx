@@ -329,7 +329,7 @@ export default function SeanceBuilder({
           >
             ✕
           </button>
-          <span className="pointer-events-none absolute inset-x-12 text-center text-[13px] font-extrabold uppercase tracking-[0.12em] text-fg-muted">
+          <span className="pointer-events-none absolute inset-x-12 text-center text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
             {mode === "edit" ? "Modifier la séance" : "Nouvelle séance"}
           </span>
         </div>
@@ -432,7 +432,7 @@ export default function SeanceBuilder({
 
         {/* ----- En-tête de liste ----- */}
         <div className="mt-6 flex items-baseline justify-between gap-3">
-          <h2 className="text-[13px] font-extrabold uppercase tracking-[0.12em] text-fg-muted">
+          <h2 className="text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
             Exercices
           </h2>
           {exercises.length > 0 && (
@@ -775,7 +775,7 @@ function Stepper({
 }) {
   return (
     <div className="mt-2 flex items-center gap-3 rounded-xl border border-accent/35 bg-ink px-3 py-2">
-      <span className="flex-1 text-xs font-extrabold uppercase tracking-wide text-fg-muted">
+      <span className="flex-1 text-xs font-bold uppercase tracking-[0.03em] text-fg-muted">
         {label}
       </span>
       <button

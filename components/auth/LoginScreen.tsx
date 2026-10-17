@@ -32,7 +32,7 @@ export default function LoginScreen() {
           <span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-energy font-oswald text-lg font-bold text-energy-fg">
             C
           </span>
-          <span className="font-oswald text-sm font-bold uppercase tracking-[0.22em] text-fg">
+          <span className="font-oswald text-sm font-bold uppercase tracking-[0.03em] text-fg">
             Coach en Muscu
           </span>
         </div>

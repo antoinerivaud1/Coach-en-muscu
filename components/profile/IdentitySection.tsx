@@ -114,7 +114,7 @@ export default function IdentitySection({
   return (
     <section aria-labelledby="mon-profil" className="mt-6">
       <div className="mb-2.5 flex items-center justify-between">
-        <h2 id="mon-profil" className="text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
+        <h2 id="mon-profil" className="text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
           Mon profil
         </h2>
         {!editing && (

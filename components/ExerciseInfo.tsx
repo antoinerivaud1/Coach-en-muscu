@@ -108,7 +108,7 @@ export default function ExerciseInfo({
                   <path d="M15 18l-6-6 6-6" />
                 </svg>
               </button>
-              <span className="font-oswald text-[13px] font-semibold uppercase tracking-[0.14em] text-fg-muted">
+              <span className="font-oswald text-[13px] font-semibold uppercase tracking-[0.03em] text-fg-muted">
                 Fiche exercice
               </span>
               <span className="h-11 w-11" aria-hidden />

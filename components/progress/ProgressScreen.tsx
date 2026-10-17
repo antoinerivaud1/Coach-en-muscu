@@ -109,10 +109,10 @@ function ProgressBody({ data, notice }: { data: ProgressData; notice: ReactNode 
         </div>
       )}
 
-      {data.hasSets && <StatsSummary stats={data.stats} color={color} />}
+      {data.hasSets && <StatsSummary stats={data.stats} />}
 
       {/* `key` : l'exercice choisi repart du premier quand on change de membre. */}
-      <ProgressView key={selectedProfileId} series={data.series} color={color} />
+      <ProgressView key={selectedProfileId} series={data.series} />
     </Frame>
   );
 }

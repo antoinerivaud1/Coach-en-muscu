@@ -1003,7 +1003,7 @@ export default function SessionLogger({
         <button
           type="button"
           onClick={() => router.push("/dashboard")}
-          className="mt-4 w-full rounded-xl bg-energy py-3 font-extrabold text-energy-fg"
+          className="mt-4 w-full rounded-full bg-energy py-3 font-bold text-energy-fg"
         >
           Retour à l&apos;accueil
         </button>
@@ -1027,7 +1027,7 @@ export default function SessionLogger({
               ? router.push("/dashboard")
               : setExitSheetOpen(true)
           }
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface2 text-fg"
+          className="glass flex h-11 w-11 items-center justify-center rounded-full text-fg"
           aria-label="Quitter la séance"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
@@ -1049,7 +1049,7 @@ export default function SessionLogger({
             type="button"
             onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
             disabled={currentIdx === 0}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface2 text-fg disabled:opacity-30"
+            className="glass flex h-11 w-11 items-center justify-center rounded-full text-fg disabled:opacity-30"
             aria-label="Exercice précédent"
           >
             ‹
@@ -1061,7 +1061,7 @@ export default function SessionLogger({
             type="button"
             onClick={() => setCurrentIdx((i) => Math.min(allExercises.length - 1, i + 1))}
             disabled={isLast}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface2 text-fg disabled:opacity-30"
+            className="glass flex h-11 w-11 items-center justify-center rounded-full text-fg disabled:opacity-30"
             aria-label="Exercice suivant"
           >
             ›
@@ -1105,7 +1105,7 @@ export default function SessionLogger({
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[12px] font-extrabold uppercase tracking-[0.18em] text-fg-muted">
+              <span className="text-[12px] font-bold uppercase tracking-[0.03em] text-fg-muted">
                 Repos
               </span>
               <span className="font-oswald text-4xl font-bold tabular-nums text-fg">
@@ -1151,7 +1151,7 @@ export default function SessionLogger({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <div className="text-[13px] font-bold uppercase tracking-wide text-member">
+              <div className="text-[13px] font-bold uppercase tracking-[0.03em] text-member">
                 Exercice {currentIdx + 1}
               </div>
               {ex.source === "extra" && (
@@ -1231,7 +1231,7 @@ export default function SessionLogger({
         {/* Rappel « dernière fois » (CM-64) — lecture seule, distinct d'un champ. */}
         {last && last.sets.length > 0 ? (
           <div className="mt-3 rounded-xl bg-surface/50 px-3.5 py-2.5">
-            <div className="font-oswald text-[13px] font-bold uppercase tracking-[0.14em] text-fg-muted">
+            <div className="font-oswald text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
               Dernière fois, {formatDateShort(last.performed_at)}
             </div>
             <div className="mt-0.5 font-oswald text-sm text-fg">
@@ -1309,14 +1309,14 @@ export default function SessionLogger({
                     <button
                       type="button"
                       onClick={cancelCorrection}
-                      className="min-h-11 flex-1 rounded-xl bg-surface2 text-sm font-semibold text-fg active:bg-fg/10"
+                      className="min-h-11 flex-1 rounded-full bg-surface2 text-sm font-semibold text-fg active:bg-fg/10"
                     >
                       Annuler
                     </button>
                     <button
                       type="button"
                       onClick={() => saveCorrection(ex.exerciseId)}
-                      className="min-h-11 flex-1 rounded-xl bg-energy text-sm font-extrabold text-energy-fg"
+                      className="min-h-11 flex-1 rounded-full bg-energy text-sm font-bold text-energy-fg"
                     >
                       Enregistrer
                     </button>
@@ -1483,7 +1483,7 @@ export default function SessionLogger({
         {/* Ressenti (dernier exercice terminé) */}
         {exerciseDone && isLast && (
           <div className="mt-5">
-            <p className="text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
+            <p className="text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
               Ressenti de la séance
             </p>
             <div className="mt-2 grid grid-cols-4 gap-2">
@@ -1532,7 +1532,7 @@ export default function SessionLogger({
                 ? validateSet(ex.exerciseId, activeIndex, ex.restSeconds)
                 : addRow(ex.exerciseId)
             }
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-energy-fg"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-energy py-4 text-[18px] font-bold text-energy-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]"
           >
             {activeRow ? "Valider la série" : "Ajouter une série"}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -1544,7 +1544,7 @@ export default function SessionLogger({
             type="button"
             onClick={() => handleFinish()}
             disabled={isPending || isFlushing}
-            className="w-full rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-energy-fg disabled:opacity-50"
+            className="w-full rounded-full bg-energy py-4 text-[18px] font-bold text-energy-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] disabled:opacity-50"
           >
             {isPending || isFlushing ? "Enregistrement…" : "Terminer la séance"}
           </button>
@@ -1552,7 +1552,7 @@ export default function SessionLogger({
           <button
             type="button"
             onClick={() => setCurrentIdx((i) => Math.min(allExercises.length - 1, i + 1))}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-energy py-4 text-[18px] font-extrabold text-energy-fg"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-energy py-4 text-[18px] font-bold text-energy-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]"
           >
             Exercice suivant
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -1712,9 +1712,9 @@ function SetInputs({
   return (
     <div className={`flex flex-col gap-3 ${className ?? ""}`}>
       {/* Poids : pas de base 1 kg + pas rapide 2,5 kg + saisie clavier */}
-      <div className="rounded-2xl border border-line bg-surface px-4 py-3.5">
+      <div className="rounded-[22px] border border-line bg-surface px-4 py-3.5">
         <div className="flex items-center justify-between">
-          <div className="text-[13px] font-extrabold uppercase tracking-wide text-fg-muted">
+          <div className="text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
             Poids
           </div>
           {deltaKg !== null && (
@@ -1755,7 +1755,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("weight", -2.5)}
-            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 font-oswald text-base font-semibold text-fg active:bg-fg/10"
+            className="flex h-11 items-center justify-center rounded-full border border-line bg-surface2 font-oswald text-base font-semibold text-fg active:bg-fg/10"
             aria-label="Moins 2,5 kg"
           >
             −2.5
@@ -1763,7 +1763,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("weight", -1)}
-            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-fg/10"
+            className="flex h-11 items-center justify-center rounded-full border border-line bg-surface2 text-2xl text-fg active:bg-fg/10"
             aria-label="Moins 1 kg"
           >
             −
@@ -1771,7 +1771,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("weight", 1)}
-            className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-energy-fg"
+            className="flex h-11 items-center justify-center rounded-full bg-energy text-2xl font-bold text-energy-fg"
             aria-label="Plus 1 kg"
           >
             +
@@ -1779,7 +1779,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("weight", 2.5)}
-            className="flex h-11 items-center justify-center rounded-2xl bg-energy font-oswald text-base font-bold text-energy-fg"
+            className="flex h-11 items-center justify-center rounded-full bg-energy font-oswald text-base font-bold text-energy-fg"
             aria-label="Plus 2,5 kg"
           >
             +2.5
@@ -1788,8 +1788,8 @@ function SetInputs({
       </div>
 
       {/* Répétitions : pas de 1 + saisie clavier (entiers) */}
-      <div className="rounded-2xl border border-line bg-surface px-4 py-3.5">
-        <div className="text-[13px] font-extrabold uppercase tracking-wide text-fg-muted">
+      <div className="rounded-[22px] border border-line bg-surface px-4 py-3.5">
+        <div className="text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
           Répétitions
         </div>
         <div className="mt-0.5 flex items-baseline gap-1.5">
@@ -1816,7 +1816,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("reps", -1)}
-            className="flex h-11 items-center justify-center rounded-2xl border border-line bg-surface2 text-2xl text-fg active:bg-fg/10"
+            className="flex h-11 items-center justify-center rounded-full border border-line bg-surface2 text-2xl text-fg active:bg-fg/10"
             aria-label="Moins 1 répétition"
           >
             −
@@ -1824,7 +1824,7 @@ function SetInputs({
           <button
             type="button"
             onClick={() => onStep("reps", 1)}
-            className="flex h-11 items-center justify-center rounded-2xl bg-energy text-2xl font-bold text-energy-fg"
+            className="flex h-11 items-center justify-center rounded-full bg-energy text-2xl font-bold text-energy-fg"
             aria-label="Plus 1 répétition"
           >
             +

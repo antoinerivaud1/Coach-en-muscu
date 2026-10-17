@@ -43,7 +43,7 @@ function Figure({
           <path key={i} d={d} className={FILL_CLASS[zoneRole(slug, roles)]} />
         ))}
       </svg>
-      <figcaption className="font-oswald text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">
+      <figcaption className="font-oswald text-[12px] font-semibold uppercase tracking-[0.03em] text-fg-muted">
         {caption}
       </figcaption>
     </figure>

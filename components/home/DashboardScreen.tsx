@@ -209,10 +209,10 @@ function Home({
     <main className={MAIN_CLASS} style={memberStyle(me.color)}>
       <header className="flex items-start justify-between">
         <div>
-          <div className="text-[15px] font-semibold tracking-wide text-fg-muted">
+          <div className="text-[13px] font-semibold uppercase leading-[18px] tracking-[0.03em] text-fg-muted">
             {todayLabel(now)}
           </div>
-          <h1 className="mt-1 text-[30px] font-black tracking-tight text-fg">
+          <h1 className="text-[34px] font-bold leading-[41px] text-fg">
             Salut, <span style={{ color: memberCss(me.color) }}>{me.name}</span>
           </h1>
         </div>
@@ -235,19 +235,13 @@ function Home({
       )}
 
       {partnerLive && partnerMember && (
-        <div
-          className="mt-5 flex items-center gap-3 rounded-2xl border px-4 py-3"
-          style={{
-            borderColor: memberCss(partnerMember.color, 0.3),
-            background: memberCss(partnerMember.color, 0.1),
-          }}
-        >
+        <div className="glass mt-5 flex min-h-12 items-center gap-3 rounded-full px-4 py-2.5">
           <span
             className="h-2.5 w-2.5 flex-none animate-pulse rounded-full"
             style={{ background: memberCss(partnerMember.color) }}
           />
           <div className="text-sm">
-            <span className="font-bold" style={{ color: partnerMember.color }}>
+            <span className="font-bold" style={{ color: memberCss(partnerMember.color) }}>
               {partnerMember.name}
             </span>
             <span className="text-fg-muted">
@@ -275,7 +269,7 @@ function Home({
           )}
         </>
       ) : (
-        <div className="mt-6 flex justify-between gap-1.5 rounded-[18px] border border-line bg-surface px-4 py-3.5">
+        <div className="mt-5 flex justify-between gap-1.5 rounded-card border border-line bg-surface px-5 py-3.5">
           {WEEK.map((d, i) => {
             const done = doneThisWeek.has(i);
             const isToday = i === todayIdx;
@@ -314,46 +308,56 @@ function Home({
       )}
 
       {seances.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-line bg-surface p-6 text-center">
+        <div className="mt-6 rounded-card border border-line bg-surface p-6 text-center">
           <p className="text-fg">Aucune séance type pour l&apos;instant</p>
           <p className="mt-1 text-sm text-fg-muted">
             Compose ta première séance pour commencer à t&apos;entraîner
           </p>
           <Link
             href="/seances/new"
-            className="mt-4 inline-block rounded-xl bg-energy px-5 py-2.5 font-extrabold text-energy-fg"
+            className="mt-4 inline-flex h-12 items-center rounded-full bg-energy px-6 text-[17px] font-bold text-energy-fg"
           >
             Créer ma première séance
           </Link>
         </div>
       ) : (
         <>
-          <p className="mb-2.5 ml-0.5 mt-6 text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
-            Choisis ta séance
-          </p>
-
-          {/* Bandeau de suggestion : une seule ligne, purement indicatif. Rien
-              n'est verrouillé, taper une autre carte reste immédiat. Masqué
-              quand une séance est en cours : le bandeau de reprise occupe déjà
-              cette place (CM-83). */}
+          {/* CM-118 (A2) : suggestion du jour en carte, un bouton Démarrer.
+              Purement indicatif : taper une autre carte reste immédiat.
+              Masquée quand une séance est en cours : le bandeau de reprise
+              occupe déjà cette place (CM-83). */}
           {!resume && recommended && (
-            <form onSubmit={startOnSubmit(recommended.id)} className="mb-2.5">
-              <button
-                type="submit"
-                className="flex w-full items-center gap-2 rounded-[14px] border border-accent/30 bg-energy/10 px-3.5 py-2.5 text-left"
-              >
-                <span className="shrink-0 text-[12px] font-extrabold uppercase tracking-[0.12em] text-accent">
-                  Suggestion
+            <form
+              onSubmit={startOnSubmit(recommended.id)}
+              aria-label="Suggestion du jour"
+              className="mt-5 rounded-card border border-line bg-surface px-[18px] pb-4 pt-[18px]"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[13px] font-bold uppercase leading-[18px] tracking-[0.03em] text-accent">
+                  Suggestion du jour
                 </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-extrabold text-fg">
-                  {recommended.name}
-                </span>
-                <span className="shrink-0 text-[13px] font-semibold text-fg-muted">
+                <span className="text-[15px] text-fg-muted">
                   {formatLastDone(recommended.lastDoneAt, now)}
                 </span>
+              </div>
+              <div className="mt-1 line-clamp-2 font-oswald text-[34px] font-extrabold leading-[40px] text-fg">
+                {recommended.name}
+              </div>
+              <button
+                type="submit"
+                className="mt-4 flex h-[54px] w-full items-center justify-center gap-2 rounded-full bg-energy text-[17px] font-bold text-energy-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden>
+                  <path d="M7 4v16l13-8z" />
+                </svg>
+                Démarrer
               </button>
             </form>
           )}
+
+          <h2 className="mx-1 mb-2 mt-6 text-[20px] font-bold leading-[25px] text-fg">
+            {!resume && recommended ? "Toutes tes séances" : "Choisis ta séance"}
+          </h2>
 
           {/* Grille : un tap = une séance démarrée, sans écran intermédiaire. */}
           <div className="grid grid-cols-2 gap-2.5">
@@ -371,16 +375,16 @@ function Home({
                     title={
                       isEmpty ? "Ajoute au moins un exercice pour démarrer" : undefined
                     }
-                    className={`flex h-full w-full flex-col items-start rounded-2xl border p-3.5 text-left disabled:opacity-50 ${
+                    className={`flex h-full w-full flex-col items-start rounded-[22px] border p-4 text-left disabled:opacity-50 ${
                       isEmpty
-                        ? "border-dashed border-flame/40 bg-surface/60"
+                        ? "border-dashed border-fg/20 bg-surface/60"
                         : "border-line bg-surface"
                     }`}
                   >
-                    <span className="line-clamp-2 w-full text-[18px] font-extrabold leading-tight text-fg">
+                    <span className="line-clamp-2 w-full text-[17px] font-semibold leading-[22px] text-fg">
                       {seance.name}
                     </span>
-                    <span className="mt-1 text-[13px] font-semibold text-fg-muted">
+                    <span className="mt-0.5 text-[15px] text-fg-muted">
                       {isEmpty
                         ? "Séance vide"
                         : `${seance.exerciseCount} exercice${
@@ -393,20 +397,20 @@ function Home({
                         {visible.map((tag) => (
                           <span
                             key={tag.group}
-                            className="rounded-full border border-line bg-surface2 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wide text-fg-muted"
+                            className="rounded-full bg-surface2 px-2 py-0.5 text-[12px] font-semibold text-fg-soft"
                           >
                             {tag.label}
                           </span>
                         ))}
                         {overflow > 0 && (
-                          <span className="rounded-full border border-line bg-surface2 px-2 py-0.5 text-[12px] font-bold text-fg-muted">
+                          <span className="rounded-full bg-surface2 px-2 py-0.5 text-[12px] font-semibold text-fg-soft">
                             +{overflow}
                           </span>
                         )}
                       </span>
                     )}
 
-                    <span className="mt-auto pt-2.5 text-[13px] font-semibold text-fg-faint">
+                    <span className="mt-auto pt-2.5 text-[13px] text-fg-muted">
                       {formatLastDone(seance.lastDoneAt, now)}
                     </span>
                   </button>

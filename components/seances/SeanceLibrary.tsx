@@ -175,7 +175,7 @@ export default function SeanceLibrary({
                 {seance.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-line bg-surface2 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wide text-fg-muted"
+                    className="rounded-full border border-line bg-surface2 px-2.5 py-1 text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted"
                   >
                     {tag}
                   </span>

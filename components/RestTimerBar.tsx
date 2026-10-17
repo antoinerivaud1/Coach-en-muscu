@@ -71,7 +71,7 @@ export default function RestTimerBar({
             style={{ height: ROW_HEIGHT }}
           >
             <div className="flex flex-col justify-center">
-              <span className="text-[12px] font-extrabold uppercase leading-none tracking-[0.18em] text-fg-muted">
+              <span className="text-[12px] font-bold uppercase leading-none tracking-[0.03em] text-fg-muted">
                 Repos
               </span>
               <span
