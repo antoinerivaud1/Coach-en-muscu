@@ -69,7 +69,7 @@ function ExerciseGroups({ exercises }: { exercises: SystemExercise[] }) {
       {groups.map((group, i) => (
         <div key={group}>
           <h2
-            className={`mb-2 text-xs font-semibold uppercase tracking-wide text-fg-muted ${i === 0 ? "" : "mt-6"}`}
+            className={`mb-2 text-xs font-semibold uppercase tracking-[0.03em] text-fg-muted ${i === 0 ? "" : "mt-6"}`}
           >
             {MUSCLE_GROUP_LABELS[group] ?? group}
           </h2>

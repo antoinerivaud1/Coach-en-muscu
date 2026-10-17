@@ -25,7 +25,7 @@ export default function DataSection({
     <section id="mes-donnees" aria-labelledby="mes-donnees-titre" className="mt-8 scroll-mt-4">
       <h2
         id="mes-donnees-titre"
-        className="mb-2.5 text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted"
+        className="mb-2.5 text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted"
       >
         Mes données
       </h2>

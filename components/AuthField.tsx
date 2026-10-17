@@ -22,7 +22,7 @@ export default function AuthField({
   const errorId = error ? `${name}-error` : undefined;
   return (
     <label className="block">
-      <span className="text-[13px] font-extrabold uppercase tracking-[0.14em] text-fg-muted">
+      <span className="text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
         {label}
       </span>
       <input

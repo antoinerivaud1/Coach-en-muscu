@@ -69,7 +69,7 @@ export default function LegalPage({
             >
               C
             </span>
-            <span className="font-oswald text-xs font-bold uppercase tracking-[0.2em] text-fg">
+            <span className="font-oswald text-xs font-bold uppercase tracking-[0.03em] text-fg">
               {LEGAL.appName}
             </span>
           </span>
@@ -87,7 +87,7 @@ export default function LegalPage({
 
         {toc && toc.length > 0 && (
           <nav aria-label="Sommaire" className="mt-7 rounded-2xl border border-line bg-surface p-4">
-            <p className="text-[13px] font-extrabold uppercase tracking-[0.14em] text-fg-muted">
+            <p className="text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
               Sommaire
             </p>
             <ol className="mt-3 flex flex-col gap-1">
@@ -111,7 +111,7 @@ export default function LegalPage({
         <div className="mt-2">{children}</div>
 
         <nav aria-label="Autres pages" className="mt-14 border-t border-line pt-8">
-          <p className="text-[13px] font-extrabold uppercase tracking-[0.14em] text-fg-muted">
+          <p className="text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
             Voir aussi
           </p>
           <ul className="mt-3 flex flex-col gap-2.5">

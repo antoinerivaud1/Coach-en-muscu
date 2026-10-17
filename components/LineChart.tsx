@@ -1,23 +1,17 @@
 "use client";
 
-import { memberCss } from "@/lib/members";
-
 export type ChartPoint = { label: string; value: number };
 
 type Props = {
   points: ChartPoint[];
-  color?: string;
   unit?: string;
 };
 
 /**
- * Petite courbe SVG sans dépendance. Responsive via viewBox.
+ * Petite courbe SVG sans dépendance. Responsive via viewBox. Couleurs du
+ * thème : lisible en clair comme en sombre (CM-118).
  */
-export default function LineChart({
-  points,
-  color = "#2FE6FF",
-  unit = "kg",
-}: Props) {
+export default function LineChart({ points, unit = "kg" }: Props) {
   const W = 320;
   const H = 160;
   const padX = 8;
@@ -58,49 +52,38 @@ export default function LineChart({
   const firstLabel = points[0]!.label;
   const lastLabel = points[points.length - 1]!.label;
 
+  const lastX = x(points.length - 1);
+  const lastY = y(points[points.length - 1]!.value);
+
+  // CM-118 (A2) : courbe neutre, seul le dernier point est orange.
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      className="w-full"
-      preserveAspectRatio="none"
+      className="h-auto w-full"
       role="img"
       aria-label="Courbe de progression"
     >
-      <defs>
-        <linearGradient id="lc-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={memberCss(color)} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={memberCss(color)} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-
-      {areaPath && <path d={areaPath} fill="url(#lc-grad)" />}
+      <line x1={0} y1={padTop + innerH} x2={W} y2={padTop + innerH} stroke="var(--line)" vectorEffect="non-scaling-stroke" />
+      {areaPath && <path d={areaPath} fill="rgb(var(--fg) / 0.05)" />}
       <path
         d={linePath}
         fill="none"
-        stroke={memberCss(color)}
-        strokeWidth="2"
+        stroke="rgb(var(--fg) / 0.9)"
+        strokeWidth="3"
         strokeLinejoin="round"
         strokeLinecap="round"
         vectorEffect="non-scaling-stroke"
       />
-      {points.map((p, i) => (
-        <circle
-          key={i}
-          cx={x(i)}
-          cy={y(p.value)}
-          r="2.5"
-          fill={memberCss(color)}
-        />
-      ))}
+      <circle cx={lastX} cy={lastY} r="6" fill="rgb(var(--energy))" stroke="rgb(var(--surface))" strokeWidth="3" vectorEffect="non-scaling-stroke" />
 
       {/* max / min labels */}
-      <text x={padX} y={11} fill="rgb(var(--fg-muted))" fontSize="10">
+      <text x={padX} y={11} fill="rgb(var(--fg-muted))" fontSize="12">
         {Math.round(max)} {unit}
       </text>
-      <text x={padX} y={H - 8} fill="rgb(var(--fg-faint))" fontSize="10">
+      <text x={padX} y={H - 6} fill="rgb(var(--fg-muted))" fontSize="12">
         {firstLabel}
       </text>
-      <text x={W - padX} y={H - 8} fill="rgb(var(--fg-faint))" fontSize="10" textAnchor="end">
+      <text x={W - padX} y={H - 6} fill="rgb(var(--fg-muted))" fontSize="12" textAnchor="end">
         {lastLabel}
       </text>
     </svg>

@@ -81,7 +81,7 @@ export default function InviterScreen() {
       </p>
 
       <div className="mt-6 flex flex-col items-center gap-4 rounded-3xl border border-line bg-surface p-[18px]">
-        <span className="text-sm font-extrabold uppercase tracking-[0.1em] text-fg-muted">
+        <span className="text-sm font-bold uppercase tracking-[0.03em] text-fg-muted">
           Code d&apos;invitation
         </span>
         <div

@@ -8,10 +8,10 @@ type Metric = "weight" | "e1rm";
 
 type Props = {
   series: ExerciseSeries[];
-  color: string;
 };
 
-export default function ProgressView({ series, color }: Props) {
+/** Courbes d'un exercice. CM-118 (A2) : neutre, l'orange reste pour l'action. */
+export default function ProgressView({ series }: Props) {
   const [selected, setSelected] = useState<string>(
     series[0]?.exercise_id ?? "",
   );
@@ -19,7 +19,7 @@ export default function ProgressView({ series, color }: Props) {
 
   if (series.length === 0) {
     return (
-      <div className="mt-8 rounded-xl border border-line bg-surface p-6 text-center">
+      <div className="mt-8 rounded-card border border-line bg-surface p-6 text-center">
         <p className="text-fg">Pas encore de séance enregistrée</p>
         <p className="mt-1 text-sm text-fg-muted">
           Tes courbes apparaîtront ici dès ta première séance loggée.
@@ -51,10 +51,11 @@ export default function ProgressView({ series, color }: Props) {
             key={s.exercise_id}
             type="button"
             onClick={() => setSelected(s.exercise_id)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+            aria-pressed={s.exercise_id === current.exercise_id}
+            className={`min-h-10 shrink-0 rounded-full px-4 text-[15px] font-semibold transition-colors ${
               s.exercise_id === current.exercise_id
-                ? "bg-member text-ink"
-                : "bg-surface2 text-fg-muted"
+                ? "bg-fg text-ink"
+                : "bg-surface2 text-fg-soft"
             }`}
           >
             {s.name}
@@ -62,43 +63,43 @@ export default function ProgressView({ series, color }: Props) {
         ))}
       </div>
 
-      <div className="mt-4 rounded-xl border border-line bg-surface p-4">
-        <div className="flex items-center justify-between">
+      <div className="mt-3 rounded-card border border-line bg-surface px-4 pb-4 pt-3.5">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="font-semibold">{current.name}</h2>
-            <p className="text-xs text-fg-muted">
+            <h2 className="text-[17px] font-semibold text-fg">{current.name}</h2>
+            <p className="text-[15px] text-fg-muted">
               {current.points.length} séance
               {current.points.length > 1 ? "s" : ""}
             </p>
           </div>
-          <div className="flex overflow-hidden rounded-lg bg-surface2 text-xs">
-            <button
-              type="button"
-              onClick={() => setMetric("weight")}
-              className={`px-3 py-1.5 font-medium ${
-                metric === "weight" ? "bg-member text-ink" : "text-fg-muted"
-              }`}
-            >
-              Poids max
-            </button>
-            <button
-              type="button"
-              onClick={() => setMetric("e1rm")}
-              className={`px-3 py-1.5 font-medium ${
-                metric === "e1rm" ? "bg-member text-ink" : "text-fg-muted"
-              }`}
-            >
-              1RM est.
-            </button>
+          <div className="glass flex flex-none rounded-full p-[3px] text-[13px]">
+            {([
+              ["weight", "Poids max"],
+              ["e1rm", "1RM est."],
+            ] as const).map(([m, label]) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={metric === m}
+                onClick={() => setMetric(m)}
+                className={`min-h-9 rounded-full px-3 ${
+                  metric === m
+                    ? "bg-[var(--glass-active)] font-semibold text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]"
+                    : "font-medium text-fg-soft"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
         <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-3xl font-bold">{latestVal}</span>
-          <span className="text-sm text-fg-muted">kg</span>
+          <span className="font-oswald text-[40px] font-extrabold leading-[46px] text-fg">{latestVal}</span>
+          <span className="text-[17px] font-semibold text-fg-muted">kg</span>
           {current.points.length > 1 && (
             <span
-              className={`ml-2 text-sm font-medium ${
+              className={`ml-1 text-[15px] font-bold ${
                 delta > 0
                   ? "text-success"
                   : delta < 0
@@ -113,23 +114,23 @@ export default function ProgressView({ series, color }: Props) {
         </div>
 
         <div className="mt-3">
-          <LineChart points={points} color={color} />
+          <LineChart points={points} />
         </div>
       </div>
 
       {/* Recent sessions table */}
-      <div className="mt-4 rounded-xl border border-line bg-surface p-4">
-        <h3 className="text-sm font-semibold text-fg">
+      <div className="mt-3.5 rounded-card border border-line bg-surface px-4 py-3.5">
+        <h3 className="text-[15px] font-semibold text-fg-muted">
           Dernières séances
         </h3>
-        <ul className="mt-2 divide-y divide-fg/10">
+        <ul className="mt-1 divide-y divide-line">
           {[...current.points]
             .slice(-8)
             .reverse()
             .map((p, i) => (
               <li
                 key={i}
-                className="flex items-center justify-between py-2 text-sm"
+                className="flex min-h-11 items-center justify-between text-[15px]"
               >
                 <span className="text-fg-muted">{p.label}</span>
                 <span>

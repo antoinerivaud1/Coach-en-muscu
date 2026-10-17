@@ -28,7 +28,7 @@ function SocialButton({ label, light }: { label: string; light?: boolean }) {
     >
       {label}
       <span
-        className={`rounded-full px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide ${
+        className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-[0.03em] ${
           light ? "bg-ink/10 text-ink" : "bg-surface2 text-fg-muted"
         }`}
       >

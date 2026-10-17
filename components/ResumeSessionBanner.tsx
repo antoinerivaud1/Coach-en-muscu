@@ -79,7 +79,7 @@ export default function ResumeSessionBanner({
         {/* CM-101 : libellé au-dessus du nom, sinon le nom de séance est tronqué
             avec la nouvelle taille de texte. */}
         <div className="min-w-0 flex-1">
-          <span className="block text-[12px] font-extrabold uppercase tracking-[0.12em] text-accent">
+          <span className="block text-[12px] font-bold uppercase tracking-[0.03em] text-accent">
             Séance en cours
           </span>
           <span className="block truncate text-sm font-extrabold text-fg">

@@ -130,7 +130,7 @@ function SectionHeader({
           id={id}
           // CM-104 : reçoit le focus après un partage (la carte a changé de section).
           tabIndex={-1}
-          className="whitespace-nowrap outline-none text-[15px] font-extrabold uppercase tracking-[0.1em] text-fg-muted"
+          className="whitespace-nowrap outline-none text-[15px] font-bold uppercase tracking-[0.03em] text-fg-muted"
         >
           {title}
         </h2>

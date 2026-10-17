@@ -33,7 +33,7 @@ export default function PartnerActivityCard({
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-balance text-base font-bold leading-snug text-fg">
-          <span style={{ color }}>{name}</span> a battu son record&nbsp;: {exerciseName}
+          <span style={{ color: memberCss(color) }}>{name}</span> a battu son record&nbsp;: {exerciseName}
         </span>
         <span className="text-sm text-fg-muted">{detail}</span>
       </div>

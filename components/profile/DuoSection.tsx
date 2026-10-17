@@ -61,7 +61,7 @@ export default function DuoSection({
               Ton duo
             </h2>
             <p className="text-balance text-base leading-snug text-fg-muted">
-              Avec <span className="font-bold" style={{ color: partner.color }}>{partner.name}</span>
+              Avec <span className="font-bold" style={{ color: memberCss(partner.color) }}>{partner.name}</span>
               , vous partagez «&nbsp;Nos séances&nbsp;».
             </p>
           </div>

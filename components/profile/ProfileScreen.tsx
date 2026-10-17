@@ -219,7 +219,7 @@ function ProfileView({
 
       <div className="mt-6">
         <div className="mb-2.5 flex items-center justify-between">
-          <p className="text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted">
+          <p className="text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted">
             Badges
           </p>
           <span className="text-xs font-semibold text-fg-muted">
@@ -261,7 +261,7 @@ function ProfileView({
       <section aria-labelledby="a-propos" className="mt-8">
         <h2
           id="a-propos"
-          className="mb-2.5 text-[13px] font-extrabold uppercase tracking-[0.16em] text-fg-muted"
+          className="mb-2.5 text-[13px] font-bold uppercase tracking-[0.03em] text-fg-muted"
         >
           À propos
         </h2>
