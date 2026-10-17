@@ -11,11 +11,12 @@ import BottomNav from "@/components/BottomNav";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
 import OfflineBanner from "@/components/OfflineBanner";
 import ProgressView from "./ProgressView";
+import ProgressHeader from "./ProgressHeader";
 import StatsSummary from "./StatsSummary";
 import { memberCss } from "@/lib/members";
 
 /**
- * Stats (progression). CM-88 : lu dans le navigateur, sous RLS. Le
+ * Progrès › Courbes (CM-117, ex-Stats). CM-88 : lu dans le navigateur, sous RLS. Le
  * `?profile=` (onglet du partenaire, duo actif seulement) est lu par
  * `useSearchParams`, sous `<Suspense>` pour que la route reste statique.
  */
@@ -73,7 +74,7 @@ function Frame({ color, children }: { color?: string; children: ReactNode }) {
       style={color ? memberStyle(color) : undefined}
     >
       <div className="mx-auto max-w-lg">
-        <h1 className="text-3xl font-black tracking-tight">Progression</h1>
+        <ProgressHeader view="curves" />
         {children}
       </div>
       <BottomNav />

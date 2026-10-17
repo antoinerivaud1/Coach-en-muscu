@@ -3,23 +3,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type Item = { href: string; label: string; icon: React.ReactNode };
+/**
+ * CM-117 : barre d'onglets A2, une capsule en verre flottante à 3 onglets.
+ * Aujourd'hui (accueil), Progrès (Courbes et Historique), Profil. Plus de
+ * bouton « + » : on crée une séance depuis l'accueil (« Gérer mes séances »).
+ */
+type Item = { href: string; label: string; match: string[]; icon: (active: boolean) => React.ReactNode };
 
-function Icon({ d, fill = false }: { d: string; fill?: boolean }) {
+function Svg({ children, fill = false }: { children: React.ReactNode; fill?: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill={fill ? "currentColor" : "none"}
       stroke={fill ? "none" : "currentColor"}
-      strokeWidth="1.9"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-[23px] w-[23px]"
+      className="h-6 w-6"
       aria-hidden
     >
-      {d.split("||").map((p, i) => (
-        <path key={i} d={p} />
-      ))}
+      {children}
     </svg>
   );
 }
@@ -27,75 +30,79 @@ function Icon({ d, fill = false }: { d: string; fill?: boolean }) {
 const ITEMS: Item[] = [
   {
     href: "/dashboard",
-    label: "Séances",
-    icon: (
-      <Icon d="m6.5 6.5 11 11||m21 21-1-1||m3 3 1 1||m18 22 4-4||m2 6 4-4||m3 10 7-7||m14 21 7-7" />
-    ),
+    label: "Aujourd'hui",
+    match: ["/dashboard"],
+    icon: (active) =>
+      active ? (
+        <Svg fill>
+          <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+        </Svg>
+      ) : (
+        <Svg>
+          <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+        </Svg>
+      ),
   },
   {
     href: "/progress",
-    label: "Stats",
-    icon: <Icon d="M22 12h-4l-3 9L9 3l-3 9H2" />,
-  },
-  {
-    href: "/history",
-    label: "Carnet",
-    icon: (
-      <Icon d="M8 2h8a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z||M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2||M9 12h6||M9 16h6" />
+    label: "Progrès",
+    match: ["/progress", "/history"],
+    icon: () => (
+      <Svg>
+        <path d="M3 3v18h18" />
+        <path d="m19 9-5 5-4-4-3 3" />
+      </Svg>
     ),
   },
   {
     href: "/profile",
     label: "Profil",
-    icon: (
-      <Icon d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2||M12 7a4 4 0 1 0 0 0.001" />
+    match: ["/profile", "/guide"],
+    icon: (active) => (
+      <Svg fill={active}>
+        {active ? (
+          <>
+            <circle cx="12" cy="7.5" r="4.5" />
+            <path d="M3.5 21a8.5 7 0 0 1 17 0z" />
+          </>
+        ) : (
+          <>
+            <circle cx="12" cy="7.5" r="4" />
+            <path d="M4 21a8 7 0 0 1 16 0" />
+          </>
+        )}
+      </Svg>
     ),
   },
 ];
 
 export default function BottomNav() {
-  const pathname = usePathname();
-  const left = ITEMS.slice(0, 2);
-  const right = ITEMS.slice(2);
-
-  const tab = (item: Item) => {
-    const active =
-      pathname === item.href || pathname.startsWith(item.href + "/");
-    return (
-      <Link
-        key={item.href}
-        href={item.href}
-        className={`flex flex-1 flex-col items-center gap-1 ${
-          active ? "text-accent" : "text-fg-faint"
-        }`}
-      >
-        {item.icon}
-        <span className="text-[12px] font-semibold">{item.label}</span>
-      </Link>
-    );
-  };
+  const pathname = usePathname() ?? "";
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 flex items-start justify-between border-t border-line bg-ink/[0.88] px-8 pt-3.5 backdrop-blur-xl"
-      style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+      aria-label="Onglets"
+      className="glass fixed inset-x-5 z-30 mx-auto grid h-16 max-w-md grid-cols-3 rounded-full p-[5px]"
+      style={{ bottom: "max(12px, calc(env(safe-area-inset-bottom) - 6px))" }}
     >
-      <div className="mx-auto flex w-full max-w-lg items-start justify-between">
-        {left.map(tab)}
-        <div className="flex w-14 justify-center">
+      {ITEMS.map((item) => {
+        const active = item.match.some((m) => pathname === m || pathname.startsWith(m + "/"));
+        return (
           <Link
-            href="/seances/new"
-            aria-label="Nouvelle séance"
-            className="-mt-7 flex h-14 w-14 items-center justify-center rounded-full border-4 border-ink bg-energy shadow-[0_8px_24px_rgba(255,122,69,0.35)]"
+            key={item.href}
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className={`flex flex-col items-center justify-center gap-px rounded-full ${
+              active
+                ? "bg-[var(--glass-active)] text-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
+                : "text-fg"
+            }`}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="rgb(var(--energy-fg))" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-              <path d="M5 12h14" />
-              <path d="M12 5v14" />
-            </svg>
+            {item.icon(active)}
+            <span className={`text-[12px] leading-[14px] ${active ? "font-semibold" : "font-medium"}`}>{item.label}</span>
           </Link>
-        </div>
-        {right.map(tab)}
-      </div>
+        );
+      })}
     </nav>
   );
 }

@@ -197,7 +197,8 @@ test("lecture hors ligne : écrans déjà vus avec bandeau, actions en ligne dé
   await expect(page.getByRole("button", { name: "Dupliquer" }).first()).toBeEnabled();
   await page.goBack();
   await expect(page.getByRole("heading", { name: /^Salut,/ })).toBeVisible();
-  await page.getByRole("link", { name: "Carnet" }).click();
+  await page.getByRole("link", { name: "Progrès", exact: true }).click();
+  await page.getByRole("link", { name: "Historique", exact: true }).click();
   await expect(page.locator(`a[href="${sessionPath(TOI_SESSION)}"]`)).toBeVisible();
   await page.getByRole("link", { name: "Profil" }).click();
   await expect(page.getByRole("button", { name: /Exporter/ }).first()).toBeEnabled();

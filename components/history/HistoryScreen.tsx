@@ -11,6 +11,7 @@ import { useHistory } from "@/hooks/data/useHistory";
 import { ScreenError, ScreenSkeleton } from "@/components/ScreenState";
 import OfflineBanner from "@/components/OfflineBanner";
 import { memberCss } from "@/lib/members";
+import ProgressHeader from "@/components/progress/ProgressHeader";
 
 const FEEDBACK_LABELS: Record<string, string> = {
   easy: "Facile",
@@ -20,7 +21,7 @@ const FEEDBACK_LABELS: Record<string, string> = {
 };
 
 /**
- * Carnet (historique des séances). CM-88 : lu dans le navigateur, sous RLS
+ * Progrès › Historique (CM-117, ex-Carnet). CM-88 : lu dans le navigateur, sous RLS
  * (mes séances, plus celles de mon partenaire en duo actif).
  */
 export default function HistoryScreen() {
@@ -32,7 +33,7 @@ export default function HistoryScreen() {
   if (auth.error || (history.error && !history.data)) {
     return (
       <div className="mx-auto max-w-lg">
-        <h1 className="text-2xl font-bold">Historique</h1>
+        <ProgressHeader view="history" />
         <div className="mt-6">
           <ScreenError
             onRetry={() => void (auth.error ? auth.refetch() : history.refetch())}
@@ -45,7 +46,7 @@ export default function HistoryScreen() {
   if (auth.isPending || !history.data) {
     return (
       <div className="mx-auto max-w-lg">
-        <h1 className="text-2xl font-bold">Historique</h1>
+        <ProgressHeader view="history" />
         <div className="mt-6">
           <ScreenSkeleton label="Chargement de l'historique" />
         </div>
@@ -80,8 +81,8 @@ function HistoryList({
 
   return (
     <div className="mx-auto max-w-lg">
-      <h1 className="text-2xl font-bold">Historique</h1>
-      <p className="mt-1 text-sm text-fg-muted">
+      <ProgressHeader view="history" />
+      <p className="mx-1 mt-3 text-sm text-fg-muted">
         {sessions.length} séance{sessions.length > 1 ? "s" : ""} enregistrée
         {sessions.length > 1 ? "s" : ""}
       </p>

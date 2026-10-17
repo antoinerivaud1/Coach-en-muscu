@@ -417,11 +417,24 @@ function Home({
         </>
       )}
 
-      {/* Bibliothèque de séances types (accès complet) */}
+      {/* Bibliothèque de séances types (accès complet). CM-117 : la création
+          passe ici, la barre d'onglets n'a plus de bouton « + ». */}
       <div className="mt-7 flex items-center justify-between">
-        <Link href="/seances" className="text-sm font-semibold text-accent">
+        <Link href="/seances" className="inline-flex min-h-11 items-center text-sm font-semibold text-accent">
           Gérer mes séances
         </Link>
+        {seances.length > 0 && (
+          <Link
+            href="/seances/new"
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-accent"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" className="h-4 w-4" aria-hidden>
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+            Créer une séance
+          </Link>
+        )}
       </div>
 
       <BottomNav />

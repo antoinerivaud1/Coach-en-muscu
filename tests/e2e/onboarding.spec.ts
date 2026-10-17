@@ -210,7 +210,7 @@ test.describe("Onboarding solo (CM-86)", () => {
       ["/dashboard", /\/dashboard$/, () => page.getByRole("heading", { name: /^Salut,/ })],
       ["/profile", /\/profile$/, () => page.getByRole("region", { name: "Mon profil" })],
       ["/seances", /\/seances$/, () => page.getByRole("heading", { level: 1, name: "Séances", exact: true })],
-      ["/history", /\/history$/, () => page.getByRole("link", { name: "Nouvelle séance" })],
+      ["/history", /\/history$/, () => page.getByRole("link", { name: "Historique", exact: true })],
     ];
     // Deux tours : profil relu à chaque écran (mémo de l'appareil effacé
     // avant), puis mémo posé (aucune relecture).
